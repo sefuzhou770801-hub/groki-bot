@@ -113,8 +113,8 @@ OpenAI / Gemini 的 API 密钥不编进固件，经 BLE / Wi-Fi 设置页在运�
 
 浏览器写入已发布固件（Chrome / Edge）：
 
-- **写入**（上游 ciniml 发布的固件）：<https://ciniml.github.io/stackchan-idf/>
-- **BLE 设置**（上游站点）：<https://ciniml.github.io/stackchan-idf/settings.html>（Web Bluetooth，仅桌面 Chrome / Edge）
+- **写入**：<https://sefuzhou770801-hub.github.io/groki-bot/>
+- **BLE 设置**：<https://sefuzhou770801-hub.github.io/groki-bot/settings.html>（Web Bluetooth，仅桌面 Chrome / Edge）
 - **Wi-Fi 设置**：设备连上 Wi-Fi 后访问 `http://stackchan-XXXXXX.local/`（mDNS）
 - **iOS / SoftAP**：进入 AP 模式后，用 iPhone 相机扫 LCD 上的 Wi-Fi QR，captive portal 会打开设置页。CoreS3 / StopWatch 点屏幕右上角打开设备 UI，在操作页选「AP 模式」；AtomS3R / AtomS3 用 BtnA 短按打开状态层、长按循环 `operation_mode`
 

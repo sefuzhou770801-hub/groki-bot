@@ -88,7 +88,7 @@ void worker(void* arg)
     // release ZIP and stages it at this stable URL alongside the ZIP. Raw
     // (uncompressed) so the device doesn't need DEFLATE on the OTA path.
     std::snprintf(url, sizeof(url),
-                  "https://ciniml.github.io/stackchan-idf/firmware/%s/%s/stackchan_idf.bin",
+                  "https://sefuzhou770801-hub.github.io/groki-bot/firmware/%s/%s/stackchan_idf.bin",
                   a->tag.c_str(), slug);
     ESP_LOGI(kTag, "GET %s", url);
 
@@ -280,7 +280,7 @@ void versions_fetch_task(void* arg)
     v->ok = false;
 
     esp_http_client_config_t cfg{};
-    cfg.url = "https://ciniml.github.io/stackchan-idf/versions.json";
+    cfg.url = "https://sefuzhou770801-hub.github.io/groki-bot/versions.json";
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
     cfg.timeout_ms = kVersionsTimeoutMs;
     cfg.keep_alive_enable = false;

@@ -10,8 +10,8 @@ XiaoZhi), three configuration paths (BLE / Wi-Fi STA / SoftAP), and device-side 
 
 Released firmware can be flashed straight from the browser (Chrome / Edge):
 
-- **Flash**: <https://ciniml.github.io/stackchan-idf/>
-- **BLE Settings**: <https://ciniml.github.io/stackchan-idf/settings.html> (Web Bluetooth, desktop Chrome / Edge only)
+- **Flash**: <https://sefuzhou770801-hub.github.io/groki-bot/>
+- **BLE Settings**: <https://sefuzhou770801-hub.github.io/groki-bot/settings.html> (Web Bluetooth, desktop Chrome / Edge only)
 - **Wi-Fi Settings**: once the device is on Wi-Fi, `http://stackchan-XXXXXX.local/` (mDNS)
 - **iOS / SoftAP Settings**: trigger AP mode on-device (per-board, see below), scan the
   Wi-Fi QR shown on the LCD with iPhone Camera → join → captive portal pops the

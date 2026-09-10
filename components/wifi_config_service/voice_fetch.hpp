@@ -12,7 +12,7 @@
 //
 // SSRF 回避のため URL は組み立て固定: 呼び出し側が渡すのは検証済みボイス ID
 // (英数 . _ -、".." 不可) のみで、デバイスが
-//   https://ciniml.github.io/stackchan-idf/voices/<id>.htsvoice
+//   https://sefuzhou770801-hub.github.io/groki-bot/voices/<id>.htsvoice
 // を自分で組む。マニフェスト voices.json も同じホストから取得して UI に渡す。
 
 #pragma once

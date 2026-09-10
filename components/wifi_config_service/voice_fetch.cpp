@@ -47,7 +47,7 @@ const char* fetch_and_install(const std::string& voice_id, const InstallFn& inst
 
     char url[256];
     std::snprintf(url, sizeof(url),
-                  "https://ciniml.github.io/stackchan-idf/voices/%s.htsvoice",
+                  "https://sefuzhou770801-hub.github.io/groki-bot/voices/%s.htsvoice",
                   voice_id.c_str());
     ESP_LOGI(kTag, "GET %s", url);
 
@@ -112,7 +112,7 @@ const char* fetch_and_install(const std::string& voice_id, const InstallFn& inst
 
 bool fetch_manifest(std::string& out) {
     esp_http_client_config_t cfg{};
-    cfg.url = "https://ciniml.github.io/stackchan-idf/voices.json";
+    cfg.url = "https://sefuzhou770801-hub.github.io/groki-bot/voices.json";
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
     cfg.timeout_ms = 15000;
     cfg.keep_alive_enable = false;

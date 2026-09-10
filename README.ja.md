@@ -20,8 +20,8 @@ BLE / Wi-Fi / SoftAP の 3 経路設定、デバイス側 OTA をサポートし
 
 GitHub Releases に置かれたファームウェアをブラウザから書き込めます (Chrome / Edge):
 
-- **書き込み**: <https://ciniml.github.io/stackchan-idf/>
-- **BLE 設定**: <https://ciniml.github.io/stackchan-idf/settings.html> (Web Bluetooth、デスクトップ Chrome / Edge のみ)
+- **書き込み**: <https://sefuzhou770801-hub.github.io/groki-bot/>
+- **BLE 設定**: <https://sefuzhou770801-hub.github.io/groki-bot/settings.html> (Web Bluetooth、デスクトップ Chrome / Edge のみ)
 - **Wi-Fi 設定**: デバイスを Wi-Fi に繋いだ後 `http://stackchan-XXXXXX.local/` (mDNS)
 - **iOS / SoftAP 設定**: 本体ボタン (boards により方法が異なる、後述) で AP モードに入り、
   LCD に表示される Wi-Fi QR を iPhone Camera で読む → captive portal で設定ページが自動表示
@@ -192,4 +192,4 @@ HMM 音声合成に使う **hts_engine API** (Modified BSD / 名古屋工業大�
 Project Team) をはじめとする第三者コンポーネントの帰属表示は
 **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** にまとめています。
 HTML 版 (Web フラッシャー・設定ページからも参照可):
-<https://ciniml.github.io/stackchan-idf/licenses.html>。
+<https://sefuzhou770801-hub.github.io/groki-bot/licenses.html>。
