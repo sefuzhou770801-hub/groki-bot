@@ -10,8 +10,16 @@ name: Build and Release Firmware
 #      upload. Per-shard ccache cache survives across runs and pulls main
 #      branch hits even on a fresh tag, keeping compile time ~30 s after
 #      the first warm-up.
-#   2. `release` job (needs: build) downloads the 4 artifacts and attaches
-#      them to a single GitHub Release in one go. Only runs on tag pushes.
+#   2. `release` job (needs: build) downloads whichever board artifacts
+#      exist and attaches those files to a single GitHub Release. Only
+#      runs on tag pushes. Missing zips must not fail the upload step.
+#
+# atoms3r / atoms3 are allowed to fail (`matrix.allow_failure`). The
+# clawd face assets (~5 MB) do not fit those boards' 1 MiB storage
+# partition (`SpiffsFullError`); see docs/known_issues.md item 4 and
+# issue #6. Keeping the shards in the matrix leaves the failure visible
+# in CI. cores3 / stopwatch have no allow_failure flag: if either fails,
+# `build` fails and `release` is skipped (job `if` implies success()).
 #
 # Previously the build was one sequential job to avoid paying the Docker
 # pull + apt install + IDF env setup 4× (was ~2 min × 4 in the old plain
@@ -38,14 +46,23 @@ jobs:
   build:
     name: Build ${{ matrix.board }}
     runs-on: ubuntu-latest
+    # Job-level, driven by matrix.include — do not hard-code per step.
+    # Unset allow_failure (cores3 / stopwatch) evaluates to false.
+    continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       # Don't kill sibling shards on one board's failure — we still want
       # to know which other boards built OK so we can rerun only the bad
-      # one. The aggregating release job below depends on all four
-      # artifacts though, so a partial success still won't publish.
+      # one. atoms3r / atoms3 may fail (known_issues.md item 4) without
+      # blocking the release; cores3 / stopwatch failures still fail
+      # this job and skip the release.
       fail-fast: false
       matrix:
         board: [cores3, atoms3r, atoms3, stopwatch]
+        include:
+          - board: atoms3r
+            allow_failure: true
+          - board: atoms3
+            allow_failure: true
     container:
       # Pinned to v5.5 to match local development. v6.0 dropped the built-in
       # `json` (cJSON) component in favour of an IDF component-manager
@@ -190,8 +207,10 @@ jobs:
     name: Create GitHub Release
     needs: build
     # Only attach to a Release on actual tag pushes — manual dispatch runs
-    # just build the artifacts and stop. The 4 matrix shards all upload
-    # their own artifact; this job aggregates them.
+    # just build the artifacts and stop. Matrix shards upload independently;
+    # this job attaches whichever zips exist. Job `if` implies success(),
+    # so a cores3 or stopwatch failure (no allow_failure) skips publish
+    # even on a tag push. atoms3r / atoms3 failures do not.
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
@@ -209,12 +228,22 @@ jobs:
         with:
           # Glob over the per-board artifact names uploaded by the build
           # matrix. merge-multiple flattens them into one directory.
+          # Pattern match of a subset (e.g. cores3 + stopwatch only) is
+          # success; v4 lists artifacts then filters, and does not fail
+          # when some names are absent (actions/download-artifact v4
+          # src/download-artifact.ts, pattern branch).
           pattern: firmware-${{ steps.version.outputs.version }}-*
           merge-multiple: true
 
       - name: Create / update Release
         uses: softprops/action-gh-release@v1
         with:
+          # v1 warns on unmatched globs and continues unless this is true
+          # (default false; set explicitly so a missing atoms3r/atoms3 zip
+          # does not fail the release). See softprops/action-gh-release
+          # v1 src/main.ts: unmatchedPatterns → console.warn, throw only
+          # when fail_on_unmatched_files is set.
+          fail_on_unmatched_files: false
           files: |
             firmware-${{ steps.version.outputs.version }}-cores3.zip
             firmware-${{ steps.version.outputs.version }}-atoms3r.zip
