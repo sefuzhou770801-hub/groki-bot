@@ -122,9 +122,13 @@ tools/apply-m5-patches.sh                    # M5Unified の 1 行修正を適�
 make build-docker BOARD=cores3
 ```
 
-`BOARD=` を `atoms3r` / `atoms3` / `stopwatch` に置き換えられます。Docker
-経路でも同じ `BOARD` を渡す必要があり、対応する sdkconfig デフォルト列が
-読み込まれ、成果物は `build-<board>/` に置かれます。
+`BOARD=` を `stopwatch` に置き換えられます。本版でビルドを検証済みなのは
+`cores3` と `stopwatch` です。`atoms3r` / `atoms3` は本版ではビルドできません。
+clawd 顔アニメ資源が約 5 MB あり、両ボードの 1 MB storage パーティションに
+載らず `SpiffsFullError` になります。詳細は
+[既知の問題 第 4 条](docs/known_issues.md)。Docker 経路でも同じ `BOARD` を
+渡す必要があり、対応する sdkconfig デフォルト列が読み込まれ、成果物は
+`build-<board>/` に置かれます。
 
 フラッシュは Docker では行いません。いまビルドしたファームを書くには:
 

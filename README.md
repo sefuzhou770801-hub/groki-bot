@@ -104,7 +104,7 @@ tools/apply-m5-patches.sh                    # 给 M5Unified 打一行补丁
 make build-docker BOARD=cores3
 ```
 
-`BOARD=` 可换成 `atoms3r` / `atoms3` / `stopwatch`。Docker 路径必须显式传入同样的 `BOARD`，才会加载对应的 sdkconfig 默认链，产物在 `build-<board>/`。
+`BOARD=` 可换成 `stopwatch`。本版已验证能编的是 `cores3` 与 `stopwatch`。`atoms3r` / `atoms3` 本版编不过：clawd 脸动画资源约 5 MB，超出这两板 1 MB 存储分区，会报 `SpiffsFullError`，见 [已知问题第 4 条](docs/known_issues.md)。Docker 路径必须显式传入同样的 `BOARD`，才会加载对应的 sdkconfig 默认链，产物在 `build-<board>/`。
 
 刷机不走 Docker。写入这次编出的固件，在本机执行：
 

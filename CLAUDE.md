@@ -19,12 +19,36 @@ M5Stack CoreS3 向けスタックチャン ファームウェア (ESP-IDF 5.5 / 
 
 ## ビルド
 
+Docker を推奨する。ホストに ESP-IDF は不要。先に Docker Desktop（または
+Docker デーモン）を起動する。本版でビルドを検証済みなのは `cores3` と
+`stopwatch`。`atoms3r` / `atoms3` は clawd 顔資源が 1 MB storage に載らず
+本版ではビルドできない（[docs/known_issues.md](docs/known_issues.md) 第 4 条）。
+
+### Docker（推奨）
+
+イメージは `espressif/idf:release-v5.5`。Makefile がコンテナ内で Node.js 18+
+を入れる。成果物は `build-$(BOARD)/`。
+
 ```sh
 git submodule update --init --recursive
 tools/apply-m5-patches.sh                 # M5Unified の 1 行修正を当てる
-idf.py set-target esp32s3
-idf.py build
-idf.py -p /dev/ttyACM0 flash monitor
+make build-docker BOARD=cores3
+```
+
+フラッシュは Docker では行わない。ホストに ESP-IDF がある場合は
+`make flash BOARD=cores3 PORT=/dev/ttyACM0`。
+
+### ホスト ESP-IDF
+
+ESP-IDF 5.5 を入れ、IDF ソースで `./install.sh esp32s3` のあと
+`source export.sh`。PATH に Node.js 18+ が必要。
+
+```sh
+git submodule update --init --recursive
+tools/apply-m5-patches.sh
+make set-target BOARD=cores3
+make build BOARD=cores3
+make flash BOARD=cores3 PORT=/dev/ttyACM0
 ```
 
 `components/M5Unified` / `components/M5GFX` / `components/tl_expected/expected`

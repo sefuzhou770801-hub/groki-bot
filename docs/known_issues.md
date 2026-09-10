@@ -149,7 +149,7 @@ PY32 0x6F へのアクセス) が走ると 数十分〜数時間で発生する�
 
 ## 3. cores3 の app パーティション余量が約 2%
 
-**症状**: cores3 向け `stackchan_idf.bin` が約 4,093,328 バイト。app
+**症状**: cores3 向け `stackchan_idf.bin` が 4,093,376 バイト。app
 パーティションサイズは `0x400000`（4 MiB）。残り約 2%。リンカが
 パーティションほぼ満杯と警告する。
 
@@ -168,5 +168,31 @@ PY32 0x6F へのアクセス) が走ると 数十分〜数時間で発生する�
 **根本対策候補**:
 - app パーティションを広げる（storage 等を削る）
 - 未使用コンポーネント / ログ文字列の削減
-- atoms3 は当該パーティションに載らないことが既知（ビルド失敗は想定内）
+
+---
+
+## 4. atoms3r / atoms3 の storage パーティションに clawd 資源が載らない
+
+**症状**: `BOARD=atoms3` または `BOARD=atoms3r` でビルドすると、CMake 設定は
+通るが `spiffsgen.py 0x100000 components/clawd_face/assets` が
+`SpiffsFullError: the image size has been exceeded` で止まる。app の
+リンクまで到達しない。
+
+**再現条件**:
+1. `make build BOARD=atoms3` または `make build-docker BOARD=atoms3`
+   （`atoms3r` も同じ）
+2. CI: GitHub Actions `release.yml` の Build atoms3 / Build atoms3r
+   （基点 43238a1、run 34458413116、2026-09-10、タグ v0.1.0）
+
+**推定原因**: 両ボードは `partitions.csv` の storage が `0x100000`（1 MiB）。
+`components/clawd_face/assets` は約 5 MB（`partitions_16mb.csv` の注記では
+約 5.19 MB）。1 MiB の SPIFFS イメージに入らない。第 3 条の cores3 app
+パーティション余量とは別件。
+
+**暫定対応**: 本版ではこの 2 ボード向けファームを出さない。README の
+Docker / ホスト経路は `cores3` と `stopwatch` のみを検証済みとして案内する。
+
+**根本対策候補**:
+- clawd 資源を取り除く（issue #6）
+- ボード別に資源を削る（16 MB 機だけ clawd を載せる）
 

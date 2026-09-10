@@ -121,9 +121,12 @@ tools/apply-m5-patches.sh                    # apply the one-line M5Unified fix
 make build-docker BOARD=cores3
 ```
 
-Replace `BOARD=` with `atoms3r` / `atoms3` / `stopwatch`. The Docker path
-must pass the same `BOARD` so the matching sdkconfig defaults chain is
-loaded; artifacts land in `build-<board>/`.
+Replace `BOARD=` with `stopwatch`. This release has been verified for
+`cores3` and `stopwatch` only. `atoms3r` / `atoms3` do not build: the
+clawd face assets are about 5 MB and overflow the 1 MB storage partition
+(`SpiffsFullError`); see [known issues item 4](docs/known_issues.md).
+The Docker path must pass the same `BOARD` so the matching sdkconfig
+defaults chain is loaded; artifacts land in `build-<board>/`.
 
 Flashing is not done inside Docker. To write the firmware you just built:
 

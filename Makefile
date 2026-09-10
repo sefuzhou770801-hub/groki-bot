@@ -108,7 +108,9 @@ define docker-run
 		$(DOCKER_IMAGE) \
 		bash -c '\
 			export DEBIAN_FRONTEND=noninteractive; \
-			apt-get update -qq && apt-get install -y --no-install-recommends nodejs || exit 1; \
+			if ! command -v node >/dev/null 2>&1; then \
+				apt-get update -qq && apt-get install -y --no-install-recommends nodejs || exit 1; \
+			fi; \
 			git -C /tmp config --global --add safe.directory "$(DOCKER_WORKDIR)" || true; \
 			. "$$IDF_PATH/export.sh" || exit 1; \
 			$(1); \
@@ -119,19 +121,31 @@ endef
 
 build-docker:
 	$(call docker-run, \
-		idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
-		       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" \
-		       set-target $(TARGET) && \
-		idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
-		       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" build)
+		if [ -f $(BUILD_DIR)/sdkconfig ]; then \
+			idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
+			       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" build; \
+		else \
+			idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
+			       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" \
+			       set-target $(TARGET) && \
+			idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
+			       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" build; \
+		fi)
 
 docker-clean:
+	@case "$(BUILD_DIR)" in \
+		build-*/*|*..*|/*) \
+			echo "docker-clean: refusing to remove '$(BUILD_DIR)' (must be a single build-* directory)"; \
+			exit 1 ;; \
+		build-*) ;; \
+		*) echo "docker-clean: refusing to remove '$(BUILD_DIR)' (must start with build-)"; exit 1 ;; \
+	esac
 	docker run --rm -t \
 		--user root \
 		-v "$(CURDIR):$(DOCKER_WORKDIR)" \
 		-w $(DOCKER_WORKDIR) \
 		$(DOCKER_IMAGE) \
-		bash -c 'rm -rf $(BUILD_DIR)'
+		bash -c 'rm -rf -- $(BUILD_DIR)'
 
 # --- BLE audio streaming CLI (tools/audio-cli) ------------------------------
 #
@@ -213,12 +227,19 @@ docker-shell:
 		-v "$(CURDIR):$(DOCKER_WORKDIR)" \
 		-w $(DOCKER_WORKDIR) \
 		-e HOME=/tmp \
+		-e HOST_UID=$$(id -u) \
+		-e HOST_GID=$$(id -g) \
 		-e BOARD=$(BOARD) \
 		-e BUILD_DIR=$(BUILD_DIR) \
 		$(DOCKER_IMAGE) \
 		bash -c '\
 			export DEBIAN_FRONTEND=noninteractive; \
-			apt-get update -qq && apt-get install -y --no-install-recommends nodejs || exit 1; \
+			if ! command -v node >/dev/null 2>&1; then \
+				apt-get update -qq && apt-get install -y --no-install-recommends nodejs || exit 1; \
+			fi; \
 			git -C /tmp config --global --add safe.directory "$(DOCKER_WORKDIR)" || true; \
 			. "$$IDF_PATH/export.sh" || exit 1; \
-			exec bash'
+			bash; \
+			status=$$?; \
+			chown -R $$HOST_UID:$$HOST_GID $(BUILD_DIR) managed_components dependencies.lock 2>/dev/null || true; \
+			exit $$status'
