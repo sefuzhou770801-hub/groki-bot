@@ -103,13 +103,60 @@ Pages サイトに反映されます。
 - 他ボードのピン配置は各 `sdkconfig.defaults.<board>` と
   `components/board/board.cpp` を参照
 
-## セットアップ
+## クイックスタート
 
-ESP-IDF 5.5 (本リポジトリは 5.5.4 で検証。5.4.2 でもビルド可) を導入済みの環境で:
+Docker でのビルドを推奨します。ホストに ESP-IDF を入れる必要はありません。
+先に Docker Desktop（または Docker デーモン）を起動してください。
+
+### Docker（推奨）
+
+イメージは `espressif/idf:release-v5.5` です。初回の pull は約 14 GB です。
+公式イメージに Node は入っていません。Makefile がコンテナ内で Node.js 18+
+を自動インストールします。成果物は `build-cores3/` です。
 
 ```sh
-git clone <this repo>
-cd stackchan-idf
+git clone https://github.com/sefuzhou770801-hub/groki-bot.git
+cd groki-bot
+git submodule update --init --recursive
+tools/apply-m5-patches.sh                    # M5Unified の 1 行修正を適用
+make build-docker BOARD=cores3
+```
+
+`BOARD=` を `stopwatch` に置き換えられます。本版でビルドを検証済みなのは
+`cores3` と `stopwatch` です。`atoms3r` / `atoms3` は本版ではビルドできません。
+clawd 顔アニメ資源が約 5 MB あり、両ボードの 1 MB storage パーティションに
+載らず `SpiffsFullError` になります。詳細は
+[既知の問題 第 4 条](docs/known_issues.md)。Docker 経路でも同じ `BOARD` を
+渡す必要があり、対応する sdkconfig デフォルト列が読み込まれ、成果物は
+`build-<board>/` に置かれます。
+
+フラッシュは Docker では行いません。いまビルドしたファームを書くには:
+
+```sh
+make flash BOARD=cores3 PORT=/dev/ttyACM0
+make monitor BOARD=cores3 PORT=/dev/ttyACM0
+```
+
+`make flash` にはホスト側の ESP-IDF が必要です（IDF 環境を読み込んでから
+`idf.py flash`）。ホストに IDF が無い場合は、公開済みリリースをブラウザ
+書き込みページで焼いてください:
+<https://sefuzhou770801-hub.github.io/groki-bot/>。
+このページは GitHub Release を読むだけで、`build-cores3/` のファイルを
+直接選べません。
+
+### ホスト ESP-IDF
+
+環境: ESP-IDF 5.5（5.5.4 で検証）。Espressif の手順で入れたあと、IDF
+ソースディレクトリで `./install.sh esp32s3` を実行し、`source export.sh`
+してください。Makefile の既定は `IDF_PATH=$(HOME)/esp-idf/5.5.4` です。
+ビルド機の PATH に Node.js 18+ が必要です（CMake 設定時に `node` を探し、
+`.avdsl` をバイトコードへコンパイルします。コンパイラは
+`tools/avatar_dsl/` にあります）。システムの `python3` が 3.14 だと、
+IDF 5.5 は対応する仮想環境を探し、未導入なら make はすぐ失敗します。
+
+```sh
+git clone https://github.com/sefuzhou770801-hub/groki-bot.git
+cd groki-bot
 git submodule update --init --recursive
 tools/apply-m5-patches.sh                    # M5Unified の 1 行修正を適用
 make set-target BOARD=cores3                 # 初回のみ (BOARD 別に build dir が分かれる)
@@ -118,8 +165,11 @@ make flash     BOARD=cores3 PORT=/dev/ttyACM0
 make monitor   BOARD=cores3 PORT=/dev/ttyACM0
 ```
 
-`BOARD=` を `atoms3r` / `atoms3` / `stopwatch` に置き換えると該当ボード用の
-ビルドが `build-<board>/` 配下に作られます (各 build dir は独立)。
+ホストの `make build BOARD=<略号>` の成果物は `build-<board>/` です。
+
+CMake が `Could not find NODE_EXECUTABLE` と出した場合、今の環境
+（Docker イメージを含む）の PATH に `node` がありません。ソース欠落では
+ありません。
 
 `tools/apply-m5-patches.sh` は upstream M5Unified の
 `RTC_PowerHub_Class::setAlarmIRQ` で GCC 14 の `-Werror=maybe-uninitialized`

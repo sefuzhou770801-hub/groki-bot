@@ -90,7 +90,34 @@ Takao Base 插在同一 `cores3` 固件上：舵机走 Port A（TX GPIO 2 / RX G
 
 ## 快速开始
 
-环境：已安装 ESP-IDF 5.5（Makefile 默认 `IDF_PATH=$(HOME)/esp-idf/5.5.4`）与 Node.js 18+（构建时把表情脚本 `.avdsl` 编译成字节码，编译器随仓库自带）。
+推荐用 Docker 编译，本机不必安装 ESP-IDF。先启动 Docker Desktop（或本机 Docker 守护进程）。
+
+### Docker（推荐）
+
+镜像是 `espressif/idf:release-v5.5`。第一次拉取约 14 GB。官方镜像里没有 Node，Makefile 会在容器内自动安装 Node.js 18+。产物在 `build-cores3/`。
+
+```sh
+git clone https://github.com/sefuzhou770801-hub/groki-bot.git
+cd groki-bot
+git submodule update --init --recursive
+tools/apply-m5-patches.sh                    # 给 M5Unified 打一行补丁
+make build-docker BOARD=cores3
+```
+
+`BOARD=` 可换成 `stopwatch`。本版已验证能编的是 `cores3` 与 `stopwatch`。`atoms3r` / `atoms3` 本版编不过：clawd 脸动画资源约 5 MB，超出这两板 1 MB 存储分区，会报 `SpiffsFullError`，见 [已知问题第 4 条](docs/known_issues.md)。Docker 路径必须显式传入同样的 `BOARD`，才会加载对应的 sdkconfig 默认链，产物在 `build-<board>/`。
+
+刷机不走 Docker。写入这次编出的固件，在本机执行：
+
+```sh
+make flash BOARD=cores3 PORT=/dev/ttyACM0
+make monitor BOARD=cores3 PORT=/dev/ttyACM0
+```
+
+`make flash` 需要本机已安装 ESP-IDF（会加载 IDF 环境再调用 `idf.py flash`）。没有本机 IDF 时，用浏览器写入页刷仓库已发布的版本：<https://sefuzhou770801-hub.github.io/groki-bot/>。该页面读取 GitHub Release，不能直接选 `build-cores3/` 里的文件。
+
+### 本机 ESP-IDF
+
+环境：ESP-IDF 5.5（按 5.5.4 验证）。请按 Espressif 文档安装，并在 IDF 源码目录执行 `./install.sh esp32s3`，再 `source export.sh`。Makefile 默认 `IDF_PATH=$(HOME)/esp-idf/5.5.4`。需要 Node.js 18+ 出现在编译机的 PATH 里（CMake 配置阶段就会找 `node`，用来把 `.avdsl` 编成字节码；编译器脚本在仓库 `tools/avatar_dsl/`）。系统 `python3` 若是 3.14，IDF 5.5 会去找对应的虚拟环境，未安装时 make 会直接失败。
 
 ```sh
 git clone https://github.com/sefuzhou770801-hub/groki-bot.git
@@ -103,7 +130,9 @@ make flash     BOARD=cores3 PORT=/dev/ttyACM0
 make monitor   BOARD=cores3 PORT=/dev/ttyACM0
 ```
 
-`BOARD=` 可换成 `atoms3r` / `atoms3` / `stopwatch`，产物在 `build-<board>/`。
+本机 `make build BOARD=<代号>` 的产物在 `build-<board>/`。
+
+CMake 配置时若报 `Could not find NODE_EXECUTABLE`，说明当前环境（包括 Docker 镜像）的 PATH 里没有 `node`，不是源码缺文件。
 
 `tools/apply-m5-patches.sh` 只修正 upstream M5Unified 里 `RTC_PowerHub_Class::setAlarmIRQ` 的 `buf` 未初始化，避免 GCC 14 `-Werror=maybe-uninitialized`。
 

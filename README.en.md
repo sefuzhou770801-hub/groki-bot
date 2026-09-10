@@ -102,13 +102,59 @@ appropriately.
 - Other boards' pin layout: see each `sdkconfig.defaults.<board>` and
   `components/board/board.cpp`.
 
-## Setup
+## Quick start
 
-With ESP-IDF 5.5 installed (tested against 5.5.4; 5.4.2 still builds):
+Docker is the recommended path: you do not need ESP-IDF on the host. Start
+Docker Desktop (or the Docker daemon) first.
+
+### Docker (recommended)
+
+Image: `espressif/idf:release-v5.5`. The first pull is about 14 GB. The
+official image has no Node; the Makefile installs Node.js 18+ inside the
+container. Artifacts land in `build-cores3/`.
 
 ```sh
-git clone <this repo>
-cd stackchan-idf
+git clone https://github.com/sefuzhou770801-hub/groki-bot.git
+cd groki-bot
+git submodule update --init --recursive
+tools/apply-m5-patches.sh                    # apply the one-line M5Unified fix
+make build-docker BOARD=cores3
+```
+
+Replace `BOARD=` with `stopwatch`. This release has been verified for
+`cores3` and `stopwatch` only. `atoms3r` / `atoms3` do not build: the
+clawd face assets are about 5 MB and overflow the 1 MB storage partition
+(`SpiffsFullError`); see [known issues item 4](docs/known_issues.md).
+The Docker path must pass the same `BOARD` so the matching sdkconfig
+defaults chain is loaded; artifacts land in `build-<board>/`.
+
+Flashing is not done inside Docker. To write the firmware you just built:
+
+```sh
+make flash BOARD=cores3 PORT=/dev/ttyACM0
+make monitor BOARD=cores3 PORT=/dev/ttyACM0
+```
+
+`make flash` needs ESP-IDF on the host (it loads the IDF environment, then
+runs `idf.py flash`). Without a host IDF install, use the browser flasher for
+a published release: <https://sefuzhou770801-hub.github.io/groki-bot/>.
+That page reads GitHub Releases; it cannot pick files out of
+`build-cores3/`.
+
+### Host ESP-IDF
+
+Environment: ESP-IDF 5.5 (tested against 5.5.4). Install it from the
+Espressif docs, then in the IDF source tree run `./install.sh esp32s3`
+and `source export.sh`. The Makefile default is
+`IDF_PATH=$(HOME)/esp-idf/5.5.4`. Node.js 18+ must be on the build
+machine's `PATH` (CMake looks up `node` at configure time to compile
+`.avdsl` to bytecode; the compiler lives in `tools/avatar_dsl/`). If
+system `python3` is 3.14, IDF 5.5 looks for the matching virtualenv and
+`make` fails immediately when that env is missing.
+
+```sh
+git clone https://github.com/sefuzhou770801-hub/groki-bot.git
+cd groki-bot
 git submodule update --init --recursive
 tools/apply-m5-patches.sh                    # apply the one-line M5Unified fix
 make set-target BOARD=cores3                 # first time only; per-board build dirs
@@ -117,8 +163,11 @@ make flash      BOARD=cores3 PORT=/dev/ttyACM0
 make monitor    BOARD=cores3 PORT=/dev/ttyACM0
 ```
 
-Replace `BOARD=` with `atoms3r` / `atoms3` / `stopwatch` to build for those
-boards; each lands under its own `build-<board>/` directory.
+Host `make build BOARD=<slug>` artifacts land in `build-<board>/`.
+
+If CMake reports `Could not find NODE_EXECUTABLE`, the current environment
+(including the Docker image) has no `node` on `PATH`. This is not a missing
+source file.
 
 `tools/apply-m5-patches.sh` just zero-initialises a `buf` array in
 `M5Unified` `RTC_PowerHub_Class::setAlarmIRQ` so it stops tripping the
