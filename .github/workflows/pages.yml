@@ -123,7 +123,9 @@ jobs:
           # Older releases stay fully downloadable from the GitHub Releases
           # page — raising this floor only prunes the Pages mirror (and the
           # versions.json entries the Web Flasher / release-fetch OTA offer).
-          RETAIN_FLOOR="v0.7.0"
+          # groki-bot 自 v0.1.0 起独立编号，上游遗留的 v0.7.0 门槛会把我们的
+          # 全部版本跳过（2026-09-15 首发时 versions.json 为空）。
+          RETAIN_FLOOR="v0.1.0"
           tags_json=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
                         --json tagName,isDraft,isPrerelease)
           mapfile -t tags < <(echo "$tags_json" | jq -r '.[] | select(.isDraft|not) | .tagName')
