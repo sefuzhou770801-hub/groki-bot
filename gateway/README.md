@@ -15,7 +15,8 @@ the firmware and Grok Bot is described in
 - **An MCP server** so Claude Code, Claude Desktop, or any other MCP client
   can make the robot speak and read its status.
 - Optional: voice control of your Mac, an `ask_claude` voice tool that
-  hands hard questions to the Claude CLI, and an `ask_grokbot` voice tool that
+  hands hard questions to the Claude CLI (offered only when the `claude` CLI
+  is installed), and an `ask_grokbot` voice tool that
   hands tasks to an agent in the Grok Bot app and reads its answers aloud
   (see [Optional: Grok Bot hand-off](#optional-grok-bot-hand-off)).
 
@@ -221,7 +222,9 @@ reconnect the MCP client, after a change).
 | `STACKCHAN_MAC_CONTROL` | off | `1` lets voice commands control this Mac (see Safety) |
 | `STACKCHAN_GEMINI_DEVICE_TOOLS` | off | `1` gives Gemini face/LED/head tools; only for firmware with device MCP |
 | `STACKCHAN_USB_TRANSPORT` | off | `1` enables the USB serial control channel; it locks `/dev/cu.usbmodem*` |
+| `STACKCHAN_ASK_CLAUDE` | on when the `claude` CLI is found | `0` removes the `ask_claude` voice tool even when the CLI is installed |
 | `STACKCHAN_CLAUDE_BIN` | `claude` on PATH | Claude CLI used by `ask_claude` |
+| `STACKCHAN_CLAUDE_MODEL` | `claude-sonnet-5` | Model passed to the Claude CLI by `ask_claude` and Mac tasks |
 | `STACKCHAN_VOICE_BACKEND` | `gemini` | `xiaozhi` forwards voice to the XiaoZhi cloud instead |
 | `STACKCHAN_PERSONALITY_FILE` | `personality.md` in this directory, if present | Extra persona text appended to Gemini's instructions |
 | `STACKCHAN_TOOL_BOT` | empty (off) | Grok Bot agent name for `ask_grokbot`; setting it turns the hand-off on |

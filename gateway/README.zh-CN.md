@@ -7,7 +7,7 @@
 - **语音对话**：通过 Google Gemini Live，用机器人的麦克风和喇叭对话。
 - **「Hi Grok」唤醒词**：在电脑上识别，喊到机器人之后网关才把麦克风声音发给 Gemini。
 - **MCP 服务**：Claude Code、Claude Desktop 或其他 MCP 客户端可以让机器人说话、读取它的状态。
-- 可选：用语音控制你的 Mac；把难题交给 Claude CLI 回答的 `ask_claude` 语音工具；把任务交给 Grok Bot 应用里的智能体、再把回复念出来的 `ask_grokbot` 语音工具（见[可选：把任务交给 Grok Bot](#可选把任务交给-grok-bot)）。
+- 可选：用语音控制你的 Mac；把难题交给 Claude CLI 回答的 `ask_claude` 语音工具（装了 `claude` 命令行才提供）；把任务交给 Grok Bot 应用里的智能体、再把回复念出来的 `ask_grokbot` 语音工具（见[可选：把任务交给 Grok Bot](#可选把任务交给-grok-bot)）。
 
 ```
  Claude / MCP 客户端 ──stdio MCP──▶ ┌──────────┐ ◀──WebSocket :8765（XiaoZhi 协议）── Groki Bot
@@ -172,7 +172,9 @@ curl -s -X POST http://127.0.0.1:18770/send \
 | `STACKCHAN_MAC_CONTROL` | 关 | 设为 `1` 允许语音控制这台 Mac（见「安全」） |
 | `STACKCHAN_GEMINI_DEVICE_TOOLS` | 关 | 设为 `1` 让 Gemini 使用表情、灯光、头部工具；只适用于带设备端 MCP 的固件 |
 | `STACKCHAN_USB_TRANSPORT` | 关 | 设为 `1` 启用 USB 串口控制通道；它会独占 `/dev/cu.usbmodem*` |
+| `STACKCHAN_ASK_CLAUDE` | 找到 `claude` 命令行时开启 | 设为 `0` 时即使装了命令行也不提供 `ask_claude` 语音工具 |
 | `STACKCHAN_CLAUDE_BIN` | PATH 里的 `claude` | `ask_claude` 使用的 Claude CLI |
+| `STACKCHAN_CLAUDE_MODEL` | `claude-sonnet-5` | `ask_claude` 和 Mac 后台任务调用 Claude CLI 时使用的模型 |
 | `STACKCHAN_VOICE_BACKEND` | `gemini` | 设为 `xiaozhi` 改为把语音转发到 XiaoZhi 云服务 |
 | `STACKCHAN_PERSONALITY_FILE` | 本目录的 `personality.md`（存在时） | 追加到 Gemini 指令后面的人设文字 |
 | `STACKCHAN_TOOL_BOT` | 空（关闭） | `ask_grokbot` 使用的 Grok Bot 智能体名字；填了才开启 |

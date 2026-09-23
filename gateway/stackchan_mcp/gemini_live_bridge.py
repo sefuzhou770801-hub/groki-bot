@@ -36,7 +36,13 @@ from typing import Any, Awaitable, Callable
 from .debug_status import DebugStatus, get_debug_status
 from .device_emotion import face_to_device_emotion
 from .gbot_brain import grokbot_enabled, tool_bot
-from .mac_control import CLAUDE_FAST_ARGS, MAC_TOOL_NAMES, MacController, resolve_claude_bin
+from .mac_control import (
+    MAC_TOOL_NAMES,
+    MacController,
+    claude_fast_args,
+    find_claude_bin,
+    resolve_claude_bin,
+)
 from .wake_gate import WakeGateState
 
 logger = logging.getLogger(__name__)
@@ -74,6 +80,18 @@ def mac_control_enabled() -> bool:
     return _env_flag("STACKCHAN_MAC_CONTROL")
 
 
+def ask_claude_enabled() -> bool:
+    """Offer the ask_claude tool only when the claude CLI is installed.
+
+    STACKCHAN_ASK_CLAUDE=0 turns it off even when the CLI is found, so a
+    user with Claude Code installed is not spending their quota by default
+    without a way out.
+    """
+    if not _env_flag("STACKCHAN_ASK_CLAUDE", default=True):
+        return False
+    return find_claude_bin() is not None
+
+
 def grokbot_instruction(bot: str, *, mac_control: bool) -> str:
     """Routing rules for the ask_grokbot tool (hand tasks to a Grok Bot agent).
 
@@ -101,10 +119,22 @@ AGENT_TOOLS_INSTRUCTION = """## 智能工具
 
 你有联网搜索能力——事实性问题（天气、新闻、知识）直接回答，搜索结果自动融入。
 
-遇到需要深度分析、代码解读、复杂推理或详细规划的问题，调用 ask_claude(question) 获取回答，用自己的话简洁转述。
-
 用户问时间时，调用 get_current_datetime 获取准确时间。
 """
+
+# Only added when ask_claude is declared (see ask_claude_enabled()).
+ASK_CLAUDE_INSTRUCTION = (
+    "遇到需要深度分析、代码解读、复杂推理或详细规划的问题，"
+    "调用 ask_claude(question) 获取回答，用自己的话简洁转述。"
+)
+
+
+def agent_tools_instruction(*, ask_claude: bool) -> str:
+    """The 智能工具 rules; the ask_claude line only when that tool exists."""
+    head, _, tail = AGENT_TOOLS_INSTRUCTION.strip().rpartition("\n\n")
+    if ask_claude:
+        return f"{head}\n\n{ASK_CLAUDE_INSTRUCTION}\n\n{tail}"
+    return f"{head}\n\n{tail}"
 
 MAC_CONTROL_INSTRUCTION = """## Mac 控制
 
@@ -165,11 +195,13 @@ def default_system_instruction(
     device_tools: bool | None = None,
     mac_control: bool | None = None,
     grokbot: str | None = None,
+    ask_claude: bool | None = None,
 ) -> str:
     """Operational rules for Gemini, matching the tools that are declared.
 
     ``grokbot`` is the Grok Bot agent name; ``None`` reads STACKCHAN_TOOL_BOT
-    and an empty string leaves the ask_grokbot rules out.
+    and an empty string leaves the ask_grokbot rules out. ``ask_claude``
+    ``None`` follows ask_claude_enabled().
     """
     if device_tools is None:
         device_tools = device_tools_enabled()
@@ -177,10 +209,12 @@ def default_system_instruction(
         mac_control = mac_control_enabled()
     if grokbot is None:
         grokbot = tool_bot()
+    if ask_claude is None:
+        ask_claude = ask_claude_enabled()
     parts = [
         _load_personality(),
         EMOTION_SYSTEM_INSTRUCTION if device_tools else VOICE_ONLY_SYSTEM_INSTRUCTION,
-        AGENT_TOOLS_INSTRUCTION.strip(),
+        agent_tools_instruction(ask_claude=ask_claude),
     ]
     if grokbot:
         parts.append(grokbot_instruction(grokbot, mac_control=mac_control))
@@ -191,7 +225,9 @@ def default_system_instruction(
 
 # Full rule set (device tools and Mac control on). Kept for callers that want
 # every rule; runtime sessions use default_system_instruction().
-DEFAULT_SYSTEM_INSTRUCTION = default_system_instruction(device_tools=True, mac_control=True)
+DEFAULT_SYSTEM_INSTRUCTION = default_system_instruction(
+    device_tools=True, mac_control=True, ask_claude=True
+)
 
 # Gemini 3.1 Flash Live Preview (launched 2026-03-26) is Google's current
 # flagship realtime audio model. Verified against client.models.list() on
@@ -496,11 +532,12 @@ def build_function_declarations() -> list[Any]:
     device = [move_head, set_avatar, set_all_leds, express_emotion] if device_tools_enabled() else []
     mac = _build_mac_declarations(types) if mac_control_enabled() else []
     grokbot = [ask_grokbot] if bot else []
+    claude = [ask_claude] if ask_claude_enabled() else []
     return [
         *device,
         end_conversation,
         *grokbot,
-        ask_claude,
+        *claude,
         get_current_datetime,
         *mac,
     ]
@@ -1743,7 +1780,7 @@ class GeminiLiveBridge:
         face_task.add_done_callback(lambda _t: None)
         try:
             proc = await asyncio.create_subprocess_exec(
-                self._claude_bin, "-p", question, *CLAUDE_FAST_ARGS,
+                self._claude_bin, "-p", question, *claude_fast_args(),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

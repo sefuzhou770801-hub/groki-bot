@@ -76,10 +76,35 @@ _MAC_TASK_ESTIMATED_SECONDS = 60
 
 # Voice latency budget: Sonnet at low effort is the fastest configuration
 # that still handles real tasks. Shared by ask_claude in the bridge.
-CLAUDE_FAST_ARGS = ("--model", "claude-sonnet-5", "--effort", "low")
+# STACKCHAN_CLAUDE_MODEL overrides the model.
+DEFAULT_CLAUDE_MODEL = "claude-sonnet-5"
+
+
+def claude_model() -> str:
+    """Claude model for ask_claude and run_mac_task (STACKCHAN_CLAUDE_MODEL)."""
+    return os.getenv("STACKCHAN_CLAUDE_MODEL", "").strip() or DEFAULT_CLAUDE_MODEL
+
+
+def claude_fast_args() -> tuple[str, ...]:
+    """Extra `claude -p` arguments: the configured model at low effort."""
+    return ("--model", claude_model(), "--effort", "low")
 
 TaskDoneCallback = Callable[[dict[str, Any]], Awaitable[None]]
 TaskStartCallback = Callable[[], Awaitable[None]]
+
+
+def _claude_bin_name(configured: str | None = None) -> str:
+    raw = (configured if configured is not None else os.getenv("STACKCHAN_CLAUDE_BIN") or "claude").strip()
+    return raw or "claude"
+
+
+def find_claude_bin(configured: str | None = None) -> str | None:
+    """Return the Claude CLI path, or None when it is not installed."""
+    raw = _claude_bin_name(configured)
+    path = Path(raw).expanduser()
+    if path.is_file() and os.access(path, os.X_OK):
+        return str(path)
+    return shutil.which(raw)
 
 
 def resolve_claude_bin(configured: str | None = None) -> str:
@@ -88,13 +113,8 @@ def resolve_claude_bin(configured: str | None = None) -> str:
     Missing binaries are returned unchanged so callers can fail at execution
     time; a warning is emitted at resolve time so gateway start is visible.
     """
-    raw = (configured if configured is not None else os.getenv("STACKCHAN_CLAUDE_BIN") or "claude").strip()
-    if not raw:
-        raw = "claude"
-    path = Path(raw).expanduser()
-    if path.is_file() and os.access(path, os.X_OK):
-        return str(path)
-    found = shutil.which(raw)
+    raw = _claude_bin_name(configured)
+    found = find_claude_bin(raw)
     if found:
         return found
     logger.warning(
@@ -725,7 +745,7 @@ class MacController:
                 self._claude_bin,
                 "-p",
                 task,
-                *CLAUDE_FAST_ARGS,
+                *claude_fast_args(),
                 "--permission-mode",
                 "acceptEdits",
                 timeout=_CLAUDE_TASK_TIMEOUT_S,
