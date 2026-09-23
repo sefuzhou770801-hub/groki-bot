@@ -119,7 +119,7 @@ conv::ToolDefinition make_set_expression_tool()
 {
     return conv::ToolDefinition{
         .name = "set_expression",
-        .description = "改变 Groki 的脸部表情。需要表达情绪时使用。",
+        .description = "Change Groki's facial expression. Use it to show emotion.",
         .parameters_json = R"({"type":"object","properties":{"expression":{"type":"string",)"
                            R"("enum":["neutral","idle","happy","sad","angry","doubt","sleepy",)"
                            R"("listening","thinking","excited","curious","confused",)"
@@ -132,7 +132,7 @@ conv::ToolDefinition make_set_head_pose_tool()
 {
     return conv::ToolDefinition{
         .name = "set_head_pose",
-        .description = "改变 Groki 的头部朝向。yaw 为左右(-40〜40度)，pitch 为上下(-10〜25度)。",
+        .description = "Turn Groki's head. yaw is left/right (-40 to 40 degrees), pitch is up/down (-10 to 25 degrees).",
         .parameters_json =
             R"({"type":"object","properties":{)"
             R"("yaw_deg":{"type":"number"},"pitch_deg":{"type":"number"}},"required":["yaw_deg","pitch_deg"]})",
@@ -144,9 +144,9 @@ conv::ToolDefinition make_speak_katakoto_tool()
     return conv::ToolDefinition{
         .name = "speak_katakoto",
         .description =
-            "用机器人风格的日语假名声发出短句。"
-            "kana 只能使用平假名、片假名、长音『ー』、促音『っ』和空格，不能使用汉字。"
-            "例: \"ぴこーん\" / \"こんにちわー\" / \"がんばるぞー\"。",
+            "Make a short robot-style sound in Japanese kana. "
+            "kana may contain only hiragana, katakana, the long-vowel mark \"ー\", the small \"っ\" and spaces; "
+            "no kanji. Examples: \"ぴこーん\" / \"こんにちわー\" / \"がんばるぞー\".",
         .parameters_json =
             R"({"type":"object","properties":{)"
             R"("kana":{"type":"string","maxLength":48}},"required":["kana"]})",
