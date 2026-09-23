@@ -456,6 +456,44 @@ def test_personality_file_is_appended_once(monkeypatch, tmp_path):
     assert instruction.startswith(bridge_mod._load_personality())
 
 
+@pytest.mark.defaults
+def test_builtin_persona_is_named_groki():
+    instruction = default_system_instruction()
+    assert instruction.startswith("You are Groki,")
+    assert "你是 Grok" not in instruction
+
+
+@pytest.mark.defaults
+def test_builtin_persona_does_not_hide_the_model():
+    import re
+
+    instruction = default_system_instruction()
+    assert not re.search(r"不要说\s*Gemini|不要提\s*Gemini", instruction)
+    assert not re.search(r"(don't|do not|never)\s+(say|mention|reveal)", instruction, re.I)
+    assert "which AI model you run on, answer truthfully" in instruction
+
+
+@pytest.mark.defaults
+def test_builtin_persona_follows_the_users_language():
+    import stackchan_mcp.gemini_live_bridge as bridge_mod
+
+    persona = bridge_mod._load_personality()
+    assert "中文" not in persona
+    assert "Chinese" not in persona
+    assert "Reply in the language the user speaks" in persona
+
+
+def test_personality_file_can_override_the_builtin_persona(monkeypatch, tmp_path):
+    path = tmp_path / "personality.md"
+    path.write_text("Always speak English. Your name is Pip.\n", encoding="utf-8")
+    monkeypatch.setenv("STACKCHAN_PERSONALITY_FILE", str(path))
+
+    instruction = build_system_instruction()
+
+    assert '"# 性格设定" section follows, it overrides this paragraph' in instruction
+    assert instruction.rstrip().endswith("Always speak English. Your name is Pip.")
+
+
 def test_system_instruction_without_personality_is_just_base():
     """Empty personality file returns the base instruction unchanged."""
     instruction = build_system_instruction(personality_loader=lambda: "")

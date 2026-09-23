@@ -30,7 +30,7 @@ TOUCH_LINES = (
     "被你发现啦。",
     "有什么事吗？",
 )
-INTRO_LINE = "我是 Grok，你写代码的时候我就在旁边。"
+INTRO_LINE = "我是 Groki，你写代码的时候我就在旁边。"
 
 
 def _env_bool(name: str, default: bool) -> bool:
