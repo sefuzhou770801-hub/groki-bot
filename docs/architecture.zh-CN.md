@@ -91,7 +91,7 @@ flowchart LR
 
 **音频。** 上行：Opus，16 kHz 单声道，每帧 60 毫秒，用 WebSocket 二进制消息发送。网关先用本机的唤醒词检测（sherpa-onnx）听，听到「Hi Grok」之后才把声音转给 Gemini；安静 `STACKCHAN_WAKE_IDLE_S` 秒后结束这一轮聆听。下行：Gemini 回复的声音编码成 Opus（24 kHz，60 毫秒）发回机器人，同时发送 `tts` 状态消息，让机器人知道什么时候开始说、什么时候说完。
 
-**Gemini Live。** 网关保持一个 Gemini Live 会话（`GEMINI_API_KEY`，默认模型 `gemini-3.1-flash-live-preview`，默认音色 `Kore`），并给 Gemini 一小组可调用的工具：`end_conversation`、`get_current_datetime`、`ask_claude`，以及开启后才有的 Mac 控制工具和 `ask_grokbot`。
+**Gemini Live。** 网关保持一个 Gemini Live 会话（`GEMINI_API_KEY`，默认模型 `gemini-3.8-live`，默认音色 `Kore`），并给 Gemini 一小组可调用的工具：`end_conversation`、`get_current_datetime`、`ask_claude`，以及开启后才有的 Mac 控制工具和 `ask_grokbot`。
 
 **8766 端口上的 HTTP 接口。**
 

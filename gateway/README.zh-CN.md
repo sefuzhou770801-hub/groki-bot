@@ -160,7 +160,7 @@ curl -s -X POST http://127.0.0.1:18770/send \
 |---|---|---|
 | `GEMINI_API_KEY` | 无 | Gemini Live 密钥，语音对话必填 |
 | `STACKCHAN_GEMINI_VOICE` | `Kore` | Gemini 的音色 |
-| `STACKCHAN_GEMINI_MODEL` | `gemini-3.1-flash-live-preview` | Gemini Live 模型 |
+| `STACKCHAN_GEMINI_MODEL` | `gemini-3.8-live` | Gemini Live 模型（改回 `gemini-3.1-flash-live-preview` 即可退回） |
 | `STACKCHAN_TOKEN` | 空 | 与机器人共享的密码，同时保护 `/capture` 和 `/debug/inject-text` |
 | `HOST`、`WS_PORT`、`CAPTURE_PORT` | `0.0.0.0`、`8765`、`8766` | 监听地址和端口 |
 | `STACKCHAN_WAKE_WORD` | 开 | 设为 `0` 关闭唤醒词 |

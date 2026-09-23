@@ -1252,6 +1252,70 @@ async def test_silence_timeout_triggers_end_conversation_after_turn_complete():
     await asyncio.wait_for(called.wait(), timeout=1.0)
 
 
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        ("gemini-3.8-live", ["AUDIO"]),
+        ("gemini-3.1-flash-live-preview", ["AUDIO"]),
+        ("gemini-2.5-flash-native-audio-latest", ["TEXT"]),
+    ],
+)
+def test_build_live_config_text_mode_remaps_for_gemini_3_models(model, expected):
+    """3.8 Live rejects TEXT with 1007; 3.x uses audio plus transcription, 2.x keeps TEXT."""
+    cfg = build_live_config(response_modality="TEXT", model=model)
+    assert _modality_values(cfg.response_modalities) == expected
+    assert cfg.output_audio_transcription is not None
+
+
+@pytest.mark.asyncio
+async def test_model_output_after_early_turn_complete_keeps_conversation_open():
+    """3.8 Live sends turn_complete after a tool call, then speaks; the silence timer must not end it."""
+    called = False
+
+    async def on_end_conversation():
+        nonlocal called
+        called = True
+
+    esp32 = FakeESP32()
+    esp32.on_end_conversation = on_end_conversation
+    bridge = GeminiLiveBridge(
+        esp32,
+        api_key="k",
+        conversation_idle_timeout_s=0.03,
+    )
+
+    class EarlyDone:
+        model_turn = None
+        output_transcription = None
+        turn_complete = True
+
+    class Part:
+        inline_data = None
+        text = None
+
+    class Speaking:
+        class model_turn:  # noqa: N801
+            parts = [Part()]
+
+        output_transcription = None
+        turn_complete = False
+
+    def resp(content):
+        class Resp:
+            tool_call = None
+            tool_call_cancellation = None
+            server_content = content
+
+        return Resp()
+
+    await bridge._handle_message(resp(EarlyDone()))
+    await asyncio.sleep(0.01)
+    await bridge._handle_message(resp(Speaking()))
+    await asyncio.sleep(0.05)
+
+    assert called is False
+
+
 @pytest.mark.asyncio
 async def test_send_audio_cancels_silence_timeout():
     called = False
