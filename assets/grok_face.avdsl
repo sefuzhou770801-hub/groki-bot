@@ -8,7 +8,7 @@
 -- handed to the VM via the Var::RingBase window as final screen coordinates.
 -- The DSL draws them as a fixed 46-triangle strip per eye and keeps the body
 -- layer: perfect white circle on black, breathing, joy hop, speech squash,
--- sleeping zzz, petting heart. Body shape never morphs (design rule).
+-- sleeping zzz, petting heart. Body shape never morphs.
 
 ----------------------------------------------------------------------
 -- Both eyes as triangle strips over the ring coordinate variables.

@@ -25,7 +25,7 @@ class FakeCodec:
 
 class FakeEdgeProvider(EdgeTTSProvider):
     async def _iter_pcm_24k(self, text: str):
-        assert text == "你好机器人"
+        assert text == "你好呀"
         yield b"\x01\x02" * 100
 
 
@@ -44,7 +44,7 @@ async def test_edge_tts_provider_sends_tts_envelope_and_opus_frames():
         on_device_state=states.append,
     )
 
-    result = await provider.speak_text("你好机器人")
+    result = await provider.speak_text("你好呀")
 
     assert result["ok"] is True
     json_msgs = [json.loads(m) for m in sent if isinstance(m, str)]

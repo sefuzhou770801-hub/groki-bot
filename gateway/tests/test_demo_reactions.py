@@ -1,4 +1,4 @@
-"""Tests for the tiny in-room demo reactions."""
+"""Tests for the optional scripted demo reactions."""
 
 import asyncio
 

@@ -336,12 +336,12 @@ class Gateway:
         return web.json_response({"ok": True, "moved": moved})
 
     async def _handle_demo_intro(self, _request: web.Request) -> web.Response:
-        """Manual trigger for the 30-second in-room demo self-introduction."""
+        """Manual trigger for the scripted self-introduction (demo reactions)."""
         self.demo_reactions.spawn_intro()
         return web.json_response({"ok": True})
 
     async def _handle_demo_arm(self, _request: web.Request) -> web.Response:
-        """Arm the next face detection for the in-room demo."""
+        """Arm the next face detection for the scripted demo reactions."""
         self.demo_reactions.arm_face_entry()
         return web.json_response({"ok": True})
 

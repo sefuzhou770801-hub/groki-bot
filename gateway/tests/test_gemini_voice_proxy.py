@@ -963,12 +963,12 @@ async def test_handle_gemini_text_uses_edge_tts_provider(monkeypatch, info):
     async def send(msg): sent.append(msg)
 
     await proxy.start(info, {"type": "hello"}, send)
-    await proxy._handle_gemini_text("你好机器人")
+    await proxy._handle_gemini_text("你好呀")
     tasks = list(proxy._tts_tasks)
     assert tasks, "edge-tts should run in a background task"
     await asyncio.gather(*tasks)
 
-    assert proxy._edge_tts.spoken == ["你好机器人"]
+    assert proxy._edge_tts.spoken == ["你好呀"]
 
 
 @pytest.mark.asyncio
@@ -1452,7 +1452,7 @@ async def test_speak_text_sends_prompt_to_gemini_session(monkeypatch, info):
     # speak_text must return quickly here; fake codec leaves empty buffer.
     proxy._tts_active = False
     result = await proxy.speak_text(
-        "你好机器人",
+        "你好呀",
         session_id="sess-1",
         prompt_audio_frames=[],
         emotion="happy",
@@ -1464,7 +1464,7 @@ async def test_speak_text_sends_prompt_to_gemini_session(monkeypatch, info):
     bridge = proxy._bridge
     assert bridge.realtime_text_calls, "Gemini did not receive the speak prompt"
     text = bridge.realtime_text_calls[0]
-    assert "你好机器人" in text
+    assert "你好呀" in text
     # Emotion hint reached the device JSON channel.
     json_emo = [
         m for m in sent

@@ -431,11 +431,11 @@ def test_system_instruction_appends_personality(monkeypatch):
     """U8 personality file is appended below the base operational rules."""
 
     def fake_loader() -> str:
-        return "我是机器人机器人，好奇又有点害羞。"
+        return "我是桌上的小机器人，好奇又有点害羞。"
 
     instruction = build_system_instruction(personality_loader=fake_loader)
     assert default_system_instruction() in instruction
-    assert "我是机器人机器人" in instruction
+    assert "我是桌上的小机器人" in instruction
     assert "性格设定" in instruction
 
 

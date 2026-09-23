@@ -205,7 +205,7 @@ async def _run(args: argparse.Namespace) -> int:
 
     print()
     print("=" * 60)
-    print("StackChan + Gemini Live 已就绪。对着 Mac 说话机器人会回应。")
+    print("StackChan + Gemini Live 已就绪。对着 Mac 说话，机器人会回应。")
     print(f"模型: {args.model}    声音: {args.voice}")
     print("function call (move_head/set_avatar/set_all_leds) 走 USB 通道，")
     print("语音回应从 Mac 喇叭出（v1 设计——v2 走机器人喇叭）。")
