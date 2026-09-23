@@ -43,8 +43,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_URL = "http://127.0.0.1:18770"
 DEFAULT_TIMEOUT_S = 110.0
 DEFAULT_TASK_PREFIX = (
-    "【这是桌面机器人转来的语音任务，你的回复会被机器人念给用户听："
-    "用一两句口语回答，不要列表、链接和 markdown。】"
+    "[Voice task forwarded by a desktop robot. Your reply will be read aloud to the user: "
+    "answer in one or two spoken sentences, in the language of the task, without lists, links "
+    "or markdown.] "
 )
 
 _SENT_RE = re.compile(r"(?s)(.+?(?:[。！？!?]+|\n+))")

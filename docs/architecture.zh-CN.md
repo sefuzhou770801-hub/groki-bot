@@ -140,7 +140,7 @@ sequenceDiagram
     P-->>G: {"event": "done"}
 ```
 
-**任务发出。** 什么时候调用 `ask_grokbot(task)` 由 Gemini 判断。加进 Gemini 指令里的分流规则是：闲聊和「你是谁」由 Gemini 自己回答；要花时间办的事（查资料、调研、写东西、叫助手）交给智能体；开了 Mac 控制时，只想要答案的问题也交给智能体，不去打开浏览器搜索。工具立刻返回「已经发给{智能体}啦」，Gemini 马上说出这句，用户不用干等。网关在任务前面加一段前缀（`STACKCHAN_TOOL_BOT_PREFIX`，默认要求智能体用一两句口语回答，不用列表、链接和 markdown），带上 `X-Stackchan-Stream: 1` 发给转发服务。
+**任务发出。** 什么时候调用 `ask_grokbot(task)` 由 Gemini 判断。加进 Gemini 指令里的分流规则是：闲聊和「你是谁」由 Gemini 自己回答；要花时间办的事（查资料、调研、写东西、叫助手）交给智能体；开了 Mac 控制时，只想要答案的问题也交给智能体，不去打开浏览器搜索。工具立刻返回（「Sent to {智能体}.」），并要求 Gemini 马上用用户的语言告诉用户任务已经发出，用户不用干等。网关在任务前面加一段前缀（`STACKCHAN_TOOL_BOT_PREFIX`，默认要求智能体用一两句口语回答，不用列表、链接和 markdown），带上 `X-Stackchan-Stream: 1` 发给转发服务。
 
 **转发服务内部**（`gateway/stackchan_mcp/gbot_http_proxy.py`）：
 
@@ -153,7 +153,7 @@ sequenceDiagram
 
 出错时返回 `{"ok": false, "error": "..."}`：请求不合法或没指定智能体是 HTTP 400，`gbot` 找不到或执行失败是 502，30 秒内没有第一句是 504。
 
-**回复传回。** 网关里的 `gbot_brain.iter_gbot_replies` 逐行读取 NDJSON，每收到一段回复，桥接层就往 Gemini Live 会话里推一条系统通知：「[系统通知，不是用户发言] {智能体}回话了：{回复}」，要求 Gemini 用自己的声音简短转述，不调用工具。Gemini 说出来，声音按第 2 节的方式传到机器人。如果什么都没收到，就推一条通知，让 Gemini 告诉用户任务没送到，并且不要编造回复。
+**回复传回。** 网关里的 `gbot_brain.iter_gbot_replies` 逐行读取 NDJSON，每收到一段回复，桥接层就往 Gemini Live 会话里推一条系统通知：「[System notice, not the user speaking] {智能体} replied: {回复}」，要求 Gemini 用自己的声音、用用户的语言简短转述，不调用工具。Gemini 说出来，声音按第 2 节的方式传到机器人。如果什么都没收到，就推一条通知，让 Gemini 告诉用户任务没送到，并且不要编造回复。
 
 **配置**（`gateway/.env`）：
 

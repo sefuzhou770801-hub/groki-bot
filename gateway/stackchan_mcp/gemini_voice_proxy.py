@@ -686,7 +686,8 @@ class GeminiVoiceProxy:
         # model may rephrase, which is fine for a desktop pet — perfect
         # word-for-word TTS is what tts/voicevox is for.
         prompt = (
-            "请用你自己的声音说这一句话，简短自然，不要补充也不要调工具：\n"
+            "Say the following text aloud in your own voice, as written, briefly and naturally. "
+            "Do not add anything and do not call tools:\n"
             + text
         )
         try:

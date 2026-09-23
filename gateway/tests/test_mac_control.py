@@ -200,7 +200,7 @@ def test_media_control_pause_reports_false_when_music_keeps_playing():
 
     assert result == {
         "ok": False,
-        "error": "没停住",
+        "error": "playback did not stop",
         "action": "pause",
         "player": "Music",
         "player_state": "playing",
@@ -244,7 +244,7 @@ def test_media_control_play_reports_false_when_music_does_not_start():
 
     assert result == {
         "ok": False,
-        "error": "没播起来",
+        "error": "playback did not start",
         "action": "play",
         "player": "Music",
         "player_state": "paused",
@@ -286,7 +286,7 @@ def test_media_control_play_pause_reports_false_when_toggle_does_not_pause():
 
     assert result == {
         "ok": False,
-        "error": "没停住",
+        "error": "playback did not stop",
         "action": "play_pause",
         "player": "Music",
         "player_state": "playing",

@@ -9,7 +9,7 @@ Two lanes, matching how voice conversation tolerates latency:
 - Task lane: run_mac_task returns immediately with a task id and spawns a
   background `claude -p` process. Completion is pushed back through
   ``on_task_done`` so the bridge can make the robot announce the result.
-  check_mac_task lets the model answer "干完了吗" without waiting.
+  check_mac_task lets the model answer "is it done yet?" without waiting.
 
 Safety posture: no raw shell tool is exposed to the model. Arbitrary work
 must go through Claude (which applies its own permission model), URLs are
@@ -416,7 +416,7 @@ class MacController:
             )
         if expected_states == _NON_PLAYING_STATES and state == _PLAYING_STATE:
             return self._media_error(
-                "没停住",
+                "playback did not stop",
                 action=action,
                 player=player,
                 state=state,
@@ -424,7 +424,7 @@ class MacController:
             )
         if expected_states == frozenset({_PLAYING_STATE}):
             return self._media_error(
-                "没播起来",
+                "playback did not start",
                 action=action,
                 player=player,
                 state=state,
@@ -432,7 +432,7 @@ class MacController:
             )
         expected = "/".join(sorted(expected_states))
         return self._media_error(
-            f"{player} 未达到预期状态：期望 {expected}",
+            f"{player} did not reach the expected state: expected {expected}",
             action=action,
             player=player,
             state=state,
@@ -474,7 +474,7 @@ class MacController:
         )
         if rc != 0:
             return self._media_error(
-                stderr or f"{player} 播放状态读取失败",
+                stderr or f"could not read the playback state of {player}",
                 auto_opened=auto_opened,
             )
         return stdout
@@ -582,7 +582,7 @@ class MacController:
             task=task[:200],
             kind="run_mac_task",
             estimated_seconds=_MAC_TASK_ESTIMATED_SECONDS,
-            user_message="任务已在后台开始执行。",
+            user_message="The task has started in the background.",
             cancelable=False,
         )
         if self._on_task_start is not None:
@@ -598,12 +598,15 @@ class MacController:
         return self._task_started_response(
             record,
             status="started",
-            user_message="任务已在后台开始执行，完成后会收到系统通知，届时向用户口头汇报。",
+            user_message=(
+                "The task has started in the background. A system notice follows when it "
+                "finishes; then tell the user the result."
+            ),
         )
 
     async def _tool_check_mac_task(self, args: dict[str, Any]) -> dict[str, Any]:
         if not self._tasks:
-            return {"ok": True, "tasks": [], "note": "没有派过后台任务"}
+            return {"ok": True, "tasks": [], "note": "no background tasks have been started"}
         return {"ok": True, "tasks": list(self._tasks)}
 
     async def cancel_task(self, task_id: int) -> dict[str, Any]:
@@ -730,14 +733,14 @@ class MacController:
     @staticmethod
     def _task_result_message(record: dict[str, Any], result: dict[str, Any]) -> str:
         if bool(result.get("ok")):
-            return str(result.get("result") or "已完成")
-        return str(result.get("error") or "任务失败")
+            return str(result.get("result") or "done")
+        return str(result.get("error") or "task failed")
 
     @staticmethod
     def _mark_task_cancelled(record: dict[str, Any]) -> None:
         record["state"] = "cancelled"
         record["status"] = "cancelled"
-        record["result"] = "任务已取消"
+        record["result"] = "task cancelled"
 
     async def _run_claude_task(self, record: dict[str, Any], task: str) -> None:
         try:

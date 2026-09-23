@@ -256,7 +256,7 @@ reconnect the MCP client, after a change).
 | `STACKCHAN_PERSONALITY_FILE` | `personality.md` in this directory, if present | Extra persona text appended to Gemini's instructions. The built-in persona is a short one named Groki that replies in the user's language; text in this file overrides it where they differ (name, language, style) |
 | `STACKCHAN_TOOL_BOT` | empty (off) | Grok Bot agent name for `ask_grokbot`; setting it turns the hand-off on |
 | `STACKCHAN_TOOL_BOT_ID` | empty | Optional agent id sent next to the name |
-| `STACKCHAN_TOOL_BOT_PREFIX` | built-in Chinese read-aloud hint | Text put in front of every task; set it empty to send tasks as is |
+| `STACKCHAN_TOOL_BOT_PREFIX` | built-in read-aloud hint | Text put in front of every task; set it empty to send tasks as is |
 | `STACKCHAN_GBOT_URL` | `http://127.0.0.1:18770` | Forwarding service address |
 | `STACKCHAN_ASK_TIMEOUT` | `110` | Seconds to wait for the agent's replies |
 | `STACKCHAN_GBOT_BIN` | `gbot` on PATH | Forwarding service: path to `gbot` |
