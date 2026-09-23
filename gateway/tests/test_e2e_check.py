@@ -153,7 +153,7 @@ def test_voice_wake_passes_when_wake_count_increases():
 
 
 def test_voice_wake_adds_say_audio_device_from_env(monkeypatch):
-    monkeypatch.setenv("STACKCHAN_E2E_SAY_DEVICE", "螃蟹麦克风")
+    monkeypatch.setenv("STACKCHAN_E2E_SAY_DEVICE", "机器人麦克风")
     gw = FakeGateway()
 
     def wake():
@@ -163,7 +163,7 @@ def test_voice_wake_adds_say_audio_device_from_env(monkeypatch):
     result = gw.make_checker().check_voice_wake()
     assert result.passed is True
     assert "-a" in gw.cmds[0]
-    assert gw.cmds[0][gw.cmds[0].index("-a") + 1] == "螃蟹麦克风"
+    assert gw.cmds[0][gw.cmds[0].index("-a") + 1] == "机器人麦克风"
 
 
 def test_voice_wake_fails_when_say_command_missing():

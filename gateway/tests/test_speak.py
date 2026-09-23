@@ -41,7 +41,7 @@ async def test_speak_text_streams_tts_protocol(monkeypatch):
 @pytest.mark.asyncio
 async def test_speak_text_defaults_to_local_tts_even_when_cloud_is_connected(monkeypatch):
     async def fake_synthesize(text: str, *, emotion: str | None = None):
-        assert text == "你好，我是小克"
+        assert text == "你好，我是机器人"
         return SynthesizedSpeech(opus_frames=[b"local-opus"], provider="local_fake")
 
     class FakeCloudProxy:
@@ -59,7 +59,7 @@ async def test_speak_text_defaults_to_local_tts_even_when_cloud_is_connected(mon
 
     result = await audio_stream.speak_text(
         send_to_device,
-        "你好，我是小克",
+        "你好，我是机器人",
         emotion="happy",
         cloud_proxy=FakeCloudProxy(),
         session_id="local-session",
@@ -73,7 +73,7 @@ async def test_speak_text_defaults_to_local_tts_even_when_cloud_is_connected(mon
 @pytest.mark.asyncio
 async def test_speak_text_uses_xiaozhi_cloud_when_required_and_connected(monkeypatch):
     async def fake_prompt(text: str):
-        assert text == "你好，我是小克"
+        assert text == "你好，我是机器人"
         return SynthesizedSpeech(opus_frames=[b"prompt-opus"], provider="macos_say")
 
     class FakeCloudProxy:
@@ -103,7 +103,7 @@ async def test_speak_text_uses_xiaozhi_cloud_when_required_and_connected(monkeyp
 
     result = await audio_stream.speak_text(
         send_to_device,
-        "你好，我是小克",
+        "你好，我是机器人",
         emotion="happy",
         cloud_proxy=cloud,
         session_id="local-session",
@@ -113,7 +113,7 @@ async def test_speak_text_uses_xiaozhi_cloud_when_required_and_connected(monkeyp
     assert result.ok is True
     assert result.provider == "xiaozhi_cloud"
     assert result.frames_sent == 3
-    assert cloud.calls == [("你好，我是小克", "local-session", [b"prompt-opus"], "happy")]
+    assert cloud.calls == [("你好，我是机器人", "local-session", [b"prompt-opus"], "happy")]
     assert sent == []
 
 

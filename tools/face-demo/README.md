@@ -13,17 +13,17 @@ Both scripts need the robot on the same network and an MCP token set in the BLE 
 
 | Script | What it does | Needs |
 |---|---|---|
-| `crab-demo` | Gives a real task to the `grok` CLI; the robot shows a thinking face while it works, then an excited face and a speech balloon with the result | zsh, curl, the `grok` CLI on `PATH` |
+| `task-demo` | Gives a real task to the `grok` CLI; the robot shows a thinking face while it works, then an excited face and a speech balloon with the result | zsh, curl, the `grok` CLI on `PATH` |
 | `groki-face` | Remote control for filming: switch expressions with one key, play a preset sequence, or send a balloon | zsh, curl, `dns-sd` (macOS) |
 
-## crab-demo
+## task-demo
 
 ```sh
-CRAB_HOST=<robot LAN address> CRAB_TOKEN=<MCP token> \
-  ./tools/face-demo/crab-demo "count the TODOs in this repository"
+GROKI_HOST=<robot LAN address> GROKI_TOKEN=<MCP token> \
+  ./tools/face-demo/task-demo "count the TODOs in this repository"
 ```
 
-`CRAB_CWD` sets the task's working directory (default: current directory). The script exits with an error when `CRAB_HOST`, `CRAB_TOKEN` or `grok` is missing.
+`GROKI_CWD` sets the task's working directory (default: current directory). The script exits with an error when `GROKI_HOST`, `GROKI_TOKEN` or `grok` is missing.
 
 ## groki-face
 
@@ -63,5 +63,5 @@ The `demo` sequence: sleepy 3 s, surprised 1 s, happy 2 s, listening 2 s, thinki
 
 两个脚本都要求机器人在同一网络，并在蓝牙设置页「维护」标签的「Claude Code Channel (MCP)」里设好 MCP 令牌。
 
-- `crab-demo`：把真实任务交给 `grok` 命令行，干活时机器人显示思考脸，完成后显示兴奋脸，并用气泡显示结果摘要。需要设置 `CRAB_HOST`、`CRAB_TOKEN`，`grok` 要在 `PATH` 里。
+- `task-demo`：把真实任务交给 `grok` 命令行，干活时机器人显示思考脸，完成后显示兴奋脸，并用气泡显示结果摘要。需要设置 `GROKI_HOST`、`GROKI_TOKEN`，`grok` 要在 `PATH` 里。
 - `groki-face`：拍摄用的表情遥控，按键切换表情、按预设段串演或发送气泡。`GROKI_TOKEN` 必填，`GROKI_HOST` 不填时用 `dns-sd` 自动查找 `stackchan-*.local`；也可以写在 `~/.config/groki/env`。用法和按键表见上方英文部分。

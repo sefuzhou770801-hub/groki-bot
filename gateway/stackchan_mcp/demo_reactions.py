@@ -1,8 +1,8 @@
-"""Tiny hardcoded reactions for the 30-second StackChan demo.
+"""Optional scripted reactions (STACKCHAN_DEMO_REACTIONS).
 
 This is intentionally not a personality architecture. It only turns the two
-physical signals that already work (new face, head tap) into immediate cute
-feedback for an in-room demo.
+physical signals that already work (new face, head tap) into immediate
+spoken feedback.
 """
 
 from __future__ import annotations
@@ -23,12 +23,12 @@ VISUAL_TOOL_TIMEOUT_S = 0.08
 
 FACE_LINES = (
     "嗨，又见面啦。",
-    "你来啦，我一直在等你。",
+    "你好呀。",
 )
 TOUCH_LINES = (
-    "嗯～别动嘛。",
-    "喜欢被你摸头。",
-    "你的手好软。",
+    "嘿，我在呢。",
+    "被你发现啦。",
+    "有什么事吗？",
 )
 INTRO_LINE = "我是 Grok，你写代码的时候我就在旁边。"
 
@@ -42,7 +42,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 @dataclass
 class DemoReactions:
-    """Minimal scripted reactions for tonight's in-room demo."""
+    """Minimal scripted reactions to a new face and a head tap."""
 
     esp32: Any
     usb_transport: Any | None = None

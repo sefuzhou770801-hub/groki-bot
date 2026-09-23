@@ -117,6 +117,6 @@ System library: [libopus](https://opus-codec.org/) (BSD-3-Clause), installed wit
 
 - Open JTalk, hts_engine and pyopenjtalk (Modified BSD and others) are used by `tools/jvox/` on the host to generate and check voice data. The generated files follow the license of the source voice.
 - `tools/stackchan-channel/` installs `@modelcontextprotocol/sdk` (MIT) with Bun when you use it; the package is not included here.
-- `tools/face-demo/` scripts call the device's HTTP API with curl; `crab-demo` also runs the `grok` CLI, which you install yourself and which is not included here.
+- `tools/face-demo/` scripts call the device's HTTP API with curl; `task-demo` also runs the `grok` CLI, which you install yourself and which is not included here.
 
 See each component's LICENSE or COPYING file for the complete terms.

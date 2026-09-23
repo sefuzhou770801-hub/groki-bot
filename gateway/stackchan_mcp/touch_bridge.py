@@ -221,7 +221,7 @@ class TouchEventBridge:
         ``SetAvatarExpressionIfActive("happy")`` and ``PerformHeadPetMotion``
         inside the touch poll. The gateway used to repeat ``set_avatar`` +
         ``set_head_angles`` here, which was a textbook "two action layers
-        racing" — exactly what the boss flagged as 自造一套. We keep only
+        racing". We keep only
         the pause marker so the hook bridge doesn't talk over the firmware
         reaction for ``action_hold_s`` seconds.
         """

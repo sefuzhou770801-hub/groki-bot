@@ -183,7 +183,7 @@ async def test_cloud_tts_request_streams_audio_to_device(cloud_server):
                 {
                     "type": "tts",
                     "state": "sentence_start",
-                    "text": "你好，我是小克",
+                    "text": "你好，我是机器人",
                 }
             )
         )
@@ -192,7 +192,7 @@ async def test_cloud_tts_request_streams_audio_to_device(cloud_server):
 
     reply_task = asyncio.create_task(cloud_replies())
     result = await proxy.speak_text(
-        "你好，我是小克",
+        "你好，我是机器人",
         session_id="local-session",
         prompt_audio_frames=[b"prompt-opus-1", b"prompt-opus-2"],
     )
@@ -200,7 +200,7 @@ async def test_cloud_tts_request_streams_audio_to_device(cloud_server):
 
     assert result == {
         "ok": True,
-        "text": "你好，我是小克",
+        "text": "你好，我是机器人",
         "emotion": None,
         "frames_sent": 1,
         "provider": "xiaozhi_cloud",
@@ -210,7 +210,7 @@ async def test_cloud_tts_request_streams_audio_to_device(cloud_server):
     assert json.loads(device_messages[1]) == {
         "type": "tts",
         "state": "sentence_start",
-        "text": "你好，我是小克",
+        "text": "你好，我是机器人",
     }
     assert device_messages[2] == b"cloud-opus"
     assert json.loads(device_messages[3]) == {"type": "tts", "state": "stop"}
@@ -247,7 +247,7 @@ async def test_cloud_tts_reconnects_if_cloud_socket_went_idle(cloud_server):
 
     reply_task = asyncio.create_task(cloud_replies())
     result = await proxy.speak_text(
-        "你好，我是小克",
+        "你好，我是机器人",
         session_id="local-session",
         prompt_audio_frames=[b"prompt-opus-1", b"prompt-opus-2"],
     )

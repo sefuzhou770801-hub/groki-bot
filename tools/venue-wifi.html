@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>螃蟹会场一键配网</title>
+<title>机器人一键配网</title>
 <style>
   :root { color-scheme: light; }
   body {
@@ -38,7 +38,7 @@
 </style>
 </head>
 <body>
-  <h1>螃蟹会场一键配网</h1>
+  <h1>机器人一键配网</h1>
   <p class="sub">Chrome 打开这一页。只改热点，网关不动。必须是桌面 Chrome 或 Edge。</p>
 
   <label for="ssid">手机热点名称（2.4G）</label>
@@ -51,9 +51,9 @@
   <label>网关（设备里已配置，本页不改）</label>
   <input class="lock" value="ws://&lt;网关局域网地址&gt;:8765" readonly>
 
-  <button id="btn-go">连接螃蟹并写入</button>
+  <button id="btn-go">连接机器人并写入</button>
   <div class="status" id="log">还没开始。</div>
-  <p class="note">写完蟹会重启。蓝牙用完立刻断开。网关电脑要先连上同一个热点并启动网关。</p>
+  <p class="note">写完机器人会重启。蓝牙用完立刻断开。网关电脑要先连上同一个热点并启动网关。</p>
 
 <script>
 const SVC_UUID  = 'e3f0a000-7b1c-4d2a-9e6f-2c5a8d4b1f00';
@@ -123,7 +123,7 @@ async function ensureAuthenticated() {
     await readEncrypted(chrStatus);
     return;
   } catch (_) {}
-  const pwd = window.prompt('螃蟹设了蓝牙密码，请输入：') || '';
+  const pwd = window.prompt('机器人设了蓝牙密码，请输入：') || '';
   if (!pwd) throw new Error('没填蓝牙密码');
   const salt = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(pwd)));
   await setupSession(salt);
@@ -146,12 +146,12 @@ document.getElementById('btn-go').addEventListener('click', async () => {
   btn.disabled = true;
   try {
     await ensureX25519Supported();
-    log('正在找螃蟹…');
+    log('正在找机器人…');
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [SVC_UUID] }],
       optionalServices: [SVC_UUID],
     });
-    log('连上 ' + (device.name || '螃蟹') + '，开始握手…');
+    log('连上 ' + (device.name || '机器人') + '，开始握手…');
     const server = await device.gatt.connect();
     const svc = await server.getPrimaryService(SVC_UUID);
     const grab = async (uuid) => {
@@ -181,11 +181,11 @@ document.getElementById('btn-go').addEventListener('click', async () => {
     } catch (e) {
       if (!(e.message && e.message.toLowerCase().includes('disconnect'))) throw e;
     }
-    log('写完了。螃蟹在重启。请断开蓝牙，等它连上新热点。', 'ok');
+    log('写完了。机器人在重启。请断开蓝牙，等它连上新热点。', 'ok');
     try { device.gatt.disconnect(); } catch (_) {}
   } catch (e) {
     if (e.name === 'NotFoundError') {
-      log('没选设备。再点一次，选螃蟹。', 'err');
+      log('没选设备。再点一次，选机器人。', 'err');
     } else {
       log(e.message || String(e), 'err');
     }

@@ -30,10 +30,10 @@ CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
 # STACKCHAN_QR_TEST_AT_BOOT stays OFF — do not flip it back on without
 # revisiting the race.
 #
-# 2026-08-25 螃蟹变体关闭摄像头：ASR（AFE+WakeNet）的前提就是 camera off
+# 2026-08-25 CoreS3 关闭摄像头：ASR（AFE+WakeNet）的前提就是 camera off
 # （见 Kconfig 帮助文本）。真机实测 camera 常驻任务 + BLE + WiFi + 屏幕挤占
 # 内部 DMA 内存后，麦克风 I2S 每轮对话初始化失败（i2s_alloc_dma_desc 512B
-# 拿不到，DMA largest 仅 432B），上行音频降级到无法唤醒。螃蟹不使用摄像头。
+# 拿不到，DMA largest 仅 432B），上行音频降级到无法唤醒。本机型不使用摄像头。
 CONFIG_STACKCHAN_CAMERA_ENABLED=n
 # DMA path selection (ESP32-S3 knob in esp32-camera).
 #   y: EDMA writes each line straight into the PSRAM framebuffer.

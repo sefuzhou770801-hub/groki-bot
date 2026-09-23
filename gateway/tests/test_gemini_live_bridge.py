@@ -431,11 +431,11 @@ def test_system_instruction_appends_personality(monkeypatch):
     """U8 personality file is appended below the base operational rules."""
 
     def fake_loader() -> str:
-        return "我是螃蟹小克，好奇又有点害羞。"
+        return "我是桌上的小机器人，好奇又有点害羞。"
 
     instruction = build_system_instruction(personality_loader=fake_loader)
     assert default_system_instruction() in instruction
-    assert "我是螃蟹小克" in instruction
+    assert "我是桌上的小机器人" in instruction
     assert "性格设定" in instruction
 
 
@@ -2309,7 +2309,7 @@ def _run_ask_grokbot(monkeypatch, fake_iter, *, wait_for: int):
 def test_ask_grokbot_relays_each_reply_into_live_session(monkeypatch):
     """The agent cannot reach the robot's speaker: every reply piece is pushed
     into the Live session so Gemini says it."""
-    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "总管")
+    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "助手")
     monkeypatch.setenv("STACKCHAN_TOOL_BOT_ID", "bot-id-123")
     calls: list[dict] = []
 
@@ -2319,17 +2319,17 @@ def test_ask_grokbot_relays_each_reply_into_live_session(monkeypatch):
         yield {"reply": "办好了，网页已经打开。", "event": "more"}
 
     result, session = _run_ask_grokbot(monkeypatch, fake_iter, wait_for=2)
-    assert result["ok"] is True and result["say"] == "已经发给总管啦"
-    assert calls and calls[0]["bot"] == "总管" and calls[0]["bot_id"] == "bot-id-123"
+    assert result["ok"] is True and result["say"] == "已经发给助手啦"
+    assert calls and calls[0]["bot"] == "助手" and calls[0]["bot_id"] == "bot-id-123"
     assert calls[0]["text"].endswith("打开苹果官网")
     assert calls[0]["text"].startswith("【")  # default read-aloud prefix
     assert len(session.texts) == 2
-    assert "总管回话了" in session.texts[0] and "好，我这就去办。" in session.texts[0]
+    assert "助手回话了" in session.texts[0] and "好，我这就去办。" in session.texts[0]
     assert "办好了，网页已经打开。" in session.texts[1]
 
 
 def test_ask_grokbot_empty_prefix_sends_task_as_is(monkeypatch):
-    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "总管")
+    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "助手")
     monkeypatch.setenv("STACKCHAN_TOOL_BOT_PREFIX", "")
     calls: list[str] = []
 
@@ -2342,7 +2342,7 @@ def test_ask_grokbot_empty_prefix_sends_task_as_is(monkeypatch):
 
 
 def test_ask_grokbot_failure_pushes_one_notice(monkeypatch):
-    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "总管")
+    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "助手")
 
     def fake_iter(text, *, timeout_s=None, bot=None, bot_id=None):
         raise RuntimeError("forwarding service down")
@@ -2351,4 +2351,4 @@ def test_ask_grokbot_failure_pushes_one_notice(monkeypatch):
     result, session = _run_ask_grokbot(monkeypatch, fake_iter, wait_for=1)
     assert result["ok"] is True
     assert len(session.texts) == 1
-    assert "发给总管失败" in session.texts[0]
+    assert "发给助手失败" in session.texts[0]

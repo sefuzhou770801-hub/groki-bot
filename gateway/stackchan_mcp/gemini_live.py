@@ -205,10 +205,10 @@ async def _run(args: argparse.Namespace) -> int:
 
     print()
     print("=" * 60)
-    print("StackChan + Gemini Live 已就绪。对着 Mac 说话螃蟹会回应。")
+    print("StackChan + Gemini Live 已就绪。对着 Mac 说话，机器人会回应。")
     print(f"模型: {args.model}    声音: {args.voice}")
     print("function call (move_head/set_avatar/set_all_leds) 走 USB 通道，")
-    print("语音回应从 Mac 喇叭出（v1 设计——v2 走螃蟹喇叭）。")
+    print("语音回应从 Mac 喇叭出（v1 设计——v2 走机器人喇叭）。")
     print("Ctrl-C 退出。")
     print("=" * 60)
     print(flush=True)
@@ -245,7 +245,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="stackchan-gemini-live",
         description=(
-            "对着螃蟹说话，Gemini Live 处理语音并回应；同时控制螃蟹硬件。"
+            "对着机器人说话，Gemini Live 处理语音并回应；同时控制机器人硬件。"
         ),
     )
     parser.add_argument(

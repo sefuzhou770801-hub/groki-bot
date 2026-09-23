@@ -50,7 +50,7 @@ class ProxyServer:
             {
                 "STACKCHAN_GBOT_BIN": str(wrapper),
                 "STACKCHAN_GBOT_HTTP_PORT": str(self.port),
-                "STACKCHAN_ASK_BOT": "总管",
+                "STACKCHAN_ASK_BOT": "助手",
                 "STACKCHAN_GBOT_POLL_S": "0.05",
                 "STACKCHAN_GBOT_STABLE_S": "0.05",
                 "STACKCHAN_GBOT_FIRST_TIMEOUT": "5",
@@ -373,7 +373,7 @@ class GatewayClientEndToEnd(unittest.TestCase):
                 os.environ["STACKCHAN_GBOT_URL"] = f"http://127.0.0.1:{server.port}"
                 try:
                     events = list(
-                        gbot_brain.iter_gbot_replies("open", bot="总管", bot_id="", timeout_s=10)
+                        gbot_brain.iter_gbot_replies("open", bot="助手", bot_id="", timeout_s=10)
                     )
                 finally:
                     if old is None:
@@ -394,7 +394,7 @@ class GatewayClientEndToEnd(unittest.TestCase):
         os.environ["STACKCHAN_GBOT_URL"] = f"http://127.0.0.1:{_free_port()}"
         try:
             with self.assertRaises(gbot_brain.GbotBrainError):
-                list(gbot_brain.iter_gbot_replies("ping", bot="总管", timeout_s=2))
+                list(gbot_brain.iter_gbot_replies("ping", bot="助手", timeout_s=2))
         finally:
             if old is None:
                 os.environ.pop("STACKCHAN_GBOT_URL", None)
