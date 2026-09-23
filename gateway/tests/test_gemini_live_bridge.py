@@ -439,6 +439,23 @@ def test_system_instruction_appends_personality(monkeypatch):
     assert "性格设定" in instruction
 
 
+def test_personality_file_is_appended_once(monkeypatch, tmp_path):
+    """The personality file is appended below the rules, exactly once, and the
+    built-in persona stays (append, not replace)."""
+    import stackchan_mcp.gemini_live_bridge as bridge_mod
+
+    persona = "My name is Pip. I answer in English."
+    path = tmp_path / "personality.md"
+    path.write_text(persona + "\n", encoding="utf-8")
+    monkeypatch.setenv("STACKCHAN_PERSONALITY_FILE", str(path))
+
+    instruction = build_system_instruction()
+
+    assert instruction.count(persona) == 1
+    assert instruction.index("# 性格设定") < instruction.index(persona)
+    assert instruction.startswith(bridge_mod._load_personality())
+
+
 def test_system_instruction_without_personality_is_just_base():
     """Empty personality file returns the base instruction unchanged."""
     instruction = build_system_instruction(personality_loader=lambda: "")

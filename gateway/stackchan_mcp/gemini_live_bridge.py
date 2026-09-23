@@ -178,10 +178,12 @@ def _personality_path() -> Path:
 
 
 def _load_personality() -> str:
-    """Load the personality file if present, fall back to inline."""
-    p = _personality_path()
-    if p.is_file():
-        return p.read_text(encoding="utf-8").strip()
+    """Built-in persona at the top of the instructions.
+
+    The personality file is not read here: build_system_instruction()
+    appends it once below the rules, as the docs describe. Reading it here
+    as well put the file into the prompt twice.
+    """
     return (
         "你是 Grok，住在桌上这台小机器人里。"
         "中文，1-2 句话，像朋友聊天。不客服腔，不叫主人。"
