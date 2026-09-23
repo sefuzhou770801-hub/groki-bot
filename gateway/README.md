@@ -162,7 +162,7 @@ or Edge), tab "对话" (Conversation):
 ## Optional: Grok Bot hand-off
 
 With this on, you can say "Hi Grok, look up tomorrow's weather in Tokyo" or
-"research X for me": Gemini answers "已经发给助手啦" (sent to the agent)
+"research X for me": Gemini says the task has been sent to the agent
 right away, hands the task to an agent in the Grok Bot app, and reads the
 agent's replies aloud as they come in. Small talk stays with Gemini. The full
 message flow is in [docs/architecture.md](../docs/architecture.md#4-grok-bot-hand-off).
@@ -181,8 +181,8 @@ gateway:
 Steps:
 
 1. Pick the agent name from `gbot bots list` (or create one, for example
-   `gbot bots create --name 助手`) and add it to `.env`:
-   `STACKCHAN_TOOL_BOT=助手`. This is what turns the feature on.
+   `gbot bots create --name assistant`) and add it to `.env`:
+   `STACKCHAN_TOOL_BOT=assistant`. This is what turns the feature on.
 2. Start the forwarding service in a second terminal (or as a second
    background service) and leave it running:
 
@@ -198,7 +198,7 @@ Test the forwarding service without the robot:
 ```bash
 curl -s -X POST http://127.0.0.1:18770/send \
   -H 'Content-Type: application/json' \
-  -d '{"text": "Reply with one short sentence: hello", "target": "助手"}'
+  -d '{"text": "Reply with one short sentence: hello", "target": "assistant"}'
 ```
 
 ## Configuration reference
