@@ -1,0 +1,296 @@
+name: Build and Release Firmware
+
+# Tag-driven release: push `vX.Y.Z` to build the firmware in the official
+# ESP-IDF container and attach the artifacts to a GitHub Release. Manual
+# dispatch is supported too for smoke-testing the CI without cutting a tag.
+#
+# Layout (2026-06 onwards):
+#   1. `build` job runs 4× in parallel (matrix on board), each shard does
+#      its own checkout + env init + ccache-warmed build + zip + artifact
+#      upload. Per-shard ccache cache survives across runs and pulls main
+#      branch hits even on a fresh tag, keeping compile time ~30 s after
+#      the first warm-up.
+#   2. `release` job (needs: build) downloads whichever board artifacts
+#      exist and attaches those files to a single GitHub Release. Only
+#      runs on tag pushes. Missing zips must not fail the upload step.
+#
+# atoms3r / atoms3 are allowed to fail (`matrix.allow_failure`). Their
+# builds used to fail because the old face animation assets did not fit
+# the 1 MiB storage partition; those assets are gone, but neither board
+# has been re-verified yet. Keeping the shards in the matrix leaves any
+# failure visible in CI. cores3 / stopwatch have no allow_failure flag: if either fails,
+# `build` fails and `release` is skipped (job `if` implies success()).
+#
+# Previously the build was one sequential job to avoid paying the Docker
+# pull + apt install + IDF env setup 4× (was ~2 min × 4 in the old plain
+# matrix). With matrix shards on separate VMs the env-init cost is paid
+# 4× but happens in parallel — wall-clock impact is ≈ 1× pull. The
+# ccache cache cuts the per-shard compile from ~3 min to ~30 s once warm,
+# so the wall-clock floor becomes the env-init step (~90 s) rather than
+# the compile, and we no longer benefit from sharing the env across the
+# 4 boards inside one job.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# softprops/action-gh-release needs to create a Release on the repo. Default
+# token scopes are tight under modern GitHub orgs / repo settings, so grant
+# `contents: write` here explicitly rather than relying on
+# Settings → Actions → Workflow permissions.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.board }}
+    runs-on: ubuntu-latest
+    # Job-level, driven by matrix.include — do not hard-code per step.
+    # Unset allow_failure (cores3 / stopwatch) evaluates to false.
+    continue-on-error: ${{ matrix.allow_failure || false }}
+    strategy:
+      # Don't kill sibling shards on one board's failure — we still want
+      # to know which other boards built OK so we can rerun only the bad
+      # one. atoms3r / atoms3 may fail (known_issues.md item 4) without
+      # blocking the release; cores3 / stopwatch failures still fail
+      # this job and skip the release.
+      fail-fast: false
+      matrix:
+        board: [cores3, atoms3r, atoms3, stopwatch]
+        include:
+          - board: atoms3r
+            allow_failure: true
+          - board: atoms3
+            allow_failure: true
+    container:
+      # Pinned to v5.5 to match local development. v6.0 dropped the built-in
+      # `json` (cJSON) component in favour of an IDF component-manager
+      # dependency; our `conversation` component requires it directly and
+      # we don't ship a manifest entry for it yet.
+      image: espressif/idf:release-v5.5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0  # full history so `git describe --tags` resolves
+
+      - name: Verify git version information
+        shell: bash
+        run: |
+          # Container's git refuses operations in a workspace it doesn't own;
+          # mark it safe before any git command.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "=== Git Information ==="
+          git describe --tags --abbrev=0 || echo "(no tags found)"
+          git rev-parse --short HEAD
+          git diff-index --quiet HEAD -- && echo "Working tree clean" || echo "Working tree dirty"
+          echo "Current ref: ${GITHUB_REF}"
+
+      - name: Install Node.js (avatar DSL compiler)
+        shell: bash
+        # components/avatar_vm/CMakeLists.txt invokes `node tools/avatar_dsl/cli.mjs`
+        # at build time to compile the default avatar face DSL into the
+        # bytecode that gets embedded into the firmware. The espressif/idf
+        # Debian image does not ship Node, so install it from the distro repo
+        # (the compiler is plain ESM that only needs a recent v18+).
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends nodejs
+          node --version
+
+      - name: Apply M5Unified patches
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/components/M5Unified"
+          tools/apply-m5-patches.sh
+
+      - name: ccache (compiler cache)
+        # Per-board cache key — the same .c source can compile differently
+        # for different boards (sdkconfig.defaults.<board> changes target /
+        # PSRAM mode / Kconfig macros), so we don't try to share .o files
+        # across shards. Restore-keys lets a new tag still pick up the
+        # most recent main-branch cache on cold start.
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: idf-v5.5-${{ matrix.board }}-${{ github.ref_name }}
+          restore-keys: |
+            idf-v5.5-${{ matrix.board }}-
+          max-size: 500M
+          variant: ccache
+          # Tell ESP-IDF's cmake module to actually invoke ccache. Without
+          # this env var ESP-IDF skips its compiler-launcher hook even if
+          # ccache is on PATH.
+          create-symlink: true
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="dev-${GITHUB_SHA::8}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
+          echo "Build date: $BUILD_DATE"
+
+      - name: Pin PROJECT_VER for the build
+        # `tools/apply-m5-patches.sh` modifies the M5Unified submodule's
+        # working tree, which makes ESP-IDF's internal
+        # `git describe --tags --dirty` (run during cmake) tack a -dirty
+        # suffix onto the version stamped into esp_app_desc. Writing the
+        # resolved version to version.txt at the project root takes priority
+        # over git_describe (see project.cmake's PROJECT_VER resolution
+        # order: version.txt > project(VERSION ...) > git describe) and
+        # gives us a clean, deterministic version string in CI builds.
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "$VERSION" > version.txt
+          echo "version.txt contents: $(cat version.txt)"
+
+      - name: Build firmware for ${{ matrix.board }}
+        shell: bash
+        env:
+          CI: true
+          VERSION: ${{ steps.version.outputs.version }}
+          BOARD: ${{ matrix.board }}
+          IDF_CCACHE_ENABLE: "1"
+        run: |
+          set -euo pipefail
+          . $IDF_PATH/export.sh
+          echo "=== ccache config ==="
+          ccache --version | head -1
+          ccache --show-config | grep -E "max_size|cache_dir|compiler_check" || true
+          echo "=== Cleaning build-$BOARD ==="
+          rm -rf "build-$BOARD"
+          echo "=== Setting target for $BOARD ==="
+          make set-target BOARD="$BOARD"
+          echo "=== Building $BOARD ==="
+          make build BOARD="$BOARD"
+          echo "=== ccache stats ==="
+          ccache --show-stats || true
+          echo "=== Packing firmware for $BOARD ==="
+          python3 script/pack_firmware.py \
+            --build-dir "build-$BOARD" \
+            --out "firmware-$BOARD.bin"
+          ls -lh "firmware-$BOARD.bin"
+          outdir="release/$BOARD"
+          mkdir -p "$outdir"
+          cp "build-$BOARD/bootloader/bootloader.bin"           "$outdir/"
+          cp "build-$BOARD/partition_table/partition-table.bin" "$outdir/"
+          cp "build-$BOARD/ota_data_initial.bin"                "$outdir/"
+          cp "build-$BOARD/stackchan_idf.bin"                   "$outdir/"
+          cp "firmware-$BOARD.bin" "$outdir/firmware-${VERSION}-${BOARD}.bin"
+          cp "build-$BOARD/flash_args" "$outdir/"
+          cp README.md "$outdir/" 2>/dev/null || true
+          echo "=== Firmware size for $BOARD ==="
+          python3 -m esp_idf_size "build-$BOARD/stackchan_idf.map" --format=text || true
+          (cd "$outdir" && zip -r "../../firmware-${VERSION}-${BOARD}.zip" .)
+          ls -lh "firmware-${VERSION}-${BOARD}.zip"
+
+      - name: Upload firmware artifact (${{ matrix.board }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ steps.version.outputs.version }}-${{ matrix.board }}
+          path: firmware-${{ steps.version.outputs.version }}-${{ matrix.board }}.zip
+          retention-days: 90
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    # Only attach to a Release on actual tag pushes — manual dispatch runs
+    # just build the artifacts and stop. Matrix shards upload independently;
+    # this job attaches whichever zips exist. Job `if` implies success(),
+    # so a cores3 or stopwatch failure (no allow_failure) skips publish
+    # even on a tag push. atoms3r / atoms3 failures do not.
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
+
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # Glob over the per-board artifact names uploaded by the build
+          # matrix. merge-multiple flattens them into one directory.
+          # Pattern match of a subset (e.g. cores3 + stopwatch only) is
+          # success; v4 lists artifacts then filters, and does not fail
+          # when some names are absent (actions/download-artifact v4
+          # src/download-artifact.ts, pattern branch).
+          pattern: firmware-${{ steps.version.outputs.version }}-*
+          merge-multiple: true
+
+      - name: Create / update Release
+        uses: softprops/action-gh-release@v1
+        with:
+          # v1 warns on unmatched globs and continues unless this is true
+          # (default false; set explicitly so a missing atoms3r/atoms3 zip
+          # does not fail the release). See softprops/action-gh-release
+          # v1 src/main.ts: unmatchedPatterns → console.warn, throw only
+          # when fail_on_unmatched_files is set.
+          fail_on_unmatched_files: false
+          files: |
+            firmware-${{ steps.version.outputs.version }}-cores3.zip
+            firmware-${{ steps.version.outputs.version }}-atoms3r.zip
+            firmware-${{ steps.version.outputs.version }}-atoms3.zip
+            firmware-${{ steps.version.outputs.version }}-stopwatch.zip
+          body: |
+            # Groki Bot firmware ${{ steps.version.outputs.version }}
+
+            Firmware for the Groki Bot desktop robot. Each board has its own build, because the PSRAM mode is fixed by the bootloader.
+
+            ## Boards
+            - **M5Stack CoreS3 with a Stack-chan base**: `firmware-${{ steps.version.outputs.version }}-cores3.zip` (16 MB flash, Quad PSRAM)
+            - **M5Stack StopWatch (C152)**: `firmware-${{ steps.version.outputs.version }}-stopwatch.zip` (16 MB flash, Octal PSRAM)
+            - **AtomS3R + Atomic ECHO BASE**: `firmware-${{ steps.version.outputs.version }}-atoms3r.zip` (8 MB flash, Octal PSRAM), attached only if this build passed
+            - **AtomS3 + Atomic ECHO BASE, slim profile**: `firmware-${{ steps.version.outputs.version }}-atoms3.zip` (8 MB flash, no PSRAM), attached only if this build passed
+
+            ## Install
+
+            ### Web flasher (desktop Chrome or Edge)
+            Open <https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/>, choose this release and your board, then click Flash.
+
+            ### Command line
+            1. Download and unzip the ZIP for your board.
+            2. Write the combined image:
+               ```bash
+               esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 460800 write_flash \
+                 0x0 firmware-${{ steps.version.outputs.version }}-<board>.bin
+               ```
+
+            ### Update a running device
+            Open <https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/settings.html>, connect over Bluetooth, open the firmware update section and either pick this release or select `stackchan_idf.bin` from the ZIP.
+
+            ## Gateway and Grok Bot
+            The gateway for your computer (Gemini Live voice with a "Hi Grok" wake word, MCP server for Claude, optional hand-off to a Grok Bot agent) is not a download here: it runs from source in `gateway/`. See https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/gateway/README.md and https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/architecture.md.
+
+            ## Licenses
+            Third-party licenses and attributions: <https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/licenses.html>. The eye-ring data is used under the Emotion Ball Community License, which allows non-commercial use only; see `third_party/emotion-ball/` in the repository.
+
+            ## Build information
+            - **ESP-IDF**: release-v5.5
+            - **Target**: ESP32-S3
+            - **Build date**: ${{ steps.version.outputs.build_date }}
+            - **Commit**: ${{ github.sha }}
+
+            ## Changes
+            https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

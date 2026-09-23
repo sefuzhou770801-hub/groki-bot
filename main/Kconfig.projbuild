@@ -1,0 +1,75 @@
+# Project-build-level Kconfig for stackchan-idf main.
+#
+# Currently only the Phase 1+2 QR scanner test trigger lives here. Once Phase
+# 3 lands (device_ui タブから start_qr_scan を呼ぶ) this entry will be removed
+# — it's only a temporary boot-time switch for bring-up.
+
+menu "Stack-chan QR scanner (Phase 1+2 test)"
+
+
+    config STACKCHAN_ASR_ENABLED
+        bool "Enable on-device ASR (esp-sr WakeNet wake word)"
+        default n
+        help
+            [Phase 0] Bring up esp-sr AFE + WakeNet (Japanese wake word
+            "Konnichiha ESP") and log internal-RAM headroom. cores3 with
+            camera disabled. Requires a "model" partition.
+
+    config STACKCHAN_QR_TEST_AT_BOOT
+        bool "Auto-start QR scan ~30 s after boot"
+        default n
+        depends on STACKCHAN_CAMERA_ENABLED
+        help
+            Phase 1/2 bring-up only. With this set, app_main spawns a
+            single-shot task that waits 30 s (so M5 init, Wi-Fi, BLE, the
+            speaker arpeggio, and demo_loop's babble can all stabilise),
+            then calls start_qr_scan(board). Decoded payloads end up in the
+            serial log under the "qr" tag. Once the Phase 3 device_ui tab
+            is in, this option goes away — the user will start/stop the
+            scanner from the touchscreen.
+
+endmenu
+
+menu "Stack-chan feature gates"
+
+    # Slim-build switches. Default ON for the full CoreS3 / AtomS3R profile;
+    # the AtomS3 (no-PSRAM) sdkconfig flips them OFF to drop everything that
+    # needs PSRAM (TLS bounce buffers, large PCM rings, etc.) and still ship
+    # avatar + jtts + LED + settings UI from internal RAM.
+
+    config STACKCHAN_CONVERSATION_ENABLED
+        bool "Enable realtime AI conversation (OpenAI / Gemini / XiaoZhi)"
+        default y
+        help
+            Pulls in components/conversation (WebSocket + TLS to OpenAI
+            Realtime, Gemini Live, or XiaoZhi) and starts main/conversation
+            _task at boot. Disable to drop ~80 KB of code + the PSRAM-only
+            assistant_pcm ring, suitable for boards with no PSRAM.
+
+    config STACKCHAN_AUDIO_STREAM_ENABLED
+        bool "Enable BLE audio streaming sink"
+        default y
+        help
+            main/audio_stream_sink decode-and-play worker. Needs ~2 MiB of
+            PSRAM for the PCM ring + raw input buffer; OFF for AtomS3.
+
+    config STACKCHAN_WIFI_AUDIO_ENABLED
+        bool "Enable Wi-Fi RTP audio receiver"
+        default y
+        help
+            main/wifi_audio listener (UDP RTP/L16/μ-law/AAC). Allocates a
+            multi-second PSRAM jitter ring; OFF for AtomS3.
+
+    config STACKCHAN_ESPNOW_REMOTE_ENABLED
+        bool "Enable ESP-NOW remote-control receiver mode"
+        default y
+        help
+            OperationMode::EspNowRemote — receive M5Stack official Stack-chan
+            compatible ESP-NOW pose packets (8-byte [id, yaw, pitch, speed,
+            laser]) and drive the head servos. Pulls in components/espnow_remote
+            (espressif/esp-now) and adds the mode to the on-device / web mode
+            picker. WiFi runs on a fixed channel with no AP association, so this
+            mode does NOT start httpd / conversation. OFF to drop the esp-now
+            dependency from slim builds.
+
+endmenu

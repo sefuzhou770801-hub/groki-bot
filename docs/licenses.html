@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<!--
+SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
+SPDX-FileCopyrightText: 2026 sefuzhou770801-hub
+SPDX-License-Identifier: BSL-1.0
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Groki Bot licenses</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif;
+         margin: 0 auto; padding: 1.5rem 1rem; max-width: 860px; line-height: 1.6; }
+  h1 { font-size: 1.4rem; margin: 0 0 .3rem; }
+  h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; border-bottom: 1px solid #888; padding-bottom: .2rem; }
+  h3 { font-size: 1rem; margin: 1.2rem 0 .3rem; }
+  .sub { opacity: .75; font-size: .92rem; }
+  a { color: #1e88e5; }
+  code { background: rgba(128,128,128,.18); padding: 0 .3em; border-radius: 3px; font-size: .9em; }
+  .tw { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; margin: .5rem 0; }
+  th, td { border: 1px solid #999; padding: .35rem .5rem; text-align: left; vertical-align: top; }
+  pre { white-space: pre-wrap; word-break: break-word; font-size: .8rem; background: rgba(128,128,128,.12);
+         padding: .8rem; border-radius: 6px; }
+  .warn { border-left: 4px solid #e0a000; padding: .3rem .8rem; background: rgba(224,160,0,.1); }
+</style>
+</head>
+<body>
+<h1>Groki Bot: licenses and attributions</h1>
+<p class="sub">Third-party software and data in the Groki Bot firmware and on this site. Source: <a href="https://github.com/sefuzhou770801-hub/groki-bot/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">THIRD_PARTY_NOTICES.md</a>. <a href="./index.html">Web flasher</a> · <a href="./settings.html">Settings (Bluetooth)</a></p>
+
+<p>Groki Bot's own source code is distributed under the <a href="#bsl">Boost Software License 1.0</a>, Copyright (c) 2026 Kenta IDA and Copyright (c) 2026 sefuzhou770801-hub.</p>
+
+<h2>Data under a non-commercial license</h2>
+<div class="warn">
+<p><strong>Emotion Ball eye-ring data</strong> from <a href="https://github.com/sam70361/aora-bot" target="_blank" rel="noopener">sam70361/aora-bot</a> (commit <code>e3b6148</code>), Copyright (c) 2026 sam70361, is compiled into the firmware (<code>main/aora_ring_data.hpp</code>, animation parameters in <code>main/aora_face.hpp</code>). It is used under the <a href="#emotion-ball">Emotion Ball Community License</a>: non-commercial use only. The firmware may therefore be used and shared for non-commercial purposes only. The ball character's visual design is not used.</p>
+</div>
+
+<h2>Compiled into the firmware</h2>
+<div class="tw"><table><thead><tr><th>Component</th><th>License</th><th>Copyright</th></tr></thead><tbody><tr><td>hts_engine API 1.10 (modified)</td><td><a href="#hts">BSD-3-Clause</a></td><td>(c) 2001-2015 Nagoya Institute of Technology; (c) 2001-2008 Tokyo Institute of Technology</td></tr><tr><td>M5GFX</td><td><a href="#mit">MIT</a></td><td>(c) 2021 M5Stack</td></tr><tr><td>efont Chinese bitmap fonts (in M5GFX)</td><td><a href="#efont">BSD-3-Clause</a></td><td>(c) 2000-2001 /efont/ The Electronic Font Open Laboratory</td></tr><tr><td>Adafruit GFX 5x7 font (in M5GFX)</td><td><a href="#adafruit">BSD-2-Clause</a></td><td>(c) 2012 Adafruit Industries</td></tr><tr><td>M5Unified</td><td><a href="#mit">MIT</a></td><td>(c) 2021 M5Stack</td></tr><tr><td>tl::expected 1.3.1</td><td><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0-1.0</a></td><td>Sy Brand</td></tr><tr><td>ESP-IDF 5.5</td><td><a href="#apache">Apache-2.0 and bundled component licenses</a></td><td>(c) Espressif Systems (Shanghai) Co., Ltd. and contributors</td></tr><tr><td>espressif/cjson 1.7.19</td><td><a href="#mit">MIT</a></td><td>(c) 2009-2017 Dave Gamble and cJSON contributors</td></tr><tr><td>espressif/dl_fft 0.7.0, espressif/esp-dl 3.3.11</td><td><a href="#mit">MIT</a></td><td>(c) 2021 Espressif Systems (Shanghai) Co., Ltd.</td></tr><tr><td>espressif/esp-dsp 1.8.0, esp-now 2.5.3, esp_jpeg 1.3.1, esp_websocket_client 1.8.0, esp32-camera 2.1.7, led_strip 3.0.3, mdns 1.13.1, cmake_utilities 1.1.1</td><td><a href="#apache">Apache-2.0</a></td><td>Espressif Systems</td></tr><tr><td>espressif/esp-sr 2.5.4 (with speech models), espressif/esp_new_jpeg 1.0.2</td><td><a href="#espmit">ESPRESSIF MIT License</a></td><td>(c) 2018, 2024 Espressif Systems</td></tr><tr><td>espressif/esp_audio_codec 2.6.2</td><td><a href="#espmod">Espressif Modified MIT License</a></td><td>(c) 2025 Espressif Systems (Shanghai) Co., Ltd.</td></tr><tr><td>espressif/quirc 1.2.0</td><td><a href="#isc">ISC</a></td><td>(c) 2010-2012 Daniel Beer</td></tr><tr><td>m5stack/m5gfx 0.2.30</td><td><a href="#mit">MIT</a></td><td>(c) 2021 M5Stack</td></tr></tbody></table></div>
+
+<h2>Voice data</h2>
+<p><strong>HTS Voice "Mei"</strong> (c) 2009-2013 Nagoya Institute of Technology / MMDAgent Project Team, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>. <code>mei16.htsvoice</code> is a modified version (downsampled to 16 kHz, Kenta IDA 2026). License file: see <a href="#mei">below</a>.</p>
+
+<h2>This website</h2>
+<div class="tw"><table><thead><tr><th>Component</th><th>License</th><th>Copyright</th></tr></thead><tbody><tr><td>esptool-js</td><td><a href="#apache">Apache-2.0</a></td><td>(c) Espressif Systems</td></tr><tr><td>pako 2.1.0 (in esptool-js)</td><td><a href="#pako">MIT AND Zlib</a></td><td>(c) 2014-2017 Vitaly Puzrin and Andrey Tupitsin</td></tr><tr><td>Emscripten runtime (in avatar_module.js)</td><td><a href="#mit">MIT</a></td><td>(c) Emscripten authors</td></tr></tbody></table></div>
+
+<h2>Gateway (runs on your computer, not in the firmware)</h2>
+<p>The gateway in <code>gateway/</code> is a fork of <a href="https://github.com/kisaragi-mochi/stackchan-mcp" target="_blank" rel="noopener">kisaragi-mochi/stackchan-mcp</a> and is distributed under the <a href="#mit">MIT License</a> with the upstream copyright lines kept in <a href="https://github.com/sefuzhou770801-hub/groki-bot/blob/main/gateway/LICENSE" target="_blank" rel="noopener">gateway/LICENSE</a>. Its Python dependencies are installed from PyPI and listed in <a href="https://github.com/sefuzhou770801-hub/groki-bot/blob/main/THIRD_PARTY_NOTICES.md#gateway-gateway" target="_blank" rel="noopener">THIRD_PARTY_NOTICES.md</a>.</p>
+
+<h2>License texts</h2>
+<h3 id="bsl">Boost Software License 1.0 (Groki Bot)</h3>
+<pre>Copyright (c) 2026 Kenta IDA
+Copyright (c) 2026 sefuzhou770801-hub
+
+Boost Software License - Version 1.0 - August 17th, 2003
+
+Permission is hereby granted, free of charge, to any person or organization
+obtaining a copy of the software and accompanying documentation covered by
+this license (the &quot;Software&quot;) to use, reproduce, display, distribute,
+execute, and transmit the Software, and to prepare derivative works of the
+Software, and to permit third-parties to whom the Software is furnished to
+do so, all subject to the following:
+
+The copyright notices in the Software and this entire statement, including
+the above license grant, this restriction and the following disclaimer,
+must be included in all copies of the Software, in whole or in part, and
+all derivative works of the Software, unless such copies or derivative
+works are solely in the form of machine-executable object code generated by
+a source language processor.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.</pre>
+<h3 id="emotion-ball">Emotion Ball Community License (eye-ring data)</h3>
+<pre>Emotion Ball Community License
+Emotion Ball 社区许可（非商业免费；引擎与表情数据可另行商业授权；球形角色视觉形象永不商用）
+
+Copyright (c) 2026 sam70361 (仅就独立编写的源代码、表情配置数据与文档部分)
+
+适用范围 / Scope: 本许可仅适用于仓库根目录及 emotion-ball/ 目录的内容
+（球形角色项目及其站点与文档）。mood-mates/ 子目录为独立原创角色子项目，
+受其自带的 mood-mates/LICENSE（社区许可）与 mood-mates/LICENSE-COMMERCIAL.md
+（商业许可）约束，不适用本许可。
+This license applies only to the contents at the repository root and in the
+emotion-ball/ directory (the ball-character project, its site and docs). The
+mood-mates/ subdirectory is an independent original-character sub-project
+governed by its own mood-mates/LICENSE (community) and
+mood-mates/LICENSE-COMMERCIAL.md (commercial); this license does not apply
+to it.
+
+【中文】
+
+0. 内容划分：本项目包含两类授权不同的内容——
+
+   (A) 表情引擎与表情数据：源代码（状态机、弹簧插值动画、球面投影、
+       渲染与配置注册中心等）、表情配置数据（眼环 / 眼形 / 嘴形参数、
+       动画原语与关键帧序列）以及配套文档，均为独立编写与设计；
+
+   (B) 球形角色视觉形象：blob / wedge / gem 身体造型、配色方案、彩带等
+       特效视觉，及其组合形成的整体角色形象。
+
+1. 非商业使用（适用于 A 与 B）：允许免费查看、下载、运行、修改本项目，
+   并在注明出处的前提下，在个人学习、研究与技术交流等非商业场景中分享
+   本项目或其衍生作品。
+
+2. 商业使用（仅限 A）：表情引擎与表情数据可通过商业授权用于商业用途，
+   通用条款见仓库根目录 LICENSE-COMMERCIAL.md；商业授权请联系
+   1251579308@qq.com。
+
+3. 视觉形象永不商用（B）：球形角色视觉形象仅供个人技术学习与研究，
+   禁止任何商业用途；该部分不提供、也永不提供商业授权。取得商业授权的
+   被许可方亦不得将球形角色视觉形象用于商业用途，须搭配自有或另行合法
+   授权的角色形象使用。详见仓库根目录 NOTICE.md。
+
+4. 未经商业授权，禁止将本项目或其衍生作品用于任何商业用途，包括但不
+   限于售卖、付费授权、集成到商业产品或服务、用于商业推广等。
+
+5. 分发本项目或其衍生作品时，须完整保留本许可声明、版权信息与
+   NOTICE.md。
+
+6. 本项目按&quot;现状&quot;提供，不附带任何明示或默示的担保；因使用本项目产生
+   的任何风险与责任由使用者自行承担。
+
+[English]
+
+0. CONTENT CLASSES: this project contains two differently licensed classes
+   of content —
+
+   (A) Expression engine &amp; emotion data: the source code (state machine,
+       spring interpolation, spherical projection, rendering, config
+       registry, etc.), the emotion configuration data (eye-ring / eye-shape
+       / mouth-shape parameters, animation primitives and keyframe
+       sequences) and the accompanying documentation, all independently
+       written and designed;
+
+   (B) Ball-character visual designs: the blob / wedge / gem body
+       silhouettes, color schemes, ribbon and other FX visuals, and the
+       overall character appearance they form together.
+
+1. NON-COMMERCIAL USE (applies to both A and B): viewing, downloading,
+   running and modifying this project free of charge, and sharing this
+   project or derivative works with proper attribution in non-commercial
+   scenarios (personal learning, research and technical exchange) are
+   permitted.
+
+2. COMMERCIAL USE (A only): the expression engine and emotion data may be
+   used commercially under a commercial license; see LICENSE-COMMERCIAL.md
+   in the repository root for the general terms, and contact
+   1251579308@qq.com for licensing.
+
+3. VISUAL DESIGNS NEVER COMMERCIAL (B): the ball-character visual designs
+   are provided solely for personal technical study and research; any
+   commercial use is prohibited, and no commercial license is or will ever
+   be offered for them. Even commercial licensees must not use the
+   ball-character visual designs commercially and must pair the licensed
+   materials with their own or otherwise lawfully licensed character
+   designs. See NOTICE.md in the repository root.
+
+4. Without a commercial license, any commercial use of this project or its
+   derivative works is prohibited, including but not limited to selling,
+   paid licensing, integration into commercial products or services, or use
+   in commercial promotion.
+
+5. This license notice, the copyright notice and NOTICE.md must be retained
+   in all copies or substantial portions of the project.
+
+6. The project is provided &quot;AS IS&quot;, without warranty of any kind, express or
+   implied. All risks and liabilities arising from its use are borne by the
+   user.</pre>
+<h3 id="emotion-ball-notice">Emotion Ball NOTICE.md</h3>
+<pre># NOTICE · 使用声明 / Usage Notice
+
+&gt; **适用范围**：本声明针对 `emotion-ball/` 目录球形角色（blob / wedge / gem）的**视觉形象**（身体造型、配色方案、彩带等特效视觉及其整体形象）。表情引擎源代码与表情配置数据不在本声明限制范围内，采用「非商业免费 + 可获取商业授权」双许可，详见根目录 `LICENSE` 与 `LICENSE-COMMERCIAL.md`。`mood-mates/` 目录中的角色（云宝 Nimbo、亮亮 Twinkle）为独立原创设计，亦不在本声明范围内，详见 `mood-mates/LICENSE` 与 `mood-mates/LICENSE-COMMERCIAL.md`。
+&gt;
+&gt; **Scope**: This notice covers the **visual designs** of the ball-shaped characters (blob / wedge / gem) in the `emotion-ball/` directory — body silhouettes, color schemes, ribbon and other FX visuals, and the overall character appearance. The expression engine source code and emotion configuration data are outside this notice and are dual-licensed (free for non-commercial use + commercial licensing available) — see `LICENSE` and `LICENSE-COMMERCIAL.md` in the repository root. The characters in the `mood-mates/` directory (Nimbo the cloud, Twinkle the star) are independently created original designs and also fall outside this notice — see `mood-mates/LICENSE` and `mood-mates/LICENSE-COMMERCIAL.md`.
+
+## 【中文】
+
+1. **视觉形象使用限制**：球形角色的视觉形象（身体造型、配色方案、彩带等特效视觉及其整体形象）仅供个人技术学习与研究，**禁止任何商业用途**；该部分不提供、也永不提供商业授权。
+
+2. **代码与表情数据归属**：本仓库中的代码实现（状态机、弹簧插值动画、球面投影、配置注册中心等）与表情配置数据（眼环 / 眼形 / 嘴形参数、动画原语、关键帧序列）为独立编写与设计，非商业使用免费，商业用途可获取商业授权（见 `LICENSE` 与 `LICENSE-COMMERCIAL.md`）；商业使用时须搭配使用方自有或另行合法授权的角色形象。
+
+3. **联系方式**：若认为本仓库的内容存在不妥，请通过邮箱 **1251579308@qq.com** 联系，我们将在收到通知后及时处理。
+
+## [English]
+
+1. **Visual-design restrictions**: The ball characters&#x27; visual designs (body silhouettes, color schemes, ribbon and other FX visuals, and the overall character appearance) are for personal technical study and research only. **Any commercial use is prohibited**, and no commercial license is or will ever be offered for them.
+
+2. **Code &amp; emotion data**: The code in this repository (state machine, spring interpolation, spherical projection, config registry, etc.) and the emotion configuration data (eye-ring / eye-shape / mouth-shape parameters, animation primitives, keyframe sequences) were independently written and designed. They are free for non-commercial use, and commercial licensing is available (see `LICENSE` and `LICENSE-COMMERCIAL.md`); commercial use must pair them with the user&#x27;s own or otherwise lawfully licensed character designs.
+
+3. **Contact**: If you consider any content of this repository inappropriate, please contact **1251579308@qq.com** and it will be handled promptly upon notice.</pre>
+<h3 id="apache">Apache License 2.0</h3>
+<pre>                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      &quot;License&quot; shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      &quot;Licensor&quot; shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      &quot;Legal Entity&quot; shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      &quot;control&quot; means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      &quot;You&quot; (or &quot;Your&quot;) shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      &quot;Source&quot; form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      &quot;Object&quot; form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      &quot;Work&quot; shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      &quot;Derivative Works&quot; shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      &quot;Contribution&quot; shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, &quot;submitted&quot;
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as &quot;Not a Contribution.&quot;
+
+      &quot;Contributor&quot; shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a &quot;NOTICE&quot; text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an &quot;AS IS&quot; BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets &quot;[]&quot;
+      replaced with your own identifying information. (Don&#x27;t include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same &quot;printed page&quot; as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.</pre>
+<h3 id="mit">MIT License</h3>
+<p class="sub">Text as used by M5GFX and M5Unified. The other MIT components use the same terms with their own copyright lines listed above.</p>
+<pre>MIT License
+
+Copyright (c) 2021 M5Stack
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+<h3 id="hts">BSD-3-Clause: hts_engine API</h3>
+<pre>The HMM-Based Speech Synthesis Engine &quot;hts_engine API&quot;
+          developed by HTS Working Group
+          http://hts-engine.sourceforge.net/
+-----------------------------------------------------------------
+
+ Copyright (c) 2001-2015  Nagoya Institute of Technology
+                          Department of Computer Science
+
+               2001-2008  Tokyo Institute of Technology
+                          Interdisciplinary Graduate School of
+                          Science and Engineering
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or
+without modification, are permitted provided that the following
+conditions are met:
+
+- Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above
+  copyright notice, this list of conditions and the following
+  disclaimer in the documentation and/or other materials provided
+  with the distribution.
+- Neither the name of the HTS working group nor the names of its
+  contributors may be used to endorse or promote products derived
+  from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+CONTRIBUTORS &quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.</pre>
+<h3 id="efont">BSD-3-Clause: efont</h3>
+<pre>(c) Copyright 2000-2001 /efont/ The Electronic Font Open Laboratory.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of the team nor the names of its contributors
+   may be used to endorse or promote products derived from this font
+   without specific prior written permission.
+
+THIS FONT IS PROVIDED BY THE TEAM AND CONTRIBUTORS ``AS IS&#x27;&#x27; AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE TEAM OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS FONT, EVEN
+IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</pre>
+<h3 id="adafruit">BSD-2-Clause: Adafruit GFX font</h3>
+<pre>Software License Agreement (BSD License)
+
+Copyright (c) 2012 Adafruit Industries.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+- Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot;
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.</pre>
+<h3 id="isc">ISC License: quirc</h3>
+<pre>quirc -- QR-code recognition library
+Copyright (C) 2010-2012 Daniel Beer &lt;dlbeer@gmail.com&gt;
+
+ISC License
+===========
+
+Permission to use, copy, modify, and/or distribute this software for
+any purpose with or without fee is hereby granted, provided that the
+above copyright notice and this permission notice appear in all
+copies.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL
+WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.</pre>
+<h3 id="espmit">ESPRESSIF MIT License: esp-sr</h3>
+<pre>ESPRESSIF MIT License
+ 
+ Copyright (c) 2018 &lt;ESPRESSIF SYSTEMS (SHANGHAI) PTE LTD&gt;
+ 
+ Permission is hereby granted for use on all ESPRESSIF SYSTEMS products, in which case,
+ it is free of charge, to any person obtaining a copy of this software and associated
+ documentation files (the &quot;Software&quot;), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit persons to whom the Software is furnished
+ to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in all copies or
+ substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</pre>
+<h3 id="espmod">Espressif Modified MIT License: esp_audio_codec</h3>
+<pre>Espressif Modified MIT License
+
+Copyright (c) 2025 Espressif Systems (Shanghai) CO., LTD
+
+Permission is hereby granted for use EXCLUSIVELY with Espressif Systems products.
+This includes the right to use, copy, modify, merge, publish, distribute, and sublicense
+the Software, subject to the following conditions:
+
+1. This Software MUST BE USED IN CONJUNCTION WITH ESPRESSIF SYSTEMS PRODUCTS.
+2. The above copyright notice and this permission notice shall be included in all copies
+or substantial portions of the Software.
+3. Redistribution of the Software in source or binary form FOR USE WITH NON-ESPRESSIF PRODUCTS
+is strictly prohibited.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+SPDX-License-Identifier: LicenseRef-Espressif-Modified-MIT</pre>
+<h3 id="pako">pako: MIT and Zlib</h3>
+<pre>(The MIT License)
+
+Copyright (C) 2014-2017 by Vitaly Puzrin and Andrey Tupitsin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</pre>
+<pre>(C) 1995-2013 Jean-loup Gailly and Mark Adler
+(C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+
+This software is provided &#x27;as-is&#x27;, without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.</pre>
+<h3 id="mei">HTS Voice "Mei" license file</h3>
+<pre># ----------------------------------------------------------------- #
+#           HTS Voice &quot;Mei&quot;                                         #
+#           released by MMDAgent Project Team                       #
+#           http://www.mmdagent.jp/                                 #
+# ----------------------------------------------------------------- #
+#                                                                   #
+#  Copyright (c) 2009-2013  Nagoya Institute of Technology          #
+#                           Department of Computer Science          #
+#                                                                   #
+# Some rights reserved.                                             #
+#                                                                   #
+# This work is licensed under the Creative Commons Attribution 3.0  #
+# license.                                                          #
+#                                                                   #
+# You are free:                                                     #
+#  * to Share - to copy, distribute and transmit the work           #
+#  * to Remix - to adapt the work                                   #
+# Under the following conditions:                                   #
+#  * Attribution - You must attribute the work in the manner        #
+#    specified by the author or licensor (but not in any way that   #
+#    suggests that they endorse you or your use of the work).       #
+# With the understanding that:                                      #
+#  * Waiver - Any of the above conditions can be waived if you get  #
+#    permission from the copyright holder.                          #
+#  * Public Domain - Where the work or any of its elements is in    #
+#    the public domain under applicable law, that status is in no   #
+#    way affected by the license.                                   #
+#  * Other Rights - In no way are any of the following rights       #
+#    affected by the license:                                       #
+#     - Your fair dealing or fair use rights, or other applicable   #
+#       copyright exceptions and limitations;                       #
+#     - The author&#x27;s moral rights;                                  #
+#     - Rights other persons may have either in the work itself or  #
+#       in how the work is used, such as publicity or privacy       #
+#       rights.                                                     #
+#  * Notice - For any reuse or distribution, you must make clear to #
+#    others the license terms of this work. The best way to do this #
+#    is with a link to this web page.                               #
+#                                                                   #
+# See http://creativecommons.org/ for details.                      #
+# ----------------------------------------------------------------- #</pre>
+</body>
+</html>

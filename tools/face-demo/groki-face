@@ -1,0 +1,410 @@
+#!/usr/bin/env zsh
+# SPDX-FileCopyrightText: 2026 sefuzhou770801-hub
+# SPDX-License-Identifier: BSL-1.0
+# groki-face：拍摄用表情遥控
+#
+# 用法：
+#   groki-face <表情名>                 单次切换
+#   groki-face                          交互式按键模式（q 退出）
+#   groki-face play <段名>              按预设脚本串演（内置 demo）
+#   groki-face balloon "<文字>" [hold_ms]  发送气泡
+#
+# 连接：GROKI_HOST（可省略，自动发现）、GROKI_TOKEN（必填）。
+# 也可写入 ~/.config/groki/env（KEY=VALUE），环境变量优先。
+
+set -uo pipefail
+typeset -F SECONDS
+
+EXPRESSIONS=(
+    neutral idle happy sad angry doubt sleepy listening
+    thinking excited curious confused surprised dizzy affection bored
+)
+
+typeset -A KEYMAP
+KEYMAP[1]=neutral
+KEYMAP[2]=happy
+KEYMAP[3]=sad
+KEYMAP[4]=angry
+KEYMAP[5]=doubt
+KEYMAP[6]=sleepy
+KEYMAP[7]=listening
+KEYMAP[8]=thinking
+KEYMAP[9]=excited
+KEYMAP[0]=curious
+KEYMAP[c]=confused
+KEYMAP[s]=surprised
+KEYMAP[d]=dizzy
+KEYMAP[a]=affection
+KEYMAP[b]=bored
+KEYMAP[i]=idle
+
+# 段表：键为段名，值为换行分隔的「表情 秒数」。秒数为 0 表示切完即停。
+# 新增段只在此表加一项。
+typeset -A GROKI_SEGMENTS
+GROKI_SEGMENTS[demo]='
+sleepy 3
+surprised 1
+happy 2
+listening 2
+thinking 2
+excited 2
+happy 0.6
+angry 0.6
+sad 0.6
+confused 0.6
+dizzy 0.6
+affection 3
+bored 2
+sleepy 0
+'
+
+STTY_SAVED=""
+DNS_PID=""
+
+stop_dns() {
+    if [[ -n $DNS_PID ]]; then
+        kill "$DNS_PID" 2>/dev/null || true
+        wait "$DNS_PID" 2>/dev/null || true
+        DNS_PID=""
+    fi
+}
+
+cleanup() {
+    if [[ -n $STTY_SAVED ]]; then
+        stty "$STTY_SAVED" 2>/dev/null || true
+        STTY_SAVED=""
+    fi
+    stop_dns
+}
+trap cleanup EXIT INT TERM
+
+red() {
+    print -u2 $'\e[31m'"$1"$'\e[0m'
+}
+
+usage() {
+    print -u2 "用法："
+    print -u2 "  groki-face <表情名>"
+    print -u2 "  groki-face"
+    print -u2 "  groki-face play <段名>"
+    print -u2 "  groki-face balloon \"<文字>\" [hold_ms]"
+}
+
+print_keymap() {
+    print "按键表："
+    print "  1  neutral      2  happy        3  sad          4  angry"
+    print "  5  doubt        6  sleepy       7  listening    8  thinking"
+    print "  9  excited      0  curious      c  confused     s  surprised"
+    print "  d  dizzy        a  affection    b  bored        i  idle"
+    print "  q  退出"
+    print "气泡请用：groki-face balloon \"<文字>\" [hold_ms]"
+}
+
+print_expressions() {
+    print -u2 "可用表情：${(j: :)EXPRESSIONS}"
+}
+
+is_expression() {
+    local name=$1 e
+    for e in $EXPRESSIONS; do
+        [[ $e == $name ]] && return 0
+    done
+    return 1
+}
+
+load_env_file() {
+    local f="$HOME/.config/groki/env"
+    [[ -r $f ]] || return 0
+    local line key val
+    while IFS= read -r line || [[ -n $line ]]; do
+        line=${line%%$'\r'}
+        [[ -z $line || $line == \#* ]] && continue
+        [[ $line == *=* ]] || continue
+        key=${line%%=*}
+        val=${line#*=}
+        case $key in
+            GROKI_HOST)
+                [[ -z ${GROKI_HOST+x} ]] && GROKI_HOST=$val
+                ;;
+            GROKI_TOKEN)
+                [[ -z ${GROKI_TOKEN+x} ]] && GROKI_TOKEN=$val
+                ;;
+        esac
+    done < "$f"
+}
+
+# dns-sd -B 的 instance 可能是 "Stack-chan config"，不含主机名。
+# 先在 browse 输出里找 stackchan-XXXXXX；找不到再对 instance 做 -L 解析。
+# 整个发现过程限时 3 秒。
+discover_host() {
+    local start=$SECONDS service host
+    for service in _stackchan-config._tcp _http._tcp; do
+        (( SECONDS - start >= 3 )) && break
+        host=$(browse_service "$service" "$start") || true
+        if [[ -n $host ]]; then
+            print -r -- "$host"
+            return 0
+        fi
+    done
+    return 1
+}
+
+browse_service() {
+    local service=$1 start=$2 tmp host inst
+    local -a seen
+    tmp=$(mktemp)
+    dns-sd -B "$service" local >"$tmp" 2>&1 &
+    DNS_PID=$!
+    while (( SECONDS - start < 3 )); do
+        host=$(grep -E -o 'stackchan-[0-9a-fA-F]{6}' "$tmp" 2>/dev/null | head -1)
+        if [[ -n $host ]]; then
+            stop_dns
+            rm -f "$tmp"
+            print -r -- "${host}.local"
+            return 0
+        fi
+        while IFS= read -r inst; do
+            [[ -z $inst ]] && continue
+            [[ ${seen[(Ie)$inst]} -ne 0 ]] && continue
+            seen+=("$inst")
+            stop_dns
+            host=$(lookup_instance "$inst" "$service" "$start")
+            if [[ -n $host ]]; then
+                rm -f "$tmp"
+                print -r -- "$host"
+                return 0
+            fi
+            dns-sd -B "$service" local >"$tmp" 2>&1 &
+            DNS_PID=$!
+        done < <(awk '/[[:space:]]Add[[:space:]]/ {
+            s = $7
+            for (i = 8; i <= NF; i++) s = s " " $i
+            if (s != "") print s
+        }' "$tmp" 2>/dev/null)
+        sleep 0.1
+    done
+    stop_dns
+    rm -f "$tmp"
+    return 1
+}
+
+lookup_instance() {
+    local inst=$1 service=$2 start=$3 tmp host
+    tmp=$(mktemp)
+    dns-sd -L "$inst" "$service" local >"$tmp" 2>&1 &
+    DNS_PID=$!
+    while (( SECONDS - start < 3 )); do
+        host=$(grep -E -o 'stackchan-[0-9a-fA-F]{6}\.local' "$tmp" 2>/dev/null | head -1)
+        if [[ -n $host ]]; then
+            stop_dns
+            rm -f "$tmp"
+            print -r -- "$host"
+            return 0
+        fi
+        sleep 0.1
+    done
+    stop_dns
+    rm -f "$tmp"
+    return 1
+}
+
+json_get() {
+    local key=$1 json=$2
+    if [[ $json =~ "\"${key}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\"" ]]; then
+        print -r -- "$match[1]"
+    fi
+}
+
+http_code() {
+    local method=$1 endpoint=$2
+    local body=${3:-}
+    local out=${4:-/dev/null}
+    local code
+    if [[ $method == GET ]]; then
+        code=$(curl -s -m 3 -o "$out" -w '%{http_code}' \
+            -H "Authorization: Bearer $GROKI_TOKEN" \
+            "http://${GROKI_HOST}${endpoint}" 2>/dev/null) || code=000
+    else
+        code=$(curl -s -m 3 -o "$out" -w '%{http_code}' \
+            -X POST "http://${GROKI_HOST}${endpoint}" \
+            -H "Authorization: Bearer $GROKI_TOKEN" \
+            --data-binary "$body" 2>/dev/null) || code=000
+    fi
+    print -r -- "$code"
+}
+
+probe() {
+    local tmp code body fw ip
+    tmp=$(mktemp)
+    code=$(http_code GET /mcp/state "" "$tmp")
+    body=$(<"$tmp")
+    rm -f "$tmp"
+    case $code in
+        200)
+            fw=$(json_get firmware "$body")
+            ip=$(json_get ip "$body")
+            print "已连接 ${GROKI_HOST}  ip=${ip:-?}  firmware=${fw:-?}"
+            ;;
+        401)
+            print -u2 "token 错误：服务器返回 401，请检查 GROKI_TOKEN"
+            exit 1
+            ;;
+        404)
+            print -u2 "未配置 token：服务器返回 404，设备尚未设置 MCP token"
+            exit 1
+            ;;
+        000)
+            print -u2 "无法连接：${GROKI_HOST}"
+            exit 1
+            ;;
+        *)
+            print -u2 "连通检查失败：HTTP ${code}"
+            exit 1
+            ;;
+    esac
+}
+
+expr_set() {
+    local name=$1
+    local code
+    code=$(http_code POST /mcp/expression "$name")
+    if [[ $code != 200 ]]; then
+        red "表情 ${name} 请求失败（HTTP ${code}）"
+        return 1
+    fi
+    return 0
+}
+
+balloon_send() {
+    local text=$1
+    local hold=${2:-}
+    local endpoint=/mcp/balloon
+    [[ -n $hold ]] && endpoint="${endpoint}?hold_ms=${hold}"
+    local code
+    code=$(http_code POST "$endpoint" "$text")
+    if [[ $code != 200 ]]; then
+        red "气泡请求失败（HTTP ${code}）"
+        return 1
+    fi
+    return 0
+}
+
+play_segment() {
+    local name=$1
+    if (( ${+GROKI_SEGMENTS[$name]} == 0 )); then
+        print -u2 "未知段名：${name}"
+        print -u2 "可用段：${(k)GROKI_SEGMENTS}"
+        exit 1
+    fi
+    local spec expr sec
+    while read -r expr sec; do
+        [[ -z $expr ]] && continue
+        if ! is_expression "$expr"; then
+            red "段 ${name} 含未知表情：${expr}"
+            continue
+        fi
+        if [[ -n ${sec:-} && $sec != 0 ]]; then
+            print "→ ${expr} (${sec}s)"
+        else
+            print "→ ${expr}"
+        fi
+        expr_set "$expr" || true
+        if [[ -n ${sec:-} && $sec != 0 ]]; then
+            sleep "$sec"
+        fi
+    done <<< "${GROKI_SEGMENTS[$name]}"
+}
+
+interactive() {
+    print_keymap
+    if [[ -t 0 ]]; then
+        STTY_SAVED=$(stty -g)
+        stty -icanon -echo min 1 time 0
+    fi
+    local key name
+    while true; do
+        read -k 1 -u 0 key || break
+        [[ $key == $'\n' || $key == $'\r' ]] && continue
+        if [[ $key == q || $key == Q ]]; then
+            break
+        fi
+        name=${KEYMAP[$key]-}
+        if [[ -n $name ]]; then
+            print "→ ${name}"
+            expr_set "$name" || true
+        fi
+    done
+}
+
+# --- main ---
+
+load_env_file
+
+if [[ -z ${GROKI_TOKEN:-} ]]; then
+    print -u2 "未设置 GROKI_TOKEN。请 export GROKI_TOKEN，或写入 ~/.config/groki/env："
+    print -u2 "  GROKI_TOKEN=<MCP_TOKEN>"
+    exit 1
+fi
+
+cmd=${1:-}
+
+if [[ $cmd == play ]]; then
+    if [[ -z ${2:-} ]]; then
+        print -u2 "缺少段名"
+        usage
+        exit 1
+    fi
+    if (( ${+GROKI_SEGMENTS[$2]} == 0 )); then
+        print -u2 "未知段名：$2"
+        print -u2 "可用段：${(k)GROKI_SEGMENTS}"
+        exit 1
+    fi
+elif [[ $cmd == balloon ]]; then
+    if [[ -z ${2:-} ]]; then
+        print -u2 "缺少气泡文字"
+        usage
+        exit 1
+    fi
+    if [[ -n ${3:-} && ! $3 =~ '^[0-9]+$' ]]; then
+        print -u2 "hold_ms 必须是非负整数：$3"
+        exit 1
+    fi
+elif [[ -n $cmd ]]; then
+    if ! is_expression "$cmd"; then
+        print -u2 "未知表情：${cmd}"
+        print_expressions
+        exit 1
+    fi
+fi
+
+if [[ -z ${GROKI_HOST:-} ]]; then
+    if ! command -v dns-sd >/dev/null 2>&1; then
+        print -u2 "未设置 GROKI_HOST，且找不到 dns-sd，无法自动发现。"
+        print -u2 "请 export GROKI_HOST=stackchan-XXXXXX.local"
+        exit 1
+    fi
+    if ! GROKI_HOST=$(discover_host); then
+        print -u2 "无法发现设备。请设置 GROKI_HOST（例如 stackchan-XXXXXX.local）"
+        exit 1
+    fi
+fi
+GROKI_HOST=${GROKI_HOST#http://}
+GROKI_HOST=${GROKI_HOST#https://}
+GROKI_HOST=${GROKI_HOST%/}
+
+probe
+
+case $cmd in
+    "")
+        interactive
+        ;;
+    play)
+        play_segment "$2"
+        ;;
+    balloon)
+        balloon_send "$2" "${3:-}" || exit 1
+        ;;
+    *)
+        expr_set "$cmd" || exit 1
+        ;;
+esac

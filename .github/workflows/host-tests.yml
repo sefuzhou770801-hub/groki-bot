@@ -1,0 +1,156 @@
+name: Host Unit Tests
+
+# ESP-IDF independent unit tests that build with a plain gcc + cmake toolchain
+# on ubuntu-latest — no ESP-IDF container, no cross toolchain. These cover the
+# pure-logic parts of the firmware (avatar bytecode VM decode/execute, SCS0009
+# servo protocol framing/checksum/parse, jtts vowel synthesis) and run on every
+# push / PR so regressions surface long before a tagged firmware build.
+#
+# The firmware build itself lives in release.yml (tag-driven, in the espressif
+# IDF container); this job is deliberately separate and fast.
+#
+# The second job runs the Python test suite of the gateway in gateway/
+# (voice bridge, MCP server and the Grok Bot forwarding service).
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  host-tests:
+    name: Host unit tests (gcc)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # tl_expected is a submodule the tests include (<tl/expected.hpp>).
+          # M5GFX / M5Unified are NOT needed — avatar_vm host tests use the
+          # in-repo WASM shim (wasm/shim/M5GFX.h) instead.
+          submodules: 'recursive'
+
+      - name: Install build tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake g++ ninja-build
+
+      - name: Show toolchain versions
+        run: |
+          cmake --version | head -1
+          g++ --version | head -1
+
+      # --- avatar_vm: bytecode decoder + VM interpreter + fuzz -------------
+      # Built twice: once plain (fast, exhaustive) and once under
+      # ASan + UBSan so the fuzz harness proves memory safety on arbitrary
+      # input.
+      - name: avatar_vm host tests
+        working-directory: components/avatar_vm/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+
+      - name: avatar_vm host tests (ASan + UBSan)
+        working-directory: components/avatar_vm/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-san -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
+          cmake --build build-san
+          ctest --test-dir build-san --output-on-failure
+
+      # --- scs_servo: SCS0009 protocol + path generator -------------------
+      - name: scs_servo host tests
+        working-directory: components/scs_servo/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+
+      - name: scs_servo host tests (ASan + UBSan)
+        working-directory: components/scs_servo/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-san -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
+          cmake --build build-san
+          ctest --test-dir build-san --output-on-failure
+
+      # --- avatar: expression ease controller (from/to/hold/blend) --------
+      - name: avatar host tests
+        working-directory: components/avatar/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+
+      - name: avatar host tests (ASan + UBSan)
+        working-directory: components/avatar/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-san -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
+          cmake --build build-san
+          ctest --test-dir build-san --output-on-failure
+
+      - name: groki_motion host tests
+        working-directory: components/groki_motion/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+
+      # --- jtts: existing vowel-synthesis test ----------------------------
+      # jtts/test/host predates ctest wiring, so drive its executable directly.
+      - name: jtts host tests
+        working-directory: components/jtts/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          ./build/jtts_test_vowels
+
+      - name: Install Node.js (avatar DSL compiler tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: avatar_dsl compile tests
+        working-directory: tools/avatar_dsl
+        run: |
+          set -euo pipefail
+          node test/smoke.mjs
+          node test/round_trip.mjs
+          node test/grok_face_compile.mjs
+
+  gateway-tests:
+    name: Gateway tests (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Opus
+        working-directory: .
+        run: sudo apt-get update && sudo apt-get install -y libopus0 libportaudio2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: pytest
+        env:
+          NO_PROXY: "*"
+        run: uv run pytest -q

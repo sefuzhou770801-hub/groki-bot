@@ -1,0 +1,11 @@
+# gitleaks configuration: default rules plus one allowlist.
+# The settings pages name BLE GATT characteristics after what they carry
+# (CHR_GEMINI_KEY, CHR_MCP_TOKEN, ...). Their values are public protocol
+# UUIDs, not secrets, but the generic-api-key rule flags them.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Groki Bot BLE GATT characteristic UUIDs"
+regexTarget = "secret"
+regexes = ['''^e3f0a0[0-9a-f]{2}-7b1c-4d2a-9e6f-2c5a8d4b1f00$''']

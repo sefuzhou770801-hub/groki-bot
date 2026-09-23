@@ -1,0 +1,25 @@
+# ESP32-S3 family common defaults — shared between the CoreS3 (M5/Takao base)
+# and AtomS3R (Atomic ECHO BASE) builds. Per-board overrides go in
+# sdkconfig.defaults.cores3 / sdkconfig.defaults.atoms3r (chained last). PSRAM
+# mode in particular is per-board because it cannot be switched at runtime
+# (the bootloader needs to know Quad vs Octal at link time).
+
+CONFIG_IDF_TARGET="esp32s3"
+# Flash size is per-board (CoreS3 16 MB / AtomS3R 8 MB) — set in the
+# sdkconfig.defaults.<board> overlay that's chained after this file. A
+# mismatch makes the SPI flash size header reject boot.
+
+# Both boards carry 8 MB PSRAM; the host-side malloc behaviour is identical.
+# The wire mode (Quad vs Octal) and clock speed are the per-board overrides.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_USE_MALLOC=y
+# NOTE: SPIRAM_MALLOC_ALWAYSINTERNAL is intentionally NOT set here. The
+# value lives in the common sdkconfig.defaults (=1024) — this per-target
+# file is loaded *after* it in the SDKCONFIG_DEFAULTS chain, so setting it
+# here would silently override the common value. A stale 16384 here was
+# exactly that bug: local builds (whose persisted sdkconfig had 1024)
+# worked, but fresh CI builds got 16384 and the esp-aes DMA alloc failed
+# during TLS reconnects. Keep memory tuning in the common file only.
+
+# Default console on the on-board USB-Serial-JTAG.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
