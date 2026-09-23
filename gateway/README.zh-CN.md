@@ -125,7 +125,7 @@ Claude Desktop 在 `claude_desktop_config.json` 里加入下面的配置（路�
 
 ## 可选：把任务交给 Grok Bot
 
-打开这项功能后，可以说「Hi Grok，帮我查一下明天东京的天气」或「帮我调研一下 X」：Gemini 马上回一句「已经发给总管啦」，把任务交给 Grok Bot 应用里的智能体，智能体每回一段话，机器人就念一段。闲聊仍由 Gemini 直接回答。完整的消息流程见[架构与通信说明](../docs/architecture.zh-CN.md#4-把任务交给-grok-bot)。
+打开这项功能后，可以说「Hi Grok，帮我查一下明天东京的天气」或「帮我调研一下 X」：Gemini 马上回一句「已经发给助手啦」，把任务交给 Grok Bot 应用里的智能体，智能体每回一段话，机器人就念一段。闲聊仍由 Gemini 直接回答。完整的消息流程见[架构与通信说明](../docs/architecture.zh-CN.md#4-把任务交给-grok-bot)。
 
 不配置就不会开启。需要在运行网关的同一台电脑上准备：
 
@@ -134,7 +134,7 @@ Claude Desktop 在 `claude_desktop_config.json` 里加入下面的配置（路�
 
 步骤：
 
-1. 从 `gbot bots list` 里选一个智能体名字（也可以新建，例如 `gbot bots create --name 总管`），写进 `.env`：`STACKCHAN_TOOL_BOT=总管`。填了这一项功能才会开启。
+1. 从 `gbot bots list` 里选一个智能体名字（也可以新建，例如 `gbot bots create --name 助手`），写进 `.env`：`STACKCHAN_TOOL_BOT=助手`。填了这一项功能才会开启。
 2. 另开一个终端（或另设一个后台服务）启动转发服务，保持运行：
 
    ```bash
@@ -149,7 +149,7 @@ Claude Desktop 在 `claude_desktop_config.json` 里加入下面的配置（路�
 ```bash
 curl -s -X POST http://127.0.0.1:18770/send \
   -H 'Content-Type: application/json' \
-  -d '{"text": "用一句话回答：你好", "target": "总管"}'
+  -d '{"text": "用一句话回答：你好", "target": "助手"}'
 ```
 
 ## 配置项

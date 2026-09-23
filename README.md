@@ -63,9 +63,9 @@ Use this if you already use the Grok Bot desktop app and want the robot to pass 
 
 1. Get path 2 working.
 2. On the same computer: sign in to the Grok Bot app and install the `gbot` CLI (`npm install --global grok-bot-cli`; it needs a recent Node.js, see [grok-bot-cli](https://github.com/ScriptedAlchemy/grok-bot-cli)). Check with `gbot bots list`.
-3. In `gateway/.env`, set `STACKCHAN_TOOL_BOT` to the agent's name (for example `STACKCHAN_TOOL_BOT=总管`). The feature stays off until this is set.
+3. In `gateway/.env`, set `STACKCHAN_TOOL_BOT` to the agent's name (for example `STACKCHAN_TOOL_BOT=assistant`). The feature stays off until this is set.
 4. Start the forwarding service next to the gateway: `cd gateway && uv run stackchan-gbot-proxy` (listens on `127.0.0.1:18770` only). Restart the gateway.
-5. Say "Hi Grok, look up tomorrow's weather". The robot answers "已经发给总管啦" (sent to the agent) and then reads the agent's replies.
+5. Say "Hi Grok, look up tomorrow's weather". The robot says the task has been sent to assistant, then reads the agent's replies.
 
 Details and troubleshooting: [gateway README, Grok Bot hand-off](gateway/README.md#optional-grok-bot-hand-off) and [docs/architecture.md, section 4](docs/architecture.md#4-grok-bot-hand-off).
 

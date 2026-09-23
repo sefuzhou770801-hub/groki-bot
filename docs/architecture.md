@@ -125,7 +125,7 @@ sequenceDiagram
     U->>R: "Hi Grok, research X for me"
     R->>G: Opus audio (ws :8765)
     G->>G: Gemini calls ask_grokbot(task)
-    G-->>R: Gemini says "已经发给总管啦" (sent to the agent)
+    G-->>R: Gemini says "Sent to assistant."
     G->>P: POST /send {"text": prefix + task, "target": agent}<br/>X-Stackchan-Stream: 1
     P->>B: gbot --json thread agent (remember old messages)
     P->>B: gbot --json send agent "task"
@@ -133,7 +133,7 @@ sequenceDiagram
         P->>B: gbot --json thread agent
     end
     P-->>G: {"event": "first", "reply": "On it."}
-    G->>G: system notice "总管回话了: On it."
+    G->>G: system notice "assistant replied: On it."
     G-->>R: Gemini says it
     P-->>G: {"event": "more", "reply": "Found it: ..."}
     G-->>R: Gemini says it

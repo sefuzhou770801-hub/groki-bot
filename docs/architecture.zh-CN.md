@@ -61,7 +61,7 @@ flowchart LR
 
 | | 用法 1：只刷固件 | 用法 2：加网关 | 用法 3：再加 Grok Bot |
 |---|---|---|---|
-| 能做什么 | 语音对话、表情、转头、触摸反应 | 「Hi Grok」唤醒词，语音经电脑走 Gemini Live，Claude 能让机器人说话、读取状态 | 说「帮我查一下」「帮我调研 X」，机器人马上回一句「已经发给总管啦」，智能体每回一段就念一段 |
+| 能做什么 | 语音对话、表情、转头、触摸反应 | 「Hi Grok」唤醒词，语音经电脑走 Gemini Live，Claude 能让机器人说话、读取状态 | 说「帮我查一下」「帮我调研 X」，机器人马上回一句「已经发给助手啦」，智能体每回一段就念一段 |
 | 硬件 | CoreS3 加 Stack-chan 底座（或其他支持的板子），USB-C 线 | 再加一台和机器人在同一 Wi-Fi 的电脑（macOS 测试过，Linux 可跑语音） | 同一台电脑 |
 | 软件 | 桌面版 Chrome 或 Edge（网页刷写和蓝牙设置页） | [uv](https://docs.astral.sh/uv/)、Git、libopus；唤醒词模型可选（约 33 MB） | 已登录的 Grok Bot 应用；[grok-bot-cli](https://github.com/ScriptedAlchemy/grok-bot-cli) 提供的 `gbot` 命令行（`npm install --global grok-bot-cli`，需要较新的 Node.js） |
 | 密钥 | OpenAI 或 Gemini API 密钥，存在机器人的 NVS 里 | `gateway/.env` 里的 Gemini API 密钥；可选的共享令牌 `STACKCHAN_TOKEN` | 不需要额外密钥：`gbot` 使用应用的登录状态，网关不保存任何 Grok 相关凭据 |
@@ -125,7 +125,7 @@ sequenceDiagram
     U->>R: 「Hi Grok，帮我调研一下 X」
     R->>G: Opus 音频（ws :8765）
     G->>G: Gemini 调用 ask_grokbot(task)
-    G-->>R: Gemini 说「已经发给总管啦」
+    G-->>R: Gemini 说「已经发给助手啦」
     G->>P: POST /send {"text": 前缀 + 任务, "target": 智能体}<br/>X-Stackchan-Stream: 1
     P->>B: gbot --json thread 智能体（记下已有消息）
     P->>B: gbot --json send 智能体 "任务"
@@ -133,7 +133,7 @@ sequenceDiagram
         P->>B: gbot --json thread 智能体
     end
     P-->>G: {"event": "first", "reply": "好，我去查。"}
-    G->>G: 系统通知「总管回话了：好，我去查。」
+    G->>G: 系统通知「助手回话了：好，我去查。」
     G-->>R: Gemini 念出来
     P-->>G: {"event": "more", "reply": "查到了：……"}
     G-->>R: Gemini 念出来

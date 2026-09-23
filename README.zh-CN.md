@@ -63,9 +63,9 @@ Groki Bot 桌面机器人（M5Stack CoreS3 加 Stack-chan 底座）的全部内�
 
 1. 先把用法 2 跑通。
 2. 在同一台电脑上登录 Grok Bot 应用，安装 `gbot` 命令行（`npm install --global grok-bot-cli`，需要较新的 Node.js，见 [grok-bot-cli](https://github.com/ScriptedAlchemy/grok-bot-cli)），用 `gbot bots list` 检查。
-3. 在 `gateway/.env` 里把 `STACKCHAN_TOOL_BOT` 设为智能体的名字（例如 `STACKCHAN_TOOL_BOT=总管`）。不设置就不会开启。
+3. 在 `gateway/.env` 里把 `STACKCHAN_TOOL_BOT` 设为智能体的名字（例如 `STACKCHAN_TOOL_BOT=助手`）。不设置就不会开启。
 4. 在网关旁边启动转发服务：`cd gateway && uv run stackchan-gbot-proxy`（只监听 `127.0.0.1:18770`），然后重启网关。
-5. 说「Hi Grok，帮我查一下明天的天气」。机器人会先说「已经发给总管啦」，再念智能体的回复。
+5. 说「Hi Grok，帮我查一下明天的天气」。机器人会先说「已经发给助手啦」，再念智能体的回复。
 
 详细说明和排查：[网关 README：把任务交给 Grok Bot](gateway/README.zh-CN.md#可选把任务交给-grok-bot)、[架构与通信说明第 4 节](docs/architecture.zh-CN.md#4-把任务交给-grok-bot)。
 
