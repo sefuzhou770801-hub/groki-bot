@@ -31,20 +31,32 @@ from stackchan_mcp.gemini_live_bridge import (
 )
 
 
+def _fake_claude_cli(directory) -> str:
+    binary = directory / "claude"
+    binary.write_text("#!/bin/sh\nexit 0\n")
+    binary.chmod(0o755)
+    return str(binary)
+
+
 @pytest.fixture(autouse=True)
-def _all_gemini_tools_enabled(request, monkeypatch):
+def _all_gemini_tools_enabled(request, monkeypatch, tmp_path):
     """Most tests here cover the full tool set (MCP-capable firmware + Mac
-    control). Tests marked ``defaults`` see the shipped defaults instead.
+    control + an installed claude CLI). Tests marked ``defaults`` see the
+    shipped defaults on a machine without the claude CLI instead.
     The Grok Bot hand-off is off in both unless a test turns it on."""
     monkeypatch.delenv("STACKCHAN_TOOL_BOT", raising=False)
     monkeypatch.delenv("STACKCHAN_TOOL_BOT_ID", raising=False)
     monkeypatch.delenv("STACKCHAN_TOOL_BOT_PREFIX", raising=False)
+    monkeypatch.delenv("STACKCHAN_ASK_CLAUDE", raising=False)
+    monkeypatch.delenv("STACKCHAN_CLAUDE_MODEL", raising=False)
     if request.node.get_closest_marker("defaults"):
         monkeypatch.delenv("STACKCHAN_GEMINI_DEVICE_TOOLS", raising=False)
         monkeypatch.delenv("STACKCHAN_MAC_CONTROL", raising=False)
+        monkeypatch.setenv("STACKCHAN_CLAUDE_BIN", str(tmp_path / "no-claude-here"))
     else:
         monkeypatch.setenv("STACKCHAN_GEMINI_DEVICE_TOOLS", "1")
         monkeypatch.setenv("STACKCHAN_MAC_CONTROL", "1")
+        monkeypatch.setenv("STACKCHAN_CLAUDE_BIN", _fake_claude_cli(tmp_path))
 
 
 @pytest.mark.defaults
@@ -55,7 +67,7 @@ def test_default_declarations_are_voice_only_without_mac_control():
     from stackchan_mcp.mac_control import MAC_TOOL_NAMES
 
     names = [decl.name for decl in build_function_declarations()]
-    assert names == ["end_conversation", "ask_claude", "get_current_datetime"]
+    assert names == ["end_conversation", "get_current_datetime"]
     assert not set(names) & (set(TOOL_MAP) | MAC_TOOL_NAMES | {"express_emotion"})
 
 
@@ -69,7 +81,28 @@ def test_default_system_instruction_matches_declared_tools(monkeypatch):
     assert "express_emotion" not in instruction
     assert "run_mac_task" not in instruction
     assert "end_conversation" in instruction
-    assert "ask_claude" in instruction
+    assert "ask_claude" not in instruction
+
+
+@pytest.mark.defaults
+def test_ask_claude_offered_when_claude_cli_installed(monkeypatch, tmp_path):
+    monkeypatch.setenv("STACKCHAN_CLAUDE_BIN", _fake_claude_cli(tmp_path))
+
+    names = [decl.name for decl in build_function_declarations()]
+    assert names == ["end_conversation", "ask_claude", "get_current_datetime"]
+    assert "ask_claude(question)" in default_system_instruction()
+
+
+@pytest.mark.defaults
+@pytest.mark.parametrize("value", ["0", "false", "off"])
+def test_ask_claude_can_be_turned_off_with_cli_installed(monkeypatch, tmp_path, value):
+    monkeypatch.setenv("STACKCHAN_CLAUDE_BIN", _fake_claude_cli(tmp_path))
+    monkeypatch.setenv("STACKCHAN_ASK_CLAUDE", value)
+
+    names = [decl.name for decl in build_function_declarations()]
+    assert "ask_claude" not in names
+    assert "ask_claude" not in default_system_instruction()
+    assert "get_current_datetime" in default_system_instruction()
 
 
 @pytest.mark.defaults
@@ -748,6 +781,37 @@ async def test_dispatch_ask_claude_missing_question():
     bridge = _bridge()
     result = await bridge._dispatch_ask_claude({"question": "   "})
     assert result == {"ok": False, "error": "question is required"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [(None, "claude-sonnet-5"), ("claude-opus-5", "claude-opus-5")],
+)
+async def test_dispatch_ask_claude_uses_configured_model(monkeypatch, configured, expected):
+    import stackchan_mcp.gemini_live_bridge as bridge_mod
+
+    if configured is not None:
+        monkeypatch.setenv("STACKCHAN_CLAUDE_MODEL", configured)
+    calls = []
+
+    class FakeProc:
+        returncode = 0
+
+        async def communicate(self):
+            return b"answer", b""
+
+    async def fake_exec(*argv, **kwargs):
+        calls.append(argv)
+        return FakeProc()
+
+    monkeypatch.setattr(bridge_mod.asyncio, "create_subprocess_exec", fake_exec)
+    bridge = _bridge()
+    result = await bridge._dispatch_ask_claude({"question": "分析一下"})
+
+    assert result == {"ok": True, "answer": "answer"}
+    argv = calls[0]
+    assert argv[argv.index("--model") + 1] == expected
 
 
 @pytest.mark.asyncio

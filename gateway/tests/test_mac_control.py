@@ -441,7 +441,8 @@ def test_run_mac_task_requires_task():
     assert result["ok"] is False
 
 
-def test_run_mac_task_starts_and_announces_completion():
+def test_run_mac_task_starts_and_announces_completion(monkeypatch):
+    monkeypatch.delenv("STACKCHAN_CLAUDE_MODEL", raising=False)
     runner = StubRunner(stdout="整理完成，移动了 3 个文件")
     announced: list[dict] = []
     started: list[bool] = []
@@ -506,6 +507,25 @@ def test_run_mac_task_missing_command_records_failure_and_announces():
     assert "claude" in announced[0]["result"].lower()
     assert status["tasks"][0]["status"] == "failed"
     assert status["tasks"][0]["state"] == "failed"
+
+
+def test_run_mac_task_uses_configured_claude_model(monkeypatch):
+    monkeypatch.setenv("STACKCHAN_CLAUDE_MODEL", "claude-opus-5")
+    calls = []
+
+    async def runner(*argv, timeout=10.0, stdin_text=None):
+        calls.append(argv)
+        return 0, "done", ""
+
+    async def scenario():
+        controller = MacController(run_cmd=runner, claude_bin="claude-test")
+        await controller.dispatch("run_mac_task", {"task": "整理桌面截图"})
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+    asyncio.run(scenario())
+    argv = calls[0]
+    assert argv[argv.index("--model") + 1] == "claude-opus-5"
 
 
 def test_resolve_claude_bin_uses_env_override(tmp_path, monkeypatch):
