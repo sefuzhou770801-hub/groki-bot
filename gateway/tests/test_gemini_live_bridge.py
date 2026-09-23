@@ -1759,6 +1759,9 @@ def test_note_session_end_while_dormant_stays_quiet(caplog):
     bridge = _bridge(debug_status=st)
     st.on_gemini_connected(1)
     bridge._session = object()
+    # Setting up the bridge may warn about unrelated things (for example no
+    # `claude` CLI on PATH on CI runners); only the session-end path counts.
+    caplog.clear()
 
     with caplog.at_level("ERROR"):
         bridge._note_session_end(None)
