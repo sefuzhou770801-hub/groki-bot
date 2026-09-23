@@ -1,0 +1,71 @@
+// SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
+// SPDX-License-Identifier: BSL-1.0
+
+#pragma once
+
+#include <cstdint>
+#include <config_service/config_service.hpp>
+
+namespace stackchan::config::gatt {
+
+// Register GATT service tables with NimBLE host and snapshot the active config.
+// Must be called after nimble_port_init() but before nimble_port_freertos_init().
+void init(const DeviceConfig& active);
+
+// Attribute handle for the Status characteristic (used for notify).
+uint16_t status_val_handle();
+
+// Update CCCD subscription state. Called from GAP SUBSCRIBE event handler.
+void set_subscribe(uint16_t conn_handle, bool subscribed);
+
+// Update cached Wi-Fi state and send Status NOTIFY if subscribed.
+// Thread-safe — may be called from any task.
+void set_wifi_connected(bool connected);
+
+// Update the cached battery snapshot (mV / mA / percent) served by the Battery
+// READ characteristic. Thread-safe — may be called from any task.
+void set_battery(int millivolts, int milliamps, int percent);
+
+// Drop application-layer crypto session state. Call on BLE disconnect so the
+// next connection runs a fresh X25519 handshake.
+void reset_session();
+
+// Register the audio playback sink. See config_service.hpp for the contract.
+void set_audio_stream_sink(const AudioStreamSink* sink);
+
+// Register the live face-config callback. See config_service.hpp for the contract.
+void set_face_config_sink(FaceConfigSink sink);
+void set_lt_config_sink(LtConfigSink sink);
+
+// Record the booted board kind (board::BoardKind cast to byte). Read by the
+// BoardKind READ characteristic. Set once at boot, before BLE comes online.
+void set_board_kind(std::uint8_t kind);
+
+// Register the servo range-setting mode sink. See config_service.hpp.
+void set_servo_range_mode_sink(ServoRangeModeSink sink);
+
+// Register the live servo positions getter. See config_service.hpp.
+void set_servo_positions_getter(ServoPositionsGetter getter);
+
+// Register the audio metrics JSON getter (BLE chr 0x1f).
+void set_audio_metrics_getter(AudioMetricsJsonGetter getter);
+
+// LED live-state read/write getter/sink (BLE chr 0x20).
+void set_led_state_getter(LedStateGetter getter);
+void set_led_state_sink(LedStateSink sink);
+
+// Avatar bytecode commit sink (BLE chr 0x21). See config_service.hpp.
+void set_avatar_bytecode_sink(AvatarBytecodeSink sink);
+
+// Mic-driven lip-sync gain getter/sink (BLE chr 0x23).
+void set_mic_lip_gain_getter(MicLipGainGetter getter);
+void set_mic_lip_gain_sink(MicLipGainSink sink);
+
+// Speaker volume getter/sink (BLE chr 0x2c).
+void set_speaker_volume_getter(SpeakerVolumeGetter getter);
+void set_speaker_volume_sink(SpeakerVolumeSink sink);
+
+// JTTS test-say sink (BLE chr 0x2d).
+void set_jtts_say_kana_sink(JttsSayKanaSink sink);
+
+} // namespace stackchan::config::gatt

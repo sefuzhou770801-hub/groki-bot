@@ -1,0 +1,245 @@
+IDF_PATH    ?= $(HOME)/esp-idf/5.5.4
+IDF_EXPORTS  = $(IDF_PATH)/export.sh
+TARGET      ?= esp32s3
+
+# Board variant. Selects the PSRAM mode (Quad vs Octal) and per-board sdkconfig
+# overrides; the resulting firmware is NOT cross-compatible because PSRAM mode
+# is locked in at boot by the bootloader.
+#   cores3   — M5Stack CoreS3 + M5/Takao base (Quad PSRAM, 320x240, ES8311 N/A)
+#   atoms3r  — AtomS3R + Atomic ECHO BASE (Octal PSRAM, 128x128, ES8311)
+#   atoms3   — Plain AtomS3 + Atomic ECHO BASE — slim profile (no PSRAM):
+#              avatar + jtts + nekomimi LED + settings UI; no realtime
+#              conversation / no BLE audio / no RTP / no camera.
+#   stopwatch — M5Stack StopWatch (C152): ESP32-S3R8 + 16 MB flash +
+#              8 MB Octal PSRAM + 466×466 AMOLED 円形 + CST820B touch +
+#              ES8311 + MEMS mic + AW8737A speaker + M5PM1 PMIC +
+#              M5IOE1 IO expander + RX8130CE RTC + BMI270 IMU + 振動モータ.
+#              No PY32 / no Si12T / no nekomimi LED 配線. Servo I/O は背面
+#              2.54 mm バス経由のオプション (Phase 3).
+# Default cores3 keeps `make build` backward-compatible.
+BOARD       ?= cores3
+BUILD_DIR    = build-$(BOARD)
+
+# Serial port for flash / monitor / erase-flash. Leave unset to let idf.py
+# auto-detect; pass on the command line (`make flash PORT=/dev/ttyACM0`) or
+# pin in Makefile.local.
+PORT        ?=
+IDFPY_PORT   = $(if $(PORT),-p $(PORT))
+
+# Allow developers to keep local overrides in an untracked file.
+-include Makefile.local
+
+# Build sdkconfig defaults chains.
+#   - sdkconfig.defaults                  (committed, common)
+#   - sdkconfig.defaults.<target>         (committed, per-chip — esp32s3 here)
+#   - sdkconfig.defaults.<board>          (committed, per-board variant — cores3
+#     / atoms3r; PSRAM mode lives here)
+#   - sdkconfig.defaults.local            (gitignored, host-specific overrides;
+#     the last entry wins for duplicate keys so local values trump committed
+#     defaults)
+SDKCONFIG_DEFAULTS_HW   = sdkconfig.defaults
+ifneq (,$(wildcard sdkconfig.defaults.$(TARGET)))
+SDKCONFIG_DEFAULTS_HW  := $(SDKCONFIG_DEFAULTS_HW);sdkconfig.defaults.$(TARGET)
+endif
+ifneq (,$(wildcard sdkconfig.defaults.$(BOARD)))
+SDKCONFIG_DEFAULTS_HW  := $(SDKCONFIG_DEFAULTS_HW);sdkconfig.defaults.$(BOARD)
+endif
+ifneq (,$(wildcard sdkconfig.defaults.local))
+SDKCONFIG_DEFAULTS_HW  := $(SDKCONFIG_DEFAULTS_HW);sdkconfig.defaults.local
+endif
+
+.PHONY: build clean set-target flash flash-monitor monitor monitor-log erase-flash \
+        build-docker docker-shell docker-clean \
+        audio-cli audio-play audio-test
+
+# Capture serial output non-interactively (for CI / agent contexts where
+# idf.py monitor refuses to attach without a TTY). SECONDS defaults to 8.
+MONITOR_LOG_SECONDS ?= 8
+
+# --- Target builds ----------------------------------------------------------
+
+set-target:
+	bash -c "source $(IDF_EXPORTS) && idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig -DSDKCONFIG_DEFAULTS='$(SDKCONFIG_DEFAULTS_HW)' set-target $(TARGET)"
+
+build:
+	bash -c "source $(IDF_EXPORTS) && idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig -DSDKCONFIG_DEFAULTS='$(SDKCONFIG_DEFAULTS_HW)' build"
+
+flash:
+	bash -c "source $(IDF_EXPORTS) && idf.py -B $(BUILD_DIR) $(IDFPY_PORT) flash"
+
+monitor:
+	bash -c "source $(IDF_EXPORTS) && idf.py -B $(BUILD_DIR) $(IDFPY_PORT) monitor"
+
+# Non-interactive log capture: resets the target and reads stdout for
+# MONITOR_LOG_SECONDS seconds. Requires pyserial.
+monitor-log:
+	python3 tools/monitor_log.py --port $(if $(PORT),$(PORT),/dev/ttyACM0) --seconds $(MONITOR_LOG_SECONDS)
+
+# Convenience: flash + monitor in a single idf.py invocation (faster than
+# `make flash monitor` because the IDF env is sourced once).
+flash-monitor:
+	bash -c "source $(IDF_EXPORTS) && idf.py -B $(BUILD_DIR) $(IDFPY_PORT) flash monitor"
+
+erase-flash:
+	bash -c "source $(IDF_EXPORTS) && idf.py -B $(BUILD_DIR) $(IDFPY_PORT) erase-flash"
+
+clean:
+	bash -c "source $(IDF_EXPORTS) && idf.py -B $(BUILD_DIR) fullclean"
+
+# --- Docker build -----------------------------------------------------------
+# Official espressif/idf images do not ship Node. avatar_vm's CMake requires
+# `node` at configure time (compiles .avdsl → bytecode), so the container
+# installs nodejs as root, then builds with the same BOARD / BUILD_DIR /
+# SDKCONFIG_DEFAULTS_HW chain as the host `build` target. After the build,
+# chown the output so the host user can read/write it (needed on Linux bind
+# mounts; macOS Docker Desktop already maps ownership in most setups).
+DOCKER_IMAGE     ?= espressif/idf:release-v5.5
+DOCKER_WORKDIR   ?= /work
+
+define docker-run
+	docker run --rm -t \
+		--user root \
+		-v "$(CURDIR):$(DOCKER_WORKDIR)" \
+		-w $(DOCKER_WORKDIR) \
+		-e HOME=/tmp \
+		-e CI=true \
+		-e HOST_UID=$$(id -u) \
+		-e HOST_GID=$$(id -g) \
+		$(DOCKER_IMAGE) \
+		bash -c '\
+			export DEBIAN_FRONTEND=noninteractive; \
+			if ! command -v node >/dev/null 2>&1; then \
+				apt-get update -qq && apt-get install -y --no-install-recommends nodejs || exit 1; \
+			fi; \
+			git -C /tmp config --global --add safe.directory "$(DOCKER_WORKDIR)" || true; \
+			. "$$IDF_PATH/export.sh" || exit 1; \
+			$(1); \
+			status=$$?; \
+			chown -R $$HOST_UID:$$HOST_GID $(BUILD_DIR) managed_components dependencies.lock 2>/dev/null || true; \
+			exit $$status'
+endef
+
+build-docker:
+	$(call docker-run, \
+		if [ -f $(BUILD_DIR)/sdkconfig ]; then \
+			idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
+			       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" build; \
+		else \
+			idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
+			       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" \
+			       set-target $(TARGET) && \
+			idf.py -B $(BUILD_DIR) -DSDKCONFIG=$(BUILD_DIR)/sdkconfig \
+			       -DSDKCONFIG_DEFAULTS="$(SDKCONFIG_DEFAULTS_HW)" build; \
+		fi)
+
+docker-clean:
+	@case "$(BUILD_DIR)" in \
+		build-*/*|*..*|/*) \
+			echo "docker-clean: refusing to remove '$(BUILD_DIR)' (must be a single build-* directory)"; \
+			exit 1 ;; \
+		build-*) ;; \
+		*) echo "docker-clean: refusing to remove '$(BUILD_DIR)' (must start with build-)"; exit 1 ;; \
+	esac
+	docker run --rm -t \
+		--user root \
+		-v "$(CURDIR):$(DOCKER_WORKDIR)" \
+		-w $(DOCKER_WORKDIR) \
+		$(DOCKER_IMAGE) \
+		bash -c 'rm -rf -- $(BUILD_DIR)'
+
+# --- BLE audio streaming CLI (tools/audio-cli) ------------------------------
+#
+# Wraps the Rust CLI for end-to-end BLE audio test. The combined target
+# starts the device serial log capture in the background so the AAC
+# decoder diagnostics line up with the CLI's send progress in the same
+# transcript.
+
+AUDIO_CLI_BIN  ?= tools/audio-cli/target/release/audio-cli
+# BLE local-name prefix to connect to. "Stackchan-" matches any unit (the CLI
+# connects to the first match); pin the full name (Stackchan-XXXXXX) to target
+# a specific device. Name suffix = Wi-Fi STA MAC lower 3 bytes.
+AUDIO_DEVICE   ?= Stackchan-
+AUDIO_FILE     ?= tools/audio-cli/out.aac
+# Throughput ceiling in KiB/s, applied on top of the device's credit-based
+# flow control. 0 = no artificial cap: the CLI polls the AudioCredit
+# characteristic and paces itself to the device's playback rate, so the PCM
+# ring can't overrun. Set a non-zero value only to debug a slower link.
+# (Fixed-rate guessing is what overran the ring before — too fast garbled
+# playback, too slow starved it.)
+AUDIO_RATE     ?= 0
+AUDIO_FLUSH    ?= 16
+AUDIO_CHUNK    ?= 250
+AUDIO_LOG_SEC  ?= 120
+
+audio-cli:
+	cd tools/audio-cli && cargo build --release
+
+audio-play: audio-cli
+	$(AUDIO_CLI_BIN) \
+	    --device "$(AUDIO_DEVICE)" \
+	    --file "$(AUDIO_FILE)" \
+	    --chunk-size $(AUDIO_CHUNK) \
+	    --rate-kbps $(AUDIO_RATE) \
+	    --flush-every $(AUDIO_FLUSH)
+
+# Parallel: serial log capture in the background while audio-play runs in
+# the foreground. The device-side `audio-stream:` and `cfg-gatt:` lines
+# interleave with the CLI's "sent N / total B" progress so the failure
+# mode is obvious in one pane.
+#
+# The CLI is held back until the conv-task reports "session ready" so the
+# streaming test runs against the real BLE/Wi-Fi radio-contention picture
+# the conversation backend creates, not the wide-open BLE we'd see
+# pre-association.
+AUDIO_TEST_READY_TIMEOUT ?= 60
+audio-test: audio-cli
+	@echo "=== launching serial log capture (PORT=$(if $(PORT),$(PORT),/dev/ttyACM0), $(AUDIO_LOG_SEC) s) ==="
+	@python3 tools/monitor_log.py \
+	    --port $(if $(PORT),$(PORT),/dev/ttyACM0) \
+	    --seconds $(AUDIO_LOG_SEC) > /tmp/audio-test-monitor.log 2>&1 & \
+	    MONITOR_PID=$$!; \
+	    echo "=== waiting for conv-task: session ready (≤$(AUDIO_TEST_READY_TIMEOUT) s) ==="; \
+	    for i in $$(seq 1 $(AUDIO_TEST_READY_TIMEOUT)); do \
+	        if grep -q "conv-task: session ready" /tmp/audio-test-monitor.log 2>/dev/null; then \
+	            echo "conv-task ready at +$${i}s"; \
+	            break; \
+	        fi; \
+	        sleep 1; \
+	    done; \
+	    if ! grep -q "conv-task: session ready" /tmp/audio-test-monitor.log 2>/dev/null; then \
+	        echo "WARN: conv-task: session ready did not show within $(AUDIO_TEST_READY_TIMEOUT)s — running test anyway"; \
+	    fi; \
+	    echo "=== streaming $(AUDIO_FILE) to $(AUDIO_DEVICE) ==="; \
+	    $(AUDIO_CLI_BIN) \
+	        --device "$(AUDIO_DEVICE)" \
+	        --file "$(AUDIO_FILE)" \
+	        --chunk-size $(AUDIO_CHUNK) \
+	        --rate-kbps $(AUDIO_RATE) \
+	        --flush-every $(AUDIO_FLUSH); \
+	    echo "=== waiting for monitor to finish ==="; \
+	    wait $$MONITOR_PID; \
+	    echo "=== device log (tail) ==="; \
+	    tail -n 80 /tmp/audio-test-monitor.log
+
+docker-shell:
+	docker run --rm -it \
+		--user root \
+		-v "$(CURDIR):$(DOCKER_WORKDIR)" \
+		-w $(DOCKER_WORKDIR) \
+		-e HOME=/tmp \
+		-e HOST_UID=$$(id -u) \
+		-e HOST_GID=$$(id -g) \
+		-e BOARD=$(BOARD) \
+		-e BUILD_DIR=$(BUILD_DIR) \
+		$(DOCKER_IMAGE) \
+		bash -c '\
+			export DEBIAN_FRONTEND=noninteractive; \
+			if ! command -v node >/dev/null 2>&1; then \
+				apt-get update -qq && apt-get install -y --no-install-recommends nodejs || exit 1; \
+			fi; \
+			git -C /tmp config --global --add safe.directory "$(DOCKER_WORKDIR)" || true; \
+			. "$$IDF_PATH/export.sh" || exit 1; \
+			bash; \
+			status=$$?; \
+			chown -R $$HOST_UID:$$HOST_GID $(BUILD_DIR) managed_components dependencies.lock 2>/dev/null || true; \
+			exit $$status'

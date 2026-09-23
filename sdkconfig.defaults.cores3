@@ -1,0 +1,111 @@
+# M5Stack CoreS3 (ESP32-S3R8 — Quad SPI PSRAM) board-specific overrides.
+# Selected by `make build BOARD=cores3` (default).
+#
+# CoreS3 uses the ESP32-S3R8 in-package PSRAM in Quad mode @ 80 MHz. Octal
+# would not even ID-probe on this chip — picking the right mode is a
+# build-time decision (handled in the bootloader before app code runs).
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# 16 MB external SPI flash (W25Q128 footprint on the CoreS3 PCB).
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# GC0308 DVP camera (CoreS3 mainboard) — Phase 1+2 connpass-QR feature.
+# Pulls espressif/esp32-camera + espressif/quirc into the build and
+# unlocks components/board/camera_gc0308.cpp. Pin defaults live in
+# components/board/Kconfig and target the CoreS3 mainboard wiring.
+#
+# Re-enabled for the settings-page one-shot capture (GET /api/camera/capture).
+# History: the boot-time QR test used to re-trigger the lgfx i2c mutex
+# priority-disinherit assert (tasks.c:5147) ~38 s into boot, around the time
+# GC0308 SCCB init runs on the same pins (G11/G12) as M5.In_I2C / led_strip.
+# CameraGc0308::begin() calls m5::In_I2C.release() before esp_camera_init,
+# but that does not stop other tasks (led refresh, touch poll, py32 LED
+# refresh) from racing on the lgfx mutex during SCCB activity.
+# The one-shot capture keeps the SCCB window to ~1 s per button press (vs a
+# continuously-running QR scan), which is the current exposure while the bus
+# ownership story gets sorted properly (gate led / touch / py32 I2C behind a
+# "camera-active" flag, or migrate them off the shared lgfx i2c instance).
+# STACKCHAN_QR_TEST_AT_BOOT stays OFF — do not flip it back on without
+# revisiting the race.
+#
+# 2026-08-25 螃蟹变体关闭摄像头：ASR（AFE+WakeNet）的前提就是 camera off
+# （见 Kconfig 帮助文本）。真机实测 camera 常驻任务 + BLE + WiFi + 屏幕挤占
+# 内部 DMA 内存后，麦克风 I2S 每轮对话初始化失败（i2s_alloc_dma_desc 512B
+# 拿不到，DMA largest 仅 432B），上行音频降级到无法唤醒。螃蟹不使用摄像头。
+CONFIG_STACKCHAN_CAMERA_ENABLED=n
+# DMA path selection (ESP32-S3 knob in esp32-camera).
+#   y: EDMA writes each line straight into the PSRAM framebuffer.
+#   n: DMA lands in small internal-RAM bounce buffers; the cam task memcpys
+#      into the PSRAM fb.
+# Direct-to-PSRAM (y) worked for the 1 B/px grayscale QR path, but at
+# RGB565's 2 B/px the EDMA writes lose the PSRAM bus to concurrent traffic
+# (Quad PSRAM @80 MHz is ~40 MB/s total; NimBLE pools + heap live there
+# too) and captured frames arrive with bands of torn pixels — confirmed on
+# hardware 2026-07-03, even with the render task quiesced. Bounce mode (n)
+# absorbs bus-arbitration stalls in internal RAM at the cost of a few KiB
+# of DMA buffers; the 12 KiB internal-RAM floor check in
+# CameraGc0308::begin() still gates the init.
+CONFIG_CAMERA_PSRAM_DMA=n
+# Bounce-buffer sizing. The esp32-camera default (32768) makes cam_dma_config
+# ask for a 30 720 B contiguous internal block — the live system's largest
+# free block is ~14 KiB, so init failed outright. 8192 shrinks the request to
+# 2 × 3 840 B halves (7 680 B total, one 6-line node per half), which fits
+# the steady-state heap with margin. Cost: an interrupt per 6 lines instead
+# of per 24 — negligible against the one-shot capture duty cycle.
+CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX=8192
+
+# --- esp32-camera sensor selection ---
+# Disable every sensor driver except GC0308 (the only sensor on the CoreS3
+# mainboard).  Each disabled driver would otherwise contribute its register-
+# initialisation tables to .dram0.data / .dram1.* inside .dram0.data, eating
+# internal RAM that TLS / esp-aes / NimBLE need at Wi-Fi bring-up:
+#   hm1055  ≈ 2648 B, hm0360 ≈ 1864 B, nt99141 ≈ 1733 B,
+#   ov3660  ≈  991 B, ov5640  ≈  755 B, ov2640  ≈  654 B,
+#   ov7670  ≈  152 B, + smaller contributions from ov7725 / gc2145 / gc032a /
+#   bf3005 / bf20a6 / sc030iot / mega_ccm.
+# Total expected saving: ~9–10 KB of static DRAM, eliminating the heap-
+# corruption / esp_timer panic seen at Wi-Fi peak.
+CONFIG_OV7670_SUPPORT=n
+CONFIG_OV7725_SUPPORT=n
+CONFIG_NT99141_SUPPORT=n
+CONFIG_OV2640_SUPPORT=n
+CONFIG_OV3660_SUPPORT=n
+CONFIG_OV5640_SUPPORT=n
+CONFIG_GC2145_SUPPORT=n
+CONFIG_GC032A_SUPPORT=n
+CONFIG_GC0308_SUPPORT=y
+CONFIG_BF3005_SUPPORT=n
+CONFIG_BF20A6_SUPPORT=n
+CONFIG_SC030IOT_SUPPORT=n
+CONFIG_HM1055_SUPPORT=n
+CONFIG_HM0360_SUPPORT=n
+CONFIG_MEGA_CCM_SUPPORT=n
+
+# 16 MB flash：本板型用 partitions_16mb.csv（storage + model，无 voice）。
+# 没有独立 voice 分区，关闭 HMM，禁止把待机 OTA 槽当语音存储。
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_16mb.csv"
+
+# HMM (hts_engine) 在本板型关闭。安装入口在无 voice 分区时必须返回错误。
+CONFIG_JTTS_ENABLE_HMM=n
+
+# hts_engine の合成 (ラベル パース等のスタック ローカル) が main タスクの
+# 既定 8 KB を溢れさせるため増量。
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+
+# ===== [ASR Phase 0] esp-sr WakeNet + AFE 実機 RAM 検証 (一時) =====
+# camera を切って内部 RAM を空け、日本語ウェイクワード「こんにちはESP」で
+# AFE+WakeNet が cores3 に載るか実測する。確定後は cores3-asr variant へ。
+CONFIG_STACKCHAN_ASR_ENABLED=y
+CONFIG_MODEL_IN_FLASH=y
+CONFIG_SR_WN_WN9L_JA_KONNICHIHAESP_TTS3=y
+CONFIG_SR_MN_CN_NONE=y
+CONFIG_SR_MN_EN_NONE=y
+# [ASR] DMA対応内部RAMの予約を増やす (mic I2S DMA + AFE + httpd 同居のため)
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=65536
+# [ASR] WiFi 静的 DMA バッファ削減 (mic I2S DMA の連続ブロック確保のため)。
+# ASR/設定用途では WiFi スループット低下は許容。conversation の音声ストリーム
+# 時のみ余裕が減るが、動作は維持。
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=3
+CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=4

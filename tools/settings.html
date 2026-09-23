@@ -1,0 +1,3904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack-chan 设置</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #f5f5f5;
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    padding: 2rem;
+    width: 100%;
+    max-width: 480px;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 0.3rem; }
+  .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    background: #f0f0f0;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #bbb;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .dot.ble-connected  { background: #4caf50; }
+  .dot.wifi-connected { background: #2196f3; }
+  .dot.ble-connecting { background: #ff9800; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .flags {
+    margin-left: auto;
+    display: flex;
+    gap: 0.3rem;
+  }
+  .flag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #e0e0e0;
+    color: #555;
+  }
+  .flag.set { background: #c8e6c9; color: #2e7d32; }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    margin-top: 1rem;
+  }
+  input[type=text], input[type=password], select#provider {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+    background: white;
+  }
+  input:focus, select#provider:focus { border-color: #2196f3; }
+  .hint { font-size: 0.78rem; color: #888; margin-top: 0.2rem; }
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-top: 1rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-label input[type=checkbox] {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: #1976d2;
+    cursor: pointer;
+  }
+  /* Inputs / selects / textareas inside any tab panel get full-width styling.
+     Originally scoped to `.jtts-section` (when these were `<details>`); the
+     5-tab refactor dropped the class wrapper so the selector now targets
+     `.tab-panel` directly. Covers jtts voice config, servo numbers, LT
+     timer, LED mode, OTA release, MCP token, jtts-phrases textarea, etc. */
+  .tab-panel select,
+  .tab-panel input[type=number],
+  .tab-panel textarea {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    outline: none;
+    background: white;
+    transition: border-color 0.2s;
+  }
+  .tab-panel textarea {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 1rem;
+    margin-top: 0.25rem;
+  }
+  .grid2 > div label { margin-top: 0.5rem; }
+  .ota-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    margin: 0.4rem 0 0.6rem;
+  }
+  .ota-row input[type=file] { flex: 1; font-size: 0.85rem; }
+  #btn-ota {
+    background: #d84315; color: white;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.9rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  #btn-ota:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ota-bar {
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+  }
+  .ota-bar-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #ff9800, #d84315);
+    transition: width 0.1s linear;
+  }
+  .ota-stats {
+    font-size: 0.78rem;
+    color: #666;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    margin-top: 0.3rem;
+  }
+  /* Avatar DSL editor — mirrors settings_wifi.html so authoring the face DSL
+     feels the same in both pages. The send path differs (BLE chr 0x21
+     chunked write here vs HTTP POST on the Wi-Fi page) but the editor UX
+     is identical. */
+  #dsl-src {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 380px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    tab-size: 2;
+    white-space: pre;
+    padding: 0.45rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+  }
+  #dsl-msg {
+    font-size: 0.78rem;
+    color: #666;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    min-height: 1.1em;
+    margin: 0.4rem 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #dsl-msg.ok { color: #2e7d32; }
+  #dsl-msg.err { color: #c62828; }
+  .dsl-btnrow {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+  }
+  .dsl-btnrow button, .dsl-btnrow label.filebtn, .dsl-btnrow select {
+    flex: 1 1 auto;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .dsl-btnrow button.primary { background: #1565c0; color: white; font-weight: 600; }
+  .dsl-btnrow button.secondary { background: #e0e0e0; color: #333; }
+  .dsl-btnrow button.danger { background: #b71c1c; color: white; }
+  .dsl-btnrow button:disabled, .dsl-btnrow select:disabled { opacity: 0.4; cursor: not-allowed; }
+  .dsl-btnrow label.filebtn { background: #e0e0e0; color: #333; }
+  .dsl-btnrow select { background: #e0e0e0; color: #333; border: 1px solid #bbb; }
+  .actions { margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  button {
+    padding: 0.55rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  #btn-connect  { background: #1976d2; color: white; }
+  #btn-apply    { background: #388e3c; color: white; }
+  #btn-disconnect { background: #e0e0e0; color: #333; }
+  .log {
+    margin-top: 1.5rem;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-family: monospace;
+    font-size: 0.8rem;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .log .entry { line-height: 1.5; }
+  .log .ts { color: #888; margin-right: 0.4rem; }
+  .log .ok  { color: #89d185; }
+  .log .err { color: #f48771; }
+  .log .info{ color: #9cdcfe; }
+  .compat-note {
+    margin-top: 1.25rem;
+    font-size: 0.78rem;
+    color: #999;
+    border-top: 1px solid #eee;
+    padding-top: 0.75rem;
+  }
+  /* Tab bar + tab-panel system. Replaces the previous `<details>` stack so
+     11 settings sections don't pile up vertically — see plan-md-lucky-dongarra.md.
+     Each panel keeps its existing inner IDs (#avatar-section, #led-section
+     etc.) so JS event listeners and BLE chr probing keep working unchanged. */
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0.5rem 0 0;
+    border-bottom: 2px solid #ddd;
+  }
+  .tabs button {
+    flex: 1 1 auto;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    padding: 0.5rem 0.7rem;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    color: #555;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tabs button:hover { background: #f0f0f0; color: #222; }
+  .tabs button.active {
+    background: white;
+    border-color: #ddd;
+    color: #111;
+    font-weight: 600;
+    position: relative;
+    top: 2px;
+  }
+  .tab-panel { display: none; padding-top: 1rem; }
+  .tab-panel.active { display: block; }
+  /* Section title — replaces `<summary>` text when a former `<details>` is
+     unfolded into a tab panel. Keeps a visible grouping cue without the
+     accordion mechanism. */
+  .section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #333;
+    margin: 1.2rem 0 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #eee;
+  }
+  .section-title:first-child { margin-top: 0.25rem; }
+  /* Compact connection header (under the title). Holds the connection state,
+     a one-line firmware/board readout, and the three global action buttons. */
+  .page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.6rem;
+  }
+  .page-header .actions { margin: 0; }
+  #header-info {
+    font-size: 0.82rem;
+    color: #555;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  #header-info .key { color: #888; margin-right: 0.3rem; }
+  #header-info .val {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: #222;
+  }
+  .instructions {
+    margin: 0.25rem 0 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #f7f8fa;
+    border-left: 3px solid #2196f3;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    color: #555;
+  }
+  .device-info {
+    display: none;
+    margin-bottom: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    color: #555;
+  }
+  .device-info.visible { display: block; }
+  .device-info .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    line-height: 1.6;
+  }
+  .device-info .key { color: #888; flex-shrink: 0; }
+  .device-info .val {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: #222;
+    text-align: right;
+    word-break: break-all;
+  }
+  #avatar-section .av-row { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; margin:0.35rem 0; }
+  #avatar-section .av-row label { flex:0 0 9rem; margin:0; font-size:0.85rem; }
+  #avatar-section .av-row input[type=range] { flex:1 1 8rem; min-width:0; }
+  #avatar-section .av-row .av-val {
+    flex:0 0 3rem; text-align:right;
+    font-family: ui-monospace, SFMono-Regular, monospace; font-size:0.8rem; color:#555;
+  }
+  /* Narrow viewports (typical phone portrait): put the label on its own line
+     above the slider so the slider gets the full row width to drag, instead of
+     the ~100 px it'd be left with squeezed between a 9 rem label and a 3 rem
+     value column. */
+  @media (max-width: 540px) {
+    #avatar-section .av-row label { flex: 1 0 100%; }
+    #avatar-section .av-row input[type=range] { flex: 1 1 auto; }
+  }
+</style>
+</head>
+<body>
+<!-- BLE auth password prompt — modal dialog with a real <form> so browser
+     password managers (Chrome / Edge / Safari) can offer to save / fill
+     it. Surfaced by ensureAuthenticated() when the device has an auth
+     password set; replaces window.prompt() which is plaintext + invisible
+     to password managers. -->
+<!-- Generic error popup. Surfaced for BLE connect failures (and any
+     other catch-block hit-points that the user shouldn't have to scroll
+     the log panel to discover). The log entry is still written for
+     post-mortem; this just makes the immediate failure unmissable. -->
+<div id="error-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1001;align-items:center;justify-content:center">
+  <div style="background:white;padding:1.5rem;border-radius:8px;min-width:300px;max-width:90vw;box-shadow:0 4px 24px rgba(0,0,0,0.3)">
+    <h2 id="error-modal-title" style="margin:0 0 0.5rem 0;font-size:1.1rem;color:#c62828">错误</h2>
+    <p id="error-modal-body" style="margin:0 0 1rem 0;white-space:pre-wrap;word-break:break-word"></p>
+    <div style="display:flex;justify-content:flex-end">
+      <button type="button" id="error-modal-ok"
+              style="background:#2563eb;color:white;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-weight:600">OK</button>
+    </div>
+  </div>
+</div>
+<div id="auth-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+  <!-- method="dialog" makes the form a no-op submitter (no navigation,
+       no GET), but Chrome / Edge / Safari password managers still see a
+       valid form-submit gesture and offer to save the credential.
+       autocomplete="on" + a visible username field + the proper
+       autocomplete tokens (username / current-password) are the
+       combination that triggers the save prompt — display:none on the
+       username field is a known reason Chrome's heuristic skips the
+       form, so the field is shown (readonly) instead. -->
+  <form id="auth-modal-form" method="dialog" action="#" autocomplete="on"
+        style="background:white;padding:1.5rem;border-radius:8px;min-width:300px;max-width:90vw;box-shadow:0 4px 24px rgba(0,0,0,0.3)">
+    <h2 style="margin:0 0 0.5rem 0;font-size:1.1rem">BLE 连接密码</h2>
+    <p class="hint" style="margin:0 0 1rem 0">此设备已设置认证密码。</p>
+    <label for="auth-modal-username" style="display:block;font-size:0.9rem;margin-bottom:0.25rem">设备</label>
+    <input type="text" id="auth-modal-username" name="username" autocomplete="username"
+           value="stackchan" readonly tabindex="-1"
+           style="width:100%;box-sizing:border-box;padding:0.5rem;font-size:1rem;margin-bottom:0.5rem;background:#f4f4f4;color:#555">
+    <label for="auth-modal-password" style="display:block;font-size:0.9rem;margin-bottom:0.25rem">密码</label>
+    <input type="password" id="auth-modal-password" name="password"
+           autocomplete="current-password" required minlength="1" maxlength="64"
+           style="width:100%;box-sizing:border-box;padding:0.5rem;font-size:1rem;margin-bottom:0.5rem">
+    <label class="toggle-label" for="auth-modal-show" style="margin:0 0 1rem 0">
+      <input type="checkbox" id="auth-modal-show">
+      <span>显示密码</span>
+    </label>
+    <div style="display:flex;gap:0.5rem;justify-content:flex-end">
+      <button type="submit" id="auth-modal-ok"
+              style="background:#2563eb;color:white;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-weight:600">连接</button>
+      <button type="button" id="auth-modal-cancel" class="secondary">取消</button>
+    </div>
+  </form>
+</div>
+<div class="card">
+  <h1>🤖 Stack-chan 设置</h1>
+  <p class="subtitle">通过 Web Bluetooth 配置 Wi-Fi 和 API 密钥</p>
+
+  <div class="page-header">
+    <div class="status-bar" style="flex:1 1 auto;margin:0">
+      <span class="dot" id="ble-dot"></span>
+      <span id="ble-label">未连接</span>
+      <span class="dot" id="wifi-dot" style="margin-left:0.75rem"></span>
+      <span id="wifi-label">Wi-Fi: —</span>
+      <span class="flags">
+        <span class="flag" id="flag-ssid" title="SSID 已设置">S</span>
+        <span class="flag" id="flag-pass" title="Password 已设置">P</span>
+        <span class="flag" id="flag-key"  title="OpenAI key 已设置">K</span>
+        <span class="flag" id="flag-en"   title="OpenAI 已开启">O</span>
+        <span class="flag" id="flag-gkey" title="Gemini key 已设置">G</span>
+        <span class="flag" id="flag-prov" title="Provider = Gemini">P</span>
+      </span>
+    </div>
+    <div id="header-info" hidden>
+      <span class="key">FW</span><span class="val" id="hdr-fw">—</span>
+      <span class="key" style="margin-left:0.6rem">Board</span><span class="val" id="hdr-board">—</span>
+    </div>
+    <div class="actions">
+      <button id="btn-connect">BLE 连接</button>
+      <button id="btn-apply" disabled>保存并重启</button>
+      <button id="btn-disconnect" disabled>断开</button>
+    </div>
+  </div>
+
+  <p class="instructions">
+    ℹ️ 先点 <strong>BLE 连接</strong> 用 Web Bluetooth 连上设备，再切换标签页改设置，
+    最后点 <strong>保存并重启</strong> 确认（仅对需要重启的项目）。
+    LED 和面部 DSL 会实时生效。
+  </p>
+
+  <nav class="tabs" role="tablist">
+    <button data-tab="conn"   class="active" role="tab">连接</button>
+    <button data-tab="avatar"             role="tab">形象</button>
+    <button data-tab="audio"              role="tab">音频</button>
+    <button data-tab="chat"               role="tab">对话</button>
+    <button data-tab="device"             role="tab">设备</button>
+    <button data-tab="maint"              role="tab">维护</button>
+  </nav>
+
+  <!-- ===== 接続 ===== -->
+  <section class="tab-panel active" data-tab="conn">
+    <div class="device-info" id="device-info">
+    <div class="row"><span class="key">Firmware</span><span class="val" id="dis-fw">—</span></div>
+    <div class="row"><span class="key">Hardware</span><span class="val" id="dis-hw">—</span></div>
+    <div class="row"><span class="key">Model</span><span class="val" id="dis-model">—</span></div>
+    <div class="row"><span class="key">Manufacturer</span><span class="val" id="dis-mfr">—</span></div>
+    <div class="row"><span class="key">Software</span><span class="val" id="dis-sw">—</span></div>
+    <div class="row" id="dis-battery-row"><span class="key">电池</span><span class="val" id="dis-battery">—</span></div>
+    <div class="row" id="dis-wifi-mac-row" hidden>
+      <span class="key">Wi-Fi MAC (STA)</span>
+      <span class="val" id="dis-wifi-mac">—</span>
+    </div>
+    <div class="row" id="dis-wifi-row" hidden>
+      <span class="key">Wi-Fi 设置 (mDNS)</span>
+      <span class="val"><a id="dis-wifi-url" href="#" target="_blank" rel="noopener">—</a></span>
+    </div>
+    <div class="row" id="dis-wifi-ip-row" hidden>
+      <span class="key">Wi-Fi 设置 (IP)</span>
+      <span class="val"><a id="dis-wifi-ip-url" href="#" target="_blank" rel="noopener">—</a></span>
+    </div>
+    <div class="row" id="dis-wifi-audio-row" hidden style="flex-direction:column; align-items:stretch; gap:0.25rem">
+      <span class="key">Wi-Fi 音频 RTP（L16/AAC/μ-law，对话功能关闭时）</span>
+      <code id="dis-wifi-audio-cmd" style="font-size:0.72rem; word-break:break-all; white-space:pre-wrap; user-select:all"></code>
+    </div>
+  </div>
+
+  <h2 class="section-title" style="margin-top:0.5rem">工作模式</h2>
+  <p class="hint" style="margin-bottom:0.5rem">
+    从三种主要行为中选择 Stack-chan 的工作方式。「对话」用 OpenAI / Gemini /
+    XiaoZhi 之一进行对话，「闲聊播报」只在空闲时发音，
+    「口型同步」只根据麦克风输入张嘴。
+    保存后重启才会切换。
+  </p>
+  <select id="operation-mode">
+    <option value="2">对话 (Conversation)</option>
+    <option value="1">闲聊播报 (JttsRandom)</option>
+    <option value="0">口型同步 (MicLipSync)</option>
+  </select>
+
+  <label for="ssid">Wi-Fi SSID</label>
+  <input type="text" id="ssid" maxlength="32" placeholder="MyNetwork">
+  <p class="hint">留空则不改当前值</p>
+
+  <label for="password">Wi-Fi 密码</label>
+  <input type="password" id="password" maxlength="64" placeholder="（不改请留空）">
+
+  <h2 class="section-title" style="margin-top:0.5rem">设备名 (BLE / mDNS)</h2>
+  <p class="hint" style="margin-bottom:0.5rem">
+    用作 BLE 广播名和 mDNS 主机名的基础。留空则自动生成
+    (Stackchan-XXXXXX)。mDNS 只会保留英文字母、数字和连字符。保存后重启生效。
+  </p>
+  <label for="device-name">设备名</label>
+  <input type="text" id="device-name" maxlength="24" placeholder="（留空则自动）">
+
+  <h2 class="section-title" style="margin-top:0.5rem">密码认证</h2>
+  <p class="hint" style="margin-bottom:0.5rem">
+    设置后，本 BLE 设置页和 Wi-Fi 设置页都需要认证。
+    BLE 会把密码哈希混进密钥，密码错误时所有通道都会解密失败。HTTP 使用 Basic Auth。
+    清除后回到无认证（与现状兼容）。保存后重启生效。
+  </p>
+  <label for="auth-password">密码 <span id="auth-password-state" class="hint" style="font-weight:normal"></span></label>
+  <div style="display:flex;gap:0.4rem;align-items:stretch">
+    <input type="password" id="auth-password" maxlength="64" placeholder="（不改请留空）" style="flex:1 1 auto">
+    <button type="button" id="btn-auth-password-clear" class="danger" title="恢复为无认证">清除</button>
+  </div>
+  </section><!-- /tab-panel "conn" -->
+
+  <!-- ===== アバター ===== -->
+  <section class="tab-panel" data-tab="avatar">
+    <div id="avatar-section">
+      <h2 class="section-title">面部调整（滑块与实时预览）</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        拖动滑块时，下方预览会跟着变；已连接时<strong>真机面部也会实时</strong>
+        变化（不必重启）。要留下当前设置，请点「保存并重启」
+        （会重启后确认）。
+      </p>
+      <div style="text-align:center;margin-bottom:0.75rem">
+        <canvas id="av-preview" width="320" height="240"
+                style="width:320px;height:240px;max-width:100%;background:#000;border-radius:8px;image-rendering:pixelated"></canvas>
+        <p class="hint" id="av-preview-note" style="margin-top:0.25rem">预览加载中…</p>
+      </div>
+
+      <div class="av-row"><label for="av-brow-show">显示眉毛</label>
+        <input type="checkbox" id="av-brow-show" checked></div>
+      <div class="av-row"><label for="av-eye-r">眼睛半径</label>
+        <input type="range" id="av-eye-r" min="2" max="20" step="0.5" value="8">
+        <span class="av-val" id="av-eye-r-v">8.0</span></div>
+      <div class="av-row"><label for="av-eye-ox">眼睛横向偏移</label>
+        <input type="range" id="av-eye-ox" min="-40" max="40" step="1" value="0">
+        <span class="av-val" id="av-eye-ox-v">0</span></div>
+      <div class="av-row"><label for="av-eye-oy">眼睛纵向偏移</label>
+        <input type="range" id="av-eye-oy" min="-40" max="40" step="1" value="0">
+        <span class="av-val" id="av-eye-oy-v">0</span></div>
+      <div class="av-row"><label for="av-brow-ox">眉毛横向偏移</label>
+        <input type="range" id="av-brow-ox" min="-40" max="40" step="1" value="0">
+        <span class="av-val" id="av-brow-ox-v">0</span></div>
+      <div class="av-row"><label for="av-brow-oy">眉毛纵向偏移</label>
+        <input type="range" id="av-brow-oy" min="-40" max="40" step="1" value="0">
+        <span class="av-val" id="av-brow-oy-v">0</span></div>
+      <div class="av-row"><label for="av-mouth-ox">嘴巴横向偏移</label>
+        <input type="range" id="av-mouth-ox" min="-60" max="60" step="1" value="0">
+        <span class="av-val" id="av-mouth-ox-v">0</span></div>
+      <div class="av-row"><label for="av-mouth-oy">嘴巴纵向偏移</label>
+        <input type="range" id="av-mouth-oy" min="-60" max="60" step="1" value="0">
+        <span class="av-val" id="av-mouth-oy-v">0</span></div>
+      <div class="av-row"><label for="av-mouth-minw">嘴巴最小宽度</label>
+        <input type="range" id="av-mouth-minw" min="4" max="160" step="1" value="50">
+        <span class="av-val" id="av-mouth-minw-v">50</span></div>
+      <div class="av-row"><label for="av-mouth-maxw">嘴巴最大宽度</label>
+        <input type="range" id="av-mouth-maxw" min="4" max="200" step="1" value="90">
+        <span class="av-val" id="av-mouth-maxw-v">90</span></div>
+      <div class="av-row"><label for="av-mouth-minh">开口最小（闭）</label>
+        <input type="range" id="av-mouth-minh" min="1" max="60" step="1" value="4">
+        <span class="av-val" id="av-mouth-minh-v">4</span></div>
+      <div class="av-row"><label for="av-mouth-maxh">开口最大（开）</label>
+        <input type="range" id="av-mouth-maxh" min="2" max="120" step="1" value="60">
+        <span class="av-val" id="av-mouth-maxh-v">60</span></div>
+      <div class="av-row"><label for="av-cheek-show">显示腮红</label>
+        <input type="checkbox" id="av-cheek-show"></div>
+      <div class="av-row"><label for="av-cheek-r">腮红半径</label>
+        <input type="range" id="av-cheek-r" min="2" max="30" step="0.5" value="10">
+        <span class="av-val" id="av-cheek-r-v">10.0</span></div>
+      <div class="av-row"><label for="av-cheek-ox">腮红横向偏移</label>
+        <input type="range" id="av-cheek-ox" min="-40" max="40" step="1" value="0">
+        <span class="av-val" id="av-cheek-ox-v">0</span></div>
+      <div class="av-row"><label for="av-cheek-oy">腮红纵向偏移</label>
+        <input type="range" id="av-cheek-oy" min="-40" max="40" step="1" value="0">
+        <span class="av-val" id="av-cheek-oy-v">0</span></div>
+      <div class="av-row"><label for="av-col-face">面部颜色</label>
+        <input type="color" id="av-col-face" value="#ffffff"></div>
+      <div class="av-row"><label for="av-col-bg">背景色</label>
+        <input type="color" id="av-col-bg" value="#000000"></div>
+
+      <button id="av-reset" type="button" style="margin-top:0.5rem">恢复默认</button>
+    </div>
+
+    <div id="avatar-dsl-section">
+      <h2 class="section-title">面部绘制 DSL（整体替换结构）</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        用类 Lua 的 DSL 编写形象面部的绘制逻辑，在浏览器里编成字节码，
+        再经 BLE 发到真机立刻生效。会写入 NVS，重启后仍然保留。
+        <a href="avatar_dsl.html" target="_blank" rel="noopener" style="white-space:nowrap">语法指南</a>
+        ／
+        <a href="https://github.com/sefuzhou770801-hub/groki-bot/blob/main/assets/default_face.avdsl"
+           target="_blank" rel="noopener" style="white-space:nowrap">默认面部源码</a>
+      </p>
+      <textarea id="dsl-src" spellcheck="false" autocomplete="off"
+                autocapitalize="off" autocorrect="off"></textarea>
+      <div id="dsl-msg">DSL 编译器未启动</div>
+      <div class="dsl-btnrow">
+        <button type="button" class="primary" id="btn-dsl-send" disabled>编译并发送</button>
+        <select id="dsl-preset" title="选择预设会读取源码并发送到真机"></select>
+        <button type="button" class="danger" id="btn-dsl-reset" disabled>将真机恢复为默认</button>
+      </div>
+      <div class="dsl-btnrow">
+        <button type="button" class="secondary" id="btn-dsl-download">下载 .avbc</button>
+        <button type="button" class="secondary" id="btn-dsl-download-src">下载 .avdsl</button>
+        <label class="filebtn" for="dsl-load">读取 .avdsl</label>
+        <input type="file" id="dsl-load" accept=".avdsl,text/plain" style="display:none">
+        <label class="filebtn" for="avbc-file">直接发送 .avbc</label>
+        <input type="file" id="avbc-file" accept=".avbc,application/octet-stream" style="display:none">
+      </div>
+    </div>
+  </section><!-- /tab-panel "avatar" -->
+
+  <!-- ===== 音声 ===== -->
+  <section class="tab-panel" data-tab="audio">
+    <div id="speaker-volume-section">
+      <h2 class="section-title">扬声器音量</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        对内置 / Module Audio / Atomic Echo Base 的全部输出生效。
+        拖动滑块会 <strong>立刻生效</strong> 并自动保存（不必重启）。
+        100% 为各主板出厂默认，200% 为增益（内部 master volume
+        乘 2，上限 255）。
+      </p>
+      <label for="speaker-volume">音量 <span id="speaker-volume-value">100</span> %</label>
+      <input type="range" id="speaker-volume" min="0" max="200" step="5" value="100" style="width:100%">
+    </div>
+
+    <div id="jtts-say-section">
+      <h2 class="section-title">jtts 试读</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        请输入平假名或片假名，再点「朗读」，由 jtts 发音。
+        汉字和英文不会转换，请直接写假名。
+        适合检查音量和音频输出。
+      </p>
+      <input type="text" id="jtts-say-text" maxlength="64" placeholder="（示例）请输入平假名">
+      <button type="button" id="btn-jtts-say" class="primary" disabled style="margin-top:0.5rem">朗读</button>
+    </div>
+
+    <div id="audio-output-section">
+      <h2 class="section-title">音频输出</h2>
+      <p class="hint">
+        选择音频输出目标。「自动」会优先使用已安装的 M5 Module Audio，
+        未安装则用内置扬声器。「内置」和「Module Audio」是强制指定
+        （未安装 Module Audio 却选了它时，会退回内置）。保存后重启才会切换。
+      </p>
+      <select id="audio-output">
+        <option value="0">自动 (Auto)</option>
+        <option value="1">内置扬声器 (Internal)</option>
+        <option value="2">M5 Module Audio (ModuleAudio)</option>
+      </select>
+    </div>
+
+    <div id="rtp-section">
+      <h2 class="section-title">Wi-Fi RTP 音频接收</h2>
+      <label class="toggle-label" for="rtp-enabled">
+        <input type="checkbox" id="rtp-enabled" checked>
+        <span>启用 RTP 音频接收</span>
+      </label>
+      <p class="hint">经 Wi-Fi 接收 RTP 音频（L16/μ-law=udp/6970，AAC=udp/6972）。对话功能开启时会自动关闭</p>
+    </div>
+
+    <div id="jtts-section">
+      <h2 class="section-title">空闲语音 (jtts)</h2>
+      <!-- Hidden legacy toggle — operation_mode == JttsRandom is the real
+           switch now. Kept in the DOM so probe/Apply JS keeps working. -->
+      <label class="toggle-label" for="jtts-idle-enabled" style="display:none">
+        <input type="checkbox" id="jtts-idle-enabled" checked>
+        <span>启用空闲播报</span>
+      </label>
+
+      <h2 class="section-title">麦克风口型同步调整（工作模式为口型同步时有效）</h2>
+      <p class="hint" style="margin-bottom:0.5rem">按麦克风音量张嘴闭嘴。CoreS3 麦克风偏钝，提高输入增益会更好看。拖动滑块会 <strong>立刻生效</strong> 并自动保存。</p>
+      <div class="grid2">
+        <div style="grid-column:span 2">
+          <label for="mic-lip-input">输入增益 <span id="mic-lip-input-value">200</span> %</label>
+          <input type="range" id="mic-lip-input" min="10" max="1000" step="10" value="200" style="width:100%">
+        </div>
+        <div style="grid-column:span 2">
+          <label for="mic-lip-output">张嘴增益 <span id="mic-lip-output-value">100</span> %</label>
+          <input type="range" id="mic-lip-output" min="10" max="500" step="10" value="100" style="width:100%">
+        </div>
+      </div>
+      <label class="toggle-label" for="mic-lip-agc" style="margin-top:0.5rem">
+        <input type="checkbox" id="mic-lip-agc">
+        <span>启用自动增益控制 (AGC)</span>
+      </label>
+      <p class="hint">自动跟踪环境噪声，让安静房间和嘈杂环境都能对说话做出反应。关闭后用固定阈值判断（不适应环境变化，但结果更好预料）。保存后重启生效。</p>
+
+      <h2 class="section-title" style="margin-top:1rem">jtts 音色</h2>
+      <p class="hint" style="margin-bottom:0.5rem">留空或不改就点「保存」，会保留当前设置。</p>
+
+      <label for="jtts-voice">声音类型</label>
+      <select id="jtts-voice">
+        <option value="female">Female（偏童声）</option>
+        <option value="male">Male（偏低）</option>
+      </select>
+
+      <label for="jtts-synth">合成方式</label>
+      <select id="jtts-synth">
+        <option value="v2">标准（v2：声门波 + 级联）</option>
+        <option value="classic">经典（旧方式：蜂鸣声）</option>
+      </select>
+
+      <label for="jtts-engine">引擎</label>
+      <select id="jtts-engine">
+        <option value="auto">自动（HMM 音色 &gt; 语音库 &gt; 共振峰）</option>
+        <option value="hmm">HMM 合成（必须有音色，否则回退）</option>
+        <option value="unit">单元拼接（必须有语音库，否则用共振峰）</option>
+        <option value="formant">仅共振峰合成</option>
+      </select>
+      <label for="jtts-halftone">HMM 音高移位 [半音]</label>
+      <input type="number" id="jtts-halftone" min="-12" max="12" step="0.5" placeholder="0">
+      <p class="hint">HMM 音色（.htsvoice）/ 单元拼接语音库（.jvox）可在 Wi-Fi 设置页上传。</p>
+      <p class="hint">语音引擎（hts_engine, Modified BSD）与配布音色的归属： <a href="./licenses.html" target="_blank" rel="noopener">许可证 / 归属</a></p>
+
+      <div class="grid2">
+        <div>
+          <label for="jtts-f0">音高 F0 (Hz)</label>
+          <input type="number" id="jtts-f0" min="60" max="500" step="1" placeholder="280">
+        </div>
+        <div>
+          <label for="jtts-formant">共振峰倍率</label>
+          <input type="number" id="jtts-formant" min="0.5" max="2.0" step="0.05" placeholder="1.30">
+        </div>
+        <div>
+          <label for="jtts-mora">音拍时长 (ms)</label>
+          <input type="number" id="jtts-mora" min="40" max="300" step="5" placeholder="120">
+        </div>
+        <div>
+          <label for="jtts-gain">音量 (gain)</label>
+          <input type="number" id="jtts-gain" min="0" max="2" step="0.05" placeholder="0.60">
+        </div>
+        <div>
+          <label for="jtts-breath">气息 (breathiness)</label>
+          <input type="number" id="jtts-breath" min="0" max="1" step="0.05" placeholder="0.00">
+        </div>
+        <div>
+          <label for="jtts-vibrate">颤音 rate (Hz)</label>
+          <input type="number" id="jtts-vibrate" min="0" max="10" step="0.1" placeholder="0">
+        </div>
+        <div>
+          <label for="jtts-vibratoc">颤音 depth (cents)</label>
+          <input type="number" id="jtts-vibratoc" min="0" max="200" step="1" placeholder="0">
+        </div>
+        <div>
+          <label for="jtts-oq">声门开合比（柔和度）</label>
+          <input type="number" id="jtts-oq" min="0.35" max="0.85" step="0.01" placeholder="0.56">
+        </div>
+        <div>
+          <label for="jtts-tilt">高频衰减 tilt (dB)</label>
+          <input type="number" id="jtts-tilt" min="0" max="24" step="1" placeholder="0">
+        </div>
+        <div>
+          <label for="jtts-bwscale">带宽倍率（抑制尖声）</label>
+          <input type="number" id="jtts-bwscale" min="0.7" max="2.0" step="0.05" placeholder="1.00">
+        </div>
+      </div>
+      <p class="hint" style="margin-top:0.25rem">
+        偏柔和的参考：开合比 0.65–0.75 / tilt 6–12 dB / 带宽 1.2–1.5
+        （加气息 0.1–0.25）。均在 v2 方式下有效（带宽在经典方式下也有效）。</p>
+
+      <label for="jtts-phrases" style="margin-top:0.75rem">空闲播报语句（一行一条）</label>
+      <p style="font-size:0.8rem;color:#888;margin:0.2rem 0">
+        格式为 <code>画面文字 | 读音</code>。<code>|</code> 右侧（读音）只能写平假名或片假名
+        （汉字在发音时会被忽略）。省略 <code>|</code> 则画面文字与读音相同。
+        示例: <code>画面文字 | 平假名读音</code></p>
+      <textarea id="jtts-phrases" rows="6" placeholder="画面文字 | 平假名读音"></textarea>
+    </div>
+
+    <div id="audio-section">
+      <h2 class="section-title">音频文件播放（BLE 流式传输）</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        选择本地音频文件（.mp3 / .wav / .m4a / .aac 等）再点「播放」，
+        浏览器会重编码为 24 kHz 单声道 AAC-LC，再经 BLE 流式发送。
+        Stack-chan 边解码 AAC 边播放，并按音量张嘴。
+      </p>
+      <div class="ota-row">
+        <input type="file" id="audio-file" accept="audio/*">
+        <button id="btn-audio-play" type="button" disabled>播放</button>
+        <button id="btn-audio-stop" type="button" disabled>停止</button>
+      </div>
+      <p class="hint" id="audio-conv-note" style="display:none;color:#c0392b">
+        ⚠ 对话功能已开启，无法使用。无线和 CPU 会互相抢占导致播放中断，两者互斥。
+        请关闭「启用对话功能」并保存重启后再用。
+      </p>
+      <div class="ota-status" id="audio-status">
+        <div class="ota-bar"><div class="ota-bar-fill" id="audio-bar-fill"></div></div>
+        <div class="ota-stats" id="audio-stats">未开始</div>
+      </div>
+    </div>
+
+    <div id="audio-metrics-section">
+      <h2 class="section-title">音频流水线诊断</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        最近一轮对话的音频流水线统计（与 BLE chr 0x1f / HTTP
+        <code>GET /api/metrics/audio</code> 相同）。每轮对话结束时
+        固件（<code>conv-task: log_playback_metrics</code>）会更新，
+        点下方「读取」可看到最新一轮的数值。
+      </p>
+      <table id="audio-metrics-table" style="width:100%;border-collapse:collapse;font-size:0.92em">
+        <thead>
+          <tr style="text-align:left;border-bottom:1px solid #444">
+            <th style="padding:0.3rem 0.5rem">指标</th>
+            <th style="padding:0.3rem 0.5rem">avg</th>
+            <th style="padding:0.3rem 0.5rem">min</th>
+            <th style="padding:0.3rem 0.5rem">max</th>
+          </tr>
+        </thead>
+        <tbody id="audio-metrics-body">
+          <tr><td colspan="4" class="hint" style="padding:0.5rem">未获取</td></tr>
+        </tbody>
+      </table>
+      <p class="hint" id="audio-metrics-summary" style="margin-top:0.5rem">—</p>
+      <div class="actions" style="margin-top:0.5rem">
+        <button id="btn-audio-metrics-reload" disabled>读取</button>
+        <label style="margin-left:0.8rem;font-size:0.92em">
+          <input type="checkbox" id="audio-metrics-autorefresh"> 自动刷新（2 秒）
+        </label>
+      </div>
+    </div>
+
+    <div id="lt-section">
+      <h2 class="section-title">LT 计时器</h2>
+      <p class="hint">在机身「LT」标签页开始或停止。这里设置默认时长和提示词（写入立刻生效，保存后重启仍保留）。读音请写平假名（jtts 读不了汉字）</p>
+      <div class="grid2">
+        <div>
+          <label for="lt-total">发言时长（秒）</label>
+          <input type="number" id="lt-total" min="30" max="3600" step="30" placeholder="300">
+        </div>
+        <div>
+          <label for="lt-warn">剩余提醒（提前秒数）</label>
+          <input type="number" id="lt-warn" min="10" max="600" step="10" placeholder="60">
+        </div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label for="lt-soon">临近提醒（提前秒数，0=关闭）</label>
+          <input type="number" id="lt-soon" min="0" max="120" step="5" placeholder="15">
+        </div>
+        <div>
+          <label for="lt-repeat">超时重复（秒，0=只一次）</label>
+          <input type="number" id="lt-repeat" min="0" max="300" step="5" placeholder="30">
+        </div>
+      </div>
+      <label for="lt-warn-text">剩余提醒 显示文字</label>
+      <input id="lt-warn-text" placeholder="还剩1分钟">
+      <label for="lt-warn-reading">剩余提醒 读音（平假名）</label>
+      <input id="lt-warn-reading" placeholder="（请输入平假名）">
+      <label for="lt-soon-text">临近提醒 显示文字</label>
+      <input id="lt-soon-text" placeholder="还剩15秒">
+      <label for="lt-soon-reading">临近提醒 读音（平假名）</label>
+      <input id="lt-soon-reading" placeholder="（请输入平假名）">
+      <label for="lt-just-text">刚好到时 显示文字</label>
+      <input id="lt-just-text" placeholder="（留空则与超时相同）">
+      <label for="lt-just-reading">刚好到时 读音（平假名）</label>
+      <input id="lt-just-reading" placeholder="（留空则与超时相同）">
+      <label for="lt-over-text">超时 显示文字</label>
+      <input id="lt-over-text" placeholder="时间到了!">
+      <label for="lt-over-reading">超时 读音（平假名）</label>
+      <input id="lt-over-reading" placeholder="（请输入平假名）">
+    </div>
+  </section><!-- /tab-panel "audio" -->
+
+  <!-- ===== 会話 ===== -->
+  <section class="tab-panel" data-tab="chat">
+    <div id="chat-section">
+      <h2 class="section-title">对话服务商与 API 密钥</h2>
+      <label for="provider">对话服务商</label>
+      <select id="provider">
+        <option value="0">OpenAI Realtime</option>
+        <option value="1">Google Gemini Live</option>
+        <option value="2">XiaoZhi 服务器</option>
+      </select>
+      <p class="hint">切换使用哪一个对话后端。密钥和设置都可以保存在下面各项里。</p>
+
+      <label for="apikey">OpenAI API 密钥</label>
+      <input type="password" id="apikey" maxlength="256" placeholder="sk-… （不改请留空）">
+
+      <label for="gemini-apikey">Gemini API 密钥</label>
+      <input type="password" id="gemini-apikey" maxlength="256" placeholder="AIza… （不改请留空）">
+
+      <label for="xiaozhi-url">XiaoZhi 服务器 URL</label>
+      <input type="text" id="xiaozhi-url" maxlength="256" placeholder="ws://192.168.1.10:8000/xiaozhi/v1/ （不改请留空）">
+
+      <label for="xiaozhi-token">XiaoZhi 令牌</label>
+      <input type="password" id="xiaozhi-token" maxlength="256" placeholder="（可选 / 不改请留空）">
+
+      <!-- Legacy toggle, kept in the DOM so existing JS keeps working but
+           hidden — operation_mode (selectable on the 接続 tab) now decides
+           whether the conversation task spawns. The device derives this
+           gate from operation_mode at boot, so the toggle value is ignored
+           on the next reboot regardless of what's in dataset.initial. -->
+      <label class="toggle-label" for="openai-enabled" style="display:none">
+        <input type="checkbox" id="openai-enabled" checked>
+        <span>启用对话功能</span>
+      </label>
+
+      <h2 class="section-title">触摸操作</h2>
+      <label class="toggle-label" for="barge-in-enabled">
+        <input type="checkbox" id="barge-in-enabled">
+        <span>点头打断对话（插话）</span>
+      </label>
+      <p class="hint">应答播放中点按形象屏幕（头部）可打断 AI 应答。触摸传感器较灵敏，容易误触，所以默认关闭。抚摸（前→中→后连续触摸）与本开关无关，始终开启。保存后重启生效。</p>
+    </div>
+  </section><!-- /tab-panel "chat" -->
+
+  <!-- ===== デバイス ===== -->
+  <section class="tab-panel" data-tab="device">
+    <div id="device-toggles-section">
+      <h2 class="section-title">设备功能开/关</h2>
+      <label class="toggle-label" for="bat-gauge-enabled">
+        <input type="checkbox" id="bat-gauge-enabled" checked>
+        <span>显示电池电量条</span>
+      </label>
+      <p class="hint">在形象画面左上角显示电量条（保存后重启生效）</p>
+
+      <label class="toggle-label" for="startup-arpeggio-enabled" style="margin-top:1rem">
+        <input type="checkbox" id="startup-arpeggio-enabled" checked>
+        <span>启动时播放琶音</span>
+      </label>
+      <p class="hint">启动后是否播放 C5–E5–G5（扬声器自检音）。关闭则静音启动（保存后重启生效）</p>
+
+      <label class="toggle-label" for="servo-enabled" style="margin-top:1rem">
+        <input type="checkbox" id="servo-enabled" checked>
+        <span>启用舵机</span>
+      </label>
+      <p class="hint">关闭后不上舵机电源，也不启动舵机任务（保存后重启生效）。与操作画面的卸力/恢复开关不是一回事，本项会写入 NVS 持久保存。</p>
+    </div>
+
+    <div id="servo-section">
+      <h2 class="section-title">舵机原点与活动范围（面向 Takao base 等自制底板）</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        舵机安装方向和活动范围因底板而异。请设置原点（0..1023）和活动范围（度），
+        再点「保存并重启」生效。默认是 M5 base 的数值。
+      </p>
+      <div class="grid2">
+        <div>
+          <label for="sv-yaw-zero">Yaw 原点 (raw)</label>
+          <input type="number" id="sv-yaw-zero" min="0" max="1023" step="1" placeholder="460">
+        </div>
+        <div></div>
+        <div>
+          <label for="sv-yaw-min">Yaw 最小 (°)</label>
+          <input type="number" id="sv-yaw-min" min="-90" max="90" step="1" placeholder="-40">
+        </div>
+        <div>
+          <label for="sv-yaw-max">Yaw 最大 (°)</label>
+          <input type="number" id="sv-yaw-max" min="-90" max="90" step="1" placeholder="40">
+        </div>
+        <div>
+          <label for="sv-pitch-zero">Pitch 原点 (raw)</label>
+          <input type="number" id="sv-pitch-zero" min="0" max="1023" step="1" placeholder="620">
+        </div>
+        <div></div>
+        <div>
+          <label for="sv-pitch-min">Pitch 最小 (°)</label>
+          <input type="number" id="sv-pitch-min" min="-90" max="90" step="1" placeholder="-10">
+        </div>
+        <div>
+          <label for="sv-pitch-max">Pitch 最大 (°)</label>
+          <input type="number" id="sv-pitch-max" min="-90" max="90" step="1" placeholder="25">
+        </div>
+      </div>
+      <div id="sv-range-area" style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px dashed #555">
+        <p class="hint" style="margin-bottom:0.5rem">
+          打开范围设置模式后舵机会卸力，可以手工摆到目标位置再采集。
+          请按顺序：正中点「采集 Yaw 原点」，左端点「采集 Yaw 最小」，右端点「采集 Yaw 最大」。
+          采集值会填进上方输入框。最后点「保存并重启」确认。
+        </p>
+        <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+          <button type="button" id="sv-range-mode">范围设置模式: OFF</button>
+          <span class="hint" id="sv-live-pos">Yaw: -- (--°)   Pitch: -- (--°)</span>
+        </div>
+        <div style="margin-top:0.4rem;display:flex;flex-wrap:wrap;gap:0.3rem">
+          <button type="button" id="sv-cap-yaw-zero" disabled>采集 Yaw 原点</button>
+          <button type="button" id="sv-cap-yaw-min"  disabled>采集 Yaw 最小</button>
+          <button type="button" id="sv-cap-yaw-max"  disabled>采集 Yaw 最大</button>
+          <button type="button" id="sv-cap-pitch-zero" disabled>采集 Pitch 原点</button>
+          <button type="button" id="sv-cap-pitch-min"  disabled>采集 Pitch 最小</button>
+          <button type="button" id="sv-cap-pitch-max"  disabled>采集 Pitch 最大</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="led-section">
+      <h2 class="section-title">猫耳 LED</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        设置猫耳 NeoPixel（GPIO9 / 18 颗 LED）的模式、颜色和亮度。
+        更改立刻生效，并自动写入 NVS，重启后仍会恢复。
+        彩虹（gradient）模式会忽略颜色。
+      </p>
+      <div class="grid2">
+        <div>
+          <label for="led-mode">模式</label>
+          <select id="led-mode">
+            <option value="0">OFF</option>
+            <option value="1">单色 (solid)</option>
+            <option value="2">呼吸 (breath)</option>
+            <option value="3">彩虹 (gradient)</option>
+          </select>
+        </div>
+        <div>
+          <label for="led-color">颜色 (solid / breath)</label>
+          <input type="color" id="led-color" value="#404040" style="width:100%;height:2.2rem;padding:0;border:0">
+        </div>
+        <div style="grid-column:span 2">
+          <label for="led-brightness">亮度 <span id="led-brightness-value">26</span> / 255</label>
+          <input type="range" id="led-brightness" min="0" max="255" step="1" value="26" style="width:100%">
+        </div>
+        <div style="grid-column:span 2">
+          <label for="led-period">彩彩虹 (gradient) 周期 <span id="led-period-value">6.0</span> 秒</label>
+          <input type="range" id="led-period" min="1" max="255" step="1" value="60" style="width:100%">
+        </div>
+      </div>
+      <label class="toggle-label" for="led-mouth-sync" style="margin-top:1rem">
+        <input type="checkbox" id="led-mouth-sync">
+        <span>按口型控制 LED</span>
+      </label>
+      <p class="hint">形象张嘴时 LED 会跟着反应（对话播放、jtts 发音、麦克风口型同步都有效）。关闭时固定为所设亮度。保存后重启生效。</p>
+      <label for="lip-sync-mode" style="margin-top:0.5rem">口型同步模式</label>
+      <p class="hint">
+        开启时选择控制方式。「亮度」是嘴张得越大 LED 整体越亮的原有行为。
+        「电平表」把猫耳三角形（LED1 为底边，LED5 为顶点）
+        当成 5 级条形图点亮。保存后重启生效。
+      </p>
+      <select id="lip-sync-mode">
+        <option value="0">亮度 (Brightness)</option>
+        <option value="1">电平表 (LevelMeter)</option>
+      </select>
+    </div>
+  </section><!-- /tab-panel "device" -->
+
+  <!-- ===== メンテ ===== -->
+  <section class="tab-panel" data-tab="maint">
+    <div id="mcp-section">
+      <h2 class="section-title">Claude Code Channel (MCP)：令牌管理</h2>
+      <p class="hint">设置后会启用 <code>/mcp/*</code> HTTP API（可由 Channel adapter 连接）。清空后 <code>/mcp/*</code> 返回 404。保存后重启生效</p>
+      <label for="mcp-token">MCP API 令牌（留空不改 / 点「清除」会把空字符串写入 NVS）</label>
+      <input type="password" id="mcp-token" autocomplete="off" placeholder="(不改请留空)">
+      <div style="display:flex;gap:0.4rem;margin-top:0.3rem">
+        <button type="button" id="btn-mcp-token-gen">随机生成</button>
+        <button type="button" id="btn-mcp-token-show">显示</button>
+        <button type="button" id="btn-mcp-token-clear">清除</button>
+      </div>
+    </div>
+
+    <div id="ota-section">
+      <h2 class="section-title">固件更新 (OTA)</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        从 GitHub Release 选择，或选本地 <code>build/stackchan_idf.bin</code>，
+        再点「写入」，会经加密 BLE 把新固件写到另一分区并重启。
+        成功后浏览器侧 BLE 会断开，请手动重新连接。
+      </p>
+      <label for="ota-release">版本</label>
+      <select id="ota-release" style="margin-bottom:0.5rem"><option value="">(使用本地文件)</option></select>
+      <div class="ota-row">
+        <input type="file" id="ota-file" accept=".bin">
+        <button id="btn-ota" type="button" disabled>写入</button>
+      </div>
+      <div class="ota-status" id="ota-status">
+        <div class="ota-bar"><div class="ota-bar-fill" id="ota-bar-fill"></div></div>
+        <div class="ota-stats" id="ota-stats">未开始</div>
+      </div>
+    </div>
+  </section><!-- /tab-panel "maint" -->
+
+  <div class="log" id="log"></div>
+
+  <p class="compat-note">
+    在 Chrome / Edge（桌面）<strong>133 及以上</strong> + <code>file://</code> 下可用。
+    Firefox、Safari 不支持 Web Bluetooth。<br>
+    每次连接用 X25519 + AES-256-GCM 加密（不必做系统配对）。
+  </p>
+</div>
+
+<!-- Embeddable avatar render module (built by wasm/build.sh, deployed next to
+     this page by pages.yml). MODULARIZE → defines window.AvatarModule. Optional:
+     if absent (e.g. local file:// without a build) the avatar preview is skipped
+     and BLE tuning still works (see setupAvatarPreview's guard). -->
+<script src="avatar_module.js" onerror="window.__avatarModuleMissing=true"></script>
+<!-- Transport-agnostic helpers (log panel / tab bar / board facts) shared
+     with the Wi-Fi settings page. Sibling file both in the repo (tools/) and
+     on the deployed site (pages.yml copies it next to settings.html), so the
+     same tag works over file:// during development. -->
+<script src="settings_common.js"></script>
+<!-- Avatar DSL compiler bundle (lexer/parser/emitter/compile/opcodes from
+     tools/avatar_dsl/), concatenated into an IIFE that hangs the public API
+     on window.AvatarDsl. Injected at Pages-deploy time by tools/avatar_dsl/
+     inject.mjs (see .github/workflows/pages.yml). When this page is loaded
+     locally without inject (file:// during development), the placeholder is
+     left as a comment so the surrounding JS still parses cleanly — the DSL
+     editor will report "DSL コンパイラ未起動" but everything else works. -->
+<script>/*{{AVATAR_DSL_BUNDLE}}*/</script>
+<!-- DSL preset list inlined the same way (`[{name,source}, ...]`). The first
+     entry is the textarea's initial value. When the placeholder is not
+     substituted (local file://) `window.AVATAR_DSL_PRESETS` ends up as the
+     literal placeholder string; setupDslEditor's Array.isArray check handles
+     that — the dropdown stays empty but the editor still works. -->
+<script>
+  window.AVATAR_DSL_PRESETS = "{{AVATAR_DSL_PRESETS}}";
+  window.AVATAR_DSL_DEFAULT_SOURCE = "{{AVATAR_DSL_DEFAULT_SOURCE}}";
+</script>
+<script>
+// --- UUIDs ---
+const SVC_UUID    = 'e3f0a000-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_SSID    = 'e3f0a001-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_PASS    = 'e3f0a002-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_KEY     = 'e3f0a003-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_APPLY   = 'e3f0a004-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_STATUS  = 'e3f0a005-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_KX      = 'e3f0a006-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_EN      = 'e3f0a007-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_RTP_EN  = 'e3f0a011-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// JttsIdleEnabled — encrypted 1-byte flag. Master switch for the idle babble
+// (the avatar speaking phrases when nothing else is going on). When this is
+// off AND CHR_EN (conversation) is off, the firmware activates a mic-driven
+// lip-sync mode instead. Takes effect after the Apply reboot.
+const CHR_JTTS_IDLE_EN = 'e3f0a022-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// BatteryGauge — encrypted 1-byte flag (show/hide the top-left battery gauge).
+const CHR_BAT_GAUGE = 'e3f0a017-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_STARTUP_ARP = 'e3f0a02e-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// ServoLimits — encrypted compact JSON of per-servo zero + motion range.
+const CHR_SERVO_LIMITS = 'e3f0a018-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// ServoRangeMode — encrypted 1-byte flag (0=off, 1=on). ON puts the device
+// into "torque off + poll present-position" mode for hand-driven calibration.
+const CHR_SERVO_RANGE_MODE = 'e3f0a019-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// ServoPositions — encrypted READ-only 4-byte snapshot of live raw positions
+// [yaw_raw i16 LE][pitch_raw i16 LE]. -1 = unknown. Polled while in range mode.
+const CHR_SERVO_POSITIONS = 'e3f0a01a-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// BoardKind — encrypted READ-only 1-byte board variant indicator
+// (0=M5Base, 1=TakaoBase, 2=AtomNyan). Lets us hide controls that don't
+// apply on the current hardware (servos on Atom-nyan, battery where absent).
+const CHR_BOARD_KIND = 'e3f0a01b-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// ServoEnabled — encrypted 1-byte flag, NVS-persisted master servo switch.
+// 0 = rail off + task not spawned at boot; 1 = normal. Staged on WRITE,
+// applied on Apply reboot. Distinct from ServoRangeMode (runtime, ephemeral).
+const CHR_SERVO_ENABLED = 'e3f0a01c-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// McpToken — encrypted WRITE-ONLY bearer for the /mcp/* (Claude Code
+// Channel) HTTP API. WRITE stages a new token; Apply persists it to NVS
+// and reboots. Empty body clears (→ 404 on /mcp/* next boot unless the
+// firmware was built with a CONFIG_MCP_API_TOKEN fallback).
+const CHR_MCP_TOKEN = 'e3f0a01d-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// LtConfig — encrypted compact JSON for the LT timekeeper (talk length,
+// warning threshold, repeat period, announcement words). WRITE applies live;
+// READ returns the active JSON. Persisted on Apply.
+const CHR_LT_CONFIG = 'e3f0a01e-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// Audio pipeline metrics: encrypted READ-only JSON snapshot from the last
+// finished conversation turn. Useful for diagnosing playback latency / drift
+// from the same settings page (no separate dashboard). Returns "{}" before
+// any turn completes. See main/conversation_task.cpp `log_playback_metrics`.
+const CHR_AUDIO_METRICS = 'e3f0a01f-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// LED live state: encrypted RW. 5-byte payload [mode][R][G][B][brightness].
+// Drives the cat-ear (nekomimi) NeoPixel chain — see main/led_task.cpp +
+// components/board/nekomimi_led_strip.cpp. Persisted to NVS automatically
+// on every WRITE so settings survive reboot.
+const CHR_LED_STATE = 'e3f0a020-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// MicLipGain — encrypted R/W. 4-byte payload [input_pct LE u16][output_pct LE u16].
+// Live calibration for main/mic_lip_sync_task. NVS-persisted; same wire format
+// as `GET/POST /api/mic-lip-gain` on the WiFi side.
+const CHR_MIC_LIP_GAIN = 'e3f0a023-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// LedMouthSyncEnabled — encrypted 1-byte flag. When 1, the LED brightness
+// follows the avatar's mouth_open. Staged via Apply path (reboot required).
+const CHR_LED_MOUTH_SYNC = 'e3f0a024-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// OperationMode — encrypted 1-byte enum (0=MicLipSync, 1=JttsRandom,
+// 2=Conversation). Single source of truth for the avatar's primary
+// behaviour. Staged via Apply path (reboot required).
+const CHR_OPERATION_MODE = 'e3f0a025-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// BargeInEnabled — encrypted 1-byte flag (0=disabled, 1=enabled). When
+// on, a screen tap mid-reply interrupts the AI; off by default because
+// the capacitive pad fires false positives from incidental contact.
+const CHR_BARGE_IN_ENABLED = 'e3f0a026-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// DeviceName (R/W) — operator-set BLE advertising name + mDNS hostname seed.
+const CHR_DEVICE_NAME = 'e3f0a027-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// AuthPassword (write-only) — set/clears the BLE+HTTP auth gate. Empty body
+// clears (= no auth). NEVER read back; status uses has_auth_password.
+const CHR_AUTH_PASSWORD = 'e3f0a028-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// AudioOutput — encrypted 1-byte enum (0=Auto, 1=Internal, 2=ModuleAudio).
+// Forces a specific output codec selection at next boot, overriding the
+// boot-time Module Audio probe when set to Internal / ModuleAudio.
+const CHR_AUDIO_OUTPUT = 'e3f0a029-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// LipSyncMode — encrypted 1-byte enum (0=Brightness, 1=LevelMeter).
+// Selects how main/led_task renders mouth_open when led_mouth_sync_enabled
+// is on. Staged via Apply path (reboot required).
+const CHR_LIP_SYNC_MODE = 'e3f0a02a-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// MicLipAgcEnabled — encrypted 1-byte flag. When 1, mic lip-sync uses
+// adaptive noise-floor tracking. Staged via Apply path (reboot required).
+const CHR_MIC_LIP_AGC = 'e3f0a02b-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// SpeakerVolume — encrypted R/W. 2-byte payload [pct LE u16] in 0..200
+// (100 = factory default per board). Live-applied (no reboot).
+const CHR_SPEAKER_VOLUME = 'e3f0a02c-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// JttsSay — encrypted WRITE-only. UTF-8 kana bytes; the device spawns
+// a worker to synthesise + play through M5.Speaker. Test trigger only.
+const CHR_JTTS_SAY = 'e3f0a02d-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// AvatarBytecode — encrypted RW. Chunked upload of the avatar face .avbc
+// (mirrors `POST /api/avatar-dsl` on the HTTP side). READ returns a status
+// JSON; WRITE accepts a 1-byte op header followed by op-specific payload:
+//   0x00 begin  [total:u16 LE]
+//   0x01 data   [bytes...]
+//   0x02 commit ()
+//   0xff reset  ()         (revert to firmware-embedded default)
+const CHR_AVATAR_BC = 'e3f0a021-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// Board facts (labels / capabilities / firmware-ZIP slug) live in
+// settings_common.js — window.StackchanSettings.BOARDS.
+const BOARD_M5_BASE = 0;
+const BOARD_TAKAO_BASE = 1;
+const BOARD_ATOM_NYAN = 2;
+const BOARD_ATOM_S3 = 3;
+const BOARD_STOPWATCH = 4;
+const CHR_JTTS    = 'e3f0a008-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_OTA_CTRL = 'e3f0a009-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_OTA_DATA = 'e3f0a00a-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_PROVIDER = 'e3f0a00b-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_GEMINI_KEY = 'e3f0a00c-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_XIAOZHI_URL = 'e3f0a013-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_XIAOZHI_TOKEN = 'e3f0a014-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// FaceConfig — encrypted compact JSON of the avatar face tuning. WRITE applies
+// live (no reboot) and stages for Apply; READ returns the active value.
+const CHR_FACE_CONFIG = 'e3f0a015-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// Battery — encrypted READ, 5 bytes [mV u16 LE][mA i16 LE][pct i8]. Polled.
+const CHR_BATTERY = 'e3f0a016-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_WIFI_IP = 'e3f0a00d-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_WIFI_MAC = 'e3f0a012-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_AUDIO_CTRL = 'e3f0a00e-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_AUDIO_DATA = 'e3f0a00f-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+// AudioCredit — READ uint32 LE, the device's current audio-buffer free space
+// in bytes. AudioData is written without response (for throughput) so there's
+// no per-write backpressure; the sender polls this for credit-based flow
+// control instead, never sending more than it last saw free. This is what
+// paces the stream to the device's playback rate so its PCM ring can't
+// overrun (which corrupted ADTS framing → garbled "overwritten" playback).
+const CHR_AUDIO_CREDIT = 'e3f0a010-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+
+// OTA transfer parameters. The chunk size is bounded by the Web Bluetooth
+// GATT value-length cap of 512 bytes total on writeValueWithResponse — and
+// we wrap each chunk in 12 B nonce + 16 B AES-GCM tag, so the plaintext can
+// be at most 512 − 28 = 484 B. 480 leaves a 4-byte safety margin and still
+// fits comfortably in the firmware's 1024-byte access-callback scratch /
+// NimBLE's CONFIG_BT_NIMBLE_ATT_MAX_PREP_ENTRIES=64 reassembly limit.
+const OTA_CHUNK_SIZE = 480;
+
+// Device Information Service (Bluetooth SIG-assigned, UUID 0x180A).
+// Web Bluetooth accepts the standard short names.
+const DIS_SVC = 'device_information';
+const DIS_CHRS = {
+  fw:    'firmware_revision_string',
+  hw:    'hardware_revision_string',
+  model: 'model_number_string',
+  mfr:   'manufacturer_name_string',
+  sw:    'software_revision_string',
+};
+
+// --- State ---
+let bleDevice = null, bleServer = null, svc = null;
+let chrSsid = null, chrPass = null, chrKey = null, chrApply = null, chrStatus = null, chrKx = null, chrEn = null, chrRtpEn = null, chrJttsIdleEn = null, chrJtts = null, chrOtaCtrl = null, chrOtaData = null, chrProvider = null, chrGeminiKey = null, chrXiaozhiUrl = null, chrXiaozhiToken = null, chrFaceConfig = null, chrBattery = null, chrBatGauge = null, chrStartupArp = null, chrServoEnabled = null, chrMcpToken = null, chrLtConfig = null, chrServoLimits = null, chrServoRangeMode = null, chrServoPositions = null, chrBoardKind = null, chrWifiIp = null, chrWifiMac = null, chrAudioCtrl = null, chrAudioData = null, chrAudioCredit = null, chrAudioMetrics = null, chrLedState = null, chrMicLipGain = null, chrLedMouthSync = null, chrLipSyncMode = null, chrMicLipAgc = null, chrSpeakerVolume = null, chrJttsSay = null, chrOperationMode = null, chrAudioOutput = null, chrBargeIn = null, chrDeviceName = null, chrAuthPassword = null, chrAvatarBc = null;
+let boardKind = null; // null = unknown (older firmware), else 0/1/2 from BOARD_*
+let batteryPollTimer = null;  // setInterval handle while connected
+let jttsInitialJson = '';  // last read JSON, used to detect Apply-time changes
+let servoLimitsInitial = ''; // last read servo-limits JSON (Apply-time change detection)
+let otaInFlight = false;
+let aesKey = null;  // CryptoKey for AES-256-GCM, derived per connection
+
+// --- Log ---
+// Shared implementation (settings_common.js). Classless calls render as
+// "info" on this page — the historical default here.
+StackchanSettings.init({ logDefaultClass: 'info' });
+const log = StackchanSettings.log;
+
+// --- UI helpers ---
+function setBleUi(connected) {
+  const dot = document.getElementById('ble-dot');
+  dot.className = 'dot ' + (connected ? 'ble-connected' : '');
+  document.getElementById('ble-label').textContent = connected ? 'BLE 已连接' : '未连接';
+  const applyBtn = document.getElementById('btn-apply');
+  applyBtn.disabled = !connected;
+  // Reset label — a prior Apply may have left it on "再起動中…", which
+  // sticks across reconnects without this.
+  applyBtn.textContent = '保存并重启';
+  document.getElementById('btn-disconnect').disabled = !connected;
+  document.getElementById('btn-connect').disabled = connected;
+  // Enable the jtts-say test button only while connected AND the chr
+  // is present (older firmware won't expose it).
+  const sayBtn = document.getElementById('btn-jtts-say');
+  if (sayBtn) sayBtn.disabled = !(connected && chrJttsSay);
+  // OTA button gating moved to refreshOtaButton() — it now also considers
+  // the release dropdown and the connection's actual chr availability.
+  if (typeof refreshOtaButton === 'function') refreshOtaButton();
+  if (typeof refreshAudioButton === 'function') refreshAudioButton();
+  if (typeof refreshAvbcButton === 'function') refreshAvbcButton();
+}
+
+// Audio play needs the chr (set during post-connect discovery), a selected
+// file, and conversation mode OFF (mutually exclusive — the device rejects
+// `begin` while voice chat is enabled). The file may have been picked
+// before connect, so re-evaluate on every UI transition.
+function refreshAudioButton() {
+  const connected = !!(bleDevice && bleDevice.gatt && bleDevice.gatt.connected);
+  const file = document.getElementById('audio-file').files[0];
+  const convEnabled = document.getElementById('openai-enabled').checked;
+  document.getElementById('audio-conv-note').style.display = convEnabled ? '' : 'none';
+  document.getElementById('btn-audio-play').disabled =
+    !(connected && chrAudioData && file && !convEnabled);
+}
+
+function updateStatus(data) {
+  const flags = data.getUint8(0);
+  const wifi  = data.getUint8(1);
+  document.getElementById('flag-ssid').classList.toggle('set', !!(flags & 0x01));
+  document.getElementById('flag-pass').classList.toggle('set', !!(flags & 0x02));
+  document.getElementById('flag-key' ).classList.toggle('set', !!(flags & 0x04));
+  document.getElementById('flag-en'  ).classList.toggle('set', !!(flags & 0x08));
+  document.getElementById('flag-gkey').classList.toggle('set', !!(flags & 0x10));
+  document.getElementById('flag-prov').classList.toggle('set', !!(flags & 0x20));
+  const wifiDot = document.getElementById('wifi-dot');
+  wifiDot.className = 'dot ' + (wifi ? 'wifi-connected' : '');
+  document.getElementById('wifi-label').textContent = wifi ? 'Wi-Fi: 已连接' : 'Wi-Fi: 已断开';
+}
+
+// --- Encode helpers ---
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function strToBytes(s) { return enc.encode(s); }
+
+// --- Crypto helpers (X25519 ECDH → HKDF-SHA256 → AES-256-GCM) ---
+
+// Probe browser X25519 support. Chrome / Edge 133+ shipped it GA; older
+// versions fail at generateKey.
+async function ensureX25519Supported() {
+  try {
+    await crypto.subtle.generateKey({ name: 'X25519' }, false, ['deriveBits']);
+  } catch (e) {
+    throw new Error('当前浏览器不支持 X25519（需要 Chrome / Edge 133 及以上）');
+  }
+}
+
+// Run the application-layer handshake against the device:
+//   1. Read device's 32-byte ephemeral pubkey from KeyExchange (plaintext).
+//   2. Generate our own X25519 keypair.
+//   3. ECDH → 32-byte shared secret → HKDF-SHA256 → AES-256 key.
+//   4. Write our pubkey to KeyExchange to commit the device side.
+// On success `aesKey` is a non-extractable CryptoKey usable for AES-GCM.
+// Run the X25519 handshake. `saltBytes` is the HKDF salt — empty by default
+// (= back-compat with pre-password firmware and devices with auth disabled).
+// On the password-gated path the caller re-runs setupSession with
+// salt = SHA-256(password), and the device's complete_handshake (which is
+// idempotent w.r.t. repeated peer-pubkey writes) re-derives its AES key with
+// the matching salt. The device's salt is set ONCE at boot from the stored
+// password — this is purely a client-side parameter.
+async function setupSession(saltBytes = new Uint8Array(0)) {
+  const devicePubRaw = new Uint8Array((await chrKx.readValue()).buffer);
+  if (devicePubRaw.length !== 32) {
+    throw new Error(`device pubkey length ${devicePubRaw.length} != 32`);
+  }
+  const ourKp = await crypto.subtle.generateKey({ name: 'X25519' }, false, ['deriveBits']);
+  const devicePub = await crypto.subtle.importKey('raw', devicePubRaw, { name: 'X25519' }, false, []);
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: 'X25519', public: devicePub }, ourKp.privateKey, 256);
+  const ikm = await crypto.subtle.importKey(
+    'raw', sharedBits, { name: 'HKDF' }, false, ['deriveKey']);
+  aesKey = await crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: saltBytes,
+      info: enc.encode('stackchan-config-v1'),
+    },
+    ikm,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']);
+  const ourPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', ourKp.publicKey));
+  await chrKx.writeValueWithResponse(ourPubRaw);
+}
+
+// Show the auth-modal-form modal and return the entered password as a
+// Promise. Resolves with the string on submit, rejects on cancel. The
+// password field has autocomplete="current-password" + a hidden
+// username field so browser password managers can save / fill the
+// credential per origin.
+// Show a blocking error popup. Returns a Promise that resolves when the
+// user dismisses it. Always writes a matching log('err') so the post-
+// mortem trace is still in the log panel.
+function showErrorPopup(message, title) {
+  log(message, 'err');
+  return new Promise((resolve) => {
+    const backdrop = document.getElementById('error-modal-backdrop');
+    const titleEl  = document.getElementById('error-modal-title');
+    const bodyEl   = document.getElementById('error-modal-body');
+    const okEl     = document.getElementById('error-modal-ok');
+    titleEl.textContent = title || '错误';
+    bodyEl.textContent  = message;
+    backdrop.style.display = 'flex';
+    setTimeout(() => okEl.focus(), 0);
+    const onOk = () => {
+      backdrop.style.display = 'none';
+      okEl.removeEventListener('click', onOk);
+      resolve();
+    };
+    okEl.addEventListener('click', onOk);
+  });
+}
+
+// Try the Credential Management API first — explicit, doesn't rely on
+// browser form heuristics. Returns the stored password or null when no
+// credential is saved / API unsupported. mediation:'optional' means the
+// browser may auto-fill silently if it's confident, or prompt if not.
+async function tryAutofillCredential(deviceName) {
+  if (!window.PasswordCredential || !navigator.credentials) return null;
+  try {
+    const cred = await navigator.credentials.get({
+      password: true,
+      mediation: 'optional',
+    });
+    if (cred && cred.password) {
+      // If the device name was known, only use the credential when it
+      // matches; else accept any.
+      if (!deviceName || cred.id === deviceName || cred.id === 'stackchan') {
+        return cred.password;
+      }
+    }
+  } catch (_) { /* ignore — fall through to prompt */ }
+  return null;
+}
+
+// Ask the browser to save the credential. Uses PasswordCredential
+// constructed from the form so id (username) / password / name align
+// with the autocomplete fields. Silently ignores when the API isn't
+// available (Firefox, older browsers).
+async function offerCredentialSave(form) {
+  if (!window.PasswordCredential || !navigator.credentials) return;
+  try {
+    const cred = new PasswordCredential(form);
+    await navigator.credentials.store(cred);
+  } catch (e) {
+    // Save prompt cancelled by user — not an error.
+    console.debug('credentials.store skipped:', e);
+  }
+}
+
+function promptForAuthPassword(deviceName) {
+  return new Promise((resolve, reject) => {
+    const backdrop = document.getElementById('auth-modal-backdrop');
+    const form     = document.getElementById('auth-modal-form');
+    const pwdEl    = document.getElementById('auth-modal-password');
+    const userEl   = document.getElementById('auth-modal-username');
+    const cancelEl = document.getElementById('auth-modal-cancel');
+    const showEl   = document.getElementById('auth-modal-show');
+    // Scope the saved credential by the device name when known so the
+    // browser can offer the right one back the next time we connect.
+    userEl.value = deviceName || 'stackchan';
+    pwdEl.value = '';
+    pwdEl.type = 'password';
+    showEl.checked = false;
+    backdrop.style.display = 'flex';
+    setTimeout(() => pwdEl.focus(), 0);
+    const onShowChange = () => {
+      pwdEl.type = showEl.checked ? 'text' : 'password';
+    };
+    const cleanup = () => {
+      backdrop.style.display = 'none';
+      form.removeEventListener('submit', onSubmit);
+      cancelEl.removeEventListener('click', onCancel);
+      showEl.removeEventListener('change', onShowChange);
+      pwdEl.type = 'password';
+      showEl.checked = false;
+    };
+    const onSubmit = async (e) => {
+      e.preventDefault();
+      const pwd = pwdEl.value;
+      if (!pwd) {
+        cleanup();
+        reject(new Error('密码为空，无法继续认证'));
+        return;
+      }
+      // Offer to save the credential to the browser's password manager
+      // BEFORE closing the modal — Credential Management API needs the
+      // form to still be in the DOM with its current values.
+      await offerCredentialSave(form);
+      cleanup();
+      resolve(pwd);
+    };
+    const onCancel = () => {
+      cleanup();
+      reject(new Error('已取消认证密码，连接中止'));
+    };
+    form.addEventListener('submit', onSubmit);
+    cancelEl.addEventListener('click', onCancel);
+    showEl.addEventListener('change', onShowChange);
+  });
+}
+
+// Probe-and-retry helper called right after the initial handshake. If the
+// device has an auth password set, the empty-salt session derives the wrong
+// AES key and the first encrypted READ (Status) fails with a GCM tag
+// mismatch. We surface a modal prompt to the user; their answer is hashed
+// and fed back into setupSession to re-derive the key. Password is kept
+// only in the local scope (no localStorage) so it lives in memory just
+// long enough to derive the salt and then becomes garbage-collectible.
+async function ensureAuthenticated() {
+  if (!chrStatus) return; // very old firmware — nothing to probe against
+  try {
+    await readEncrypted(chrStatus);
+    return; // no password on device, or already authed (= empty salt matched)
+  } catch (_) {
+    // Fall through to the password prompt.
+  }
+  log('读取 Status 失败，设备侧可能已设置认证密码。', 'info');
+  const deviceName = (bleDevice && bleDevice.name) || '';
+  // Try browser's password manager first (silent autofill if a saved
+  // credential matches). On success skips the modal entirely.
+  let pwd = await tryAutofillCredential(deviceName);
+  if (pwd) {
+    log('已从密码管理器自动填入', 'info');
+  } else {
+    log('请输入密码。', 'info');
+    pwd = await promptForAuthPassword(deviceName);
+  }
+  if (pwd === '') {
+    throw new Error('密码为空，无法继续认证');
+  }
+  const salt = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(pwd)));
+  await setupSession(salt);
+  // Final verification: any error here means the password was wrong (a
+  // device with no auth would have succeeded on the first probe above).
+  try {
+    await readEncrypted(chrStatus);
+  } catch (e) {
+    throw new Error('密码不正确，连接中止：' + e.message);
+  }
+  log('BLE 认证 OK', 'ok');
+}
+
+// Decrypt a characteristic READ. Wire format: [12B nonce][ct][16B tag].
+async function readEncrypted(chr) {
+  const wire = new Uint8Array((await chr.readValue()).buffer);
+  if (wire.length < 12 + 16) throw new Error('encrypted read too short');
+  const iv = wire.subarray(0, 12);
+  const ctTag = wire.subarray(12);
+  const ptBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ctTag);
+  return new Uint8Array(ptBuf);
+}
+
+// Read the Device Information Service (standard 0x180A) and populate the
+// device-info panel. DIS is plaintext (it's identification info), so this
+// runs alongside the encrypted settings I/O without touching aesKey.
+async function fetchDeviceInfo() {
+  const disSvc = await bleServer.getPrimaryService(DIS_SVC);
+  const entries = await Promise.all(
+    Object.entries(DIS_CHRS).map(async ([id, uuid]) => {
+      try {
+        const chr = await disSvc.getCharacteristic(uuid);
+        const v = await chr.readValue();
+        return [id, dec.decode(v)];
+      } catch (e) {
+        return [id, ''];
+      }
+    }));
+  for (const [id, val] of entries) {
+    const el = document.getElementById('dis-' + id);
+    if (el) el.textContent = val || '—';
+  }
+  document.getElementById('device-info').classList.add('visible');
+  const fw = entries.find(([id]) => id === 'fw');
+  if (fw && fw[1]) {
+    log(`Firmware: ${fw[1]}`);
+    // Mirror into the compact page header (board is filled in later by
+    // post-connect logic when CHR_BOARD_KIND is available).
+    const hdrFw = document.getElementById('hdr-fw');
+    if (hdrFw) hdrFw.textContent = fw[1];
+    const headerInfo = document.getElementById('header-info');
+    if (headerInfo) headerInfo.hidden = false;
+  }
+
+  // Build the mDNS hostname from the device-reported Wi-Fi STA MAC (WifiMac
+  // chr): the device publishes `stackchan-<lower 3 MAC bytes>.local`. Reading
+  // the actual MAC avoids guessing — older firmware composed the BLE name from
+  // a different MAC (BT = STA+2) than the mDNS hostname, so a name-derived
+  // guess could be wrong. Falls back to the BLE name if WifiMac is absent.
+  const name = bleDevice && bleDevice.name;
+  const row = document.getElementById('dis-wifi-row');
+  const link = document.getElementById('dis-wifi-url');
+  const macRow = document.getElementById('dis-wifi-mac-row');
+  const macVal = document.getElementById('dis-wifi-mac');
+  let host = null;
+  if (chrWifiMac && aesKey) {
+    try {
+      const mac = dec.decode(await readEncrypted(chrWifiMac)).trim(); // "aa:bb:cc:dd:ee:ff"
+      const oct = mac.split(':');
+      if (oct.length === 6) {
+        macVal.textContent = mac;
+        macRow.hidden = false;
+        host = 'stackchan-' + (oct[3] + oct[4] + oct[5]).toLowerCase();
+      }
+    } catch (e) { /* fall through to BLE-name derivation */ }
+  }
+  if (!host && name && /^stackchan-[0-9a-f]{6}$/i.test(name)) {
+    host = name.toLowerCase();
+  }
+  if (host) {
+    // Plain HTTP — the Wi-Fi settings page doesn't use Web Crypto, so
+    // a Secure Context isn't required and self-signed TLS would only
+    // add the cert-warning click-through.
+    const url = `http://${host}.local/`;
+    link.href = url;
+    link.textContent = url;
+    row.hidden = false;
+  } else {
+    row.hidden = true;
+  }
+
+  // Fallback for environments where mDNS doesn't resolve (Android Chrome,
+  // Windows without Bonjour, locked-down nets): read the live IPv4 address
+  // from the encrypted WifiIp chr and surface it as a second link. Empty
+  // string from the device means Wi-Fi isn't connected yet — hide the row.
+  const ipRow = document.getElementById('dis-wifi-ip-row');
+  const ipLink = document.getElementById('dis-wifi-ip-url');
+  let audioHost = null;
+  if (chrWifiIp && aesKey) {
+    try {
+      const ip = dec.decode(await readEncrypted(chrWifiIp)).trim();
+      if (ip && /^[\d.]+$/.test(ip)) {
+        const url = `http://${ip}/`;
+        ipLink.href = url;
+        ipLink.textContent = url;
+        ipRow.hidden = false;
+        audioHost = ip;
+      } else {
+        ipRow.hidden = true;
+      }
+    } catch (e) {
+      ipRow.hidden = true;
+    }
+  } else {
+    ipRow.hidden = true;
+  }
+
+  // Ready-to-copy ffmpeg commands for Wi-Fi live audio. udp/6970 carries L16
+  // or μ-law (codec by RTP payload type), udp/6972 carries AAC. Prefer the
+  // live IP; fall back to the .local hostname. The browser can't send UDP, so
+  // this is copy-only.
+  const audioRow = document.getElementById('dis-wifi-audio-row');
+  const audioCmd = document.getElementById('dis-wifi-audio-cmd');
+  if (!audioHost && name && /^stackchan-[0-9a-f]{6}$/i.test(name)) {
+    audioHost = `${name.toLowerCase()}.local`;
+  }
+  if (audioHost) {
+    audioCmd.textContent =
+      `# L16（未压缩） udp/6970\n` +
+      `ffmpeg -re -i IN -ac 1 -ar 48000 -c:a pcm_s16be -f rtp rtp://${audioHost}:6970\n` +
+      `# AAC（压缩）   udp/6972\n` +
+      `ffmpeg -re -i IN -ac 1 -ar 48000 -c:a aac -f rtp rtp://${audioHost}:6972\n` +
+      `# mu-law (OBS)  udp/6970\n` +
+      `ffmpeg -re -i IN -ac 1 -ar 8000 -c:a pcm_mulaw -f rtp rtp://${audioHost}:6970`;
+    audioRow.hidden = false;
+  } else {
+    audioRow.hidden = true;
+  }
+}
+
+function clearDeviceInfo() {
+  document.getElementById('device-info').classList.remove('visible');
+  for (const id of Object.keys(DIS_CHRS)) {
+    const el = document.getElementById('dis-' + id);
+    if (el) el.textContent = '—';
+  }
+  document.getElementById('dis-battery').textContent = '—';
+  document.getElementById('dis-wifi-mac-row').hidden = true;
+  document.getElementById('dis-wifi-mac').textContent = '—';
+  document.getElementById('dis-wifi-row').hidden = true;
+  const link = document.getElementById('dis-wifi-url');
+  link.href = '#';
+  link.textContent = '—';
+  document.getElementById('dis-wifi-ip-row').hidden = true;
+  const ipLink = document.getElementById('dis-wifi-ip-url');
+  ipLink.href = '#';
+  ipLink.textContent = '—';
+  document.getElementById('dis-wifi-audio-row').hidden = true;
+  document.getElementById('dis-wifi-audio-cmd').textContent = '';
+  // Hide the compact header readout too.
+  const headerInfo = document.getElementById('header-info');
+  if (headerInfo) headerInfo.hidden = true;
+  const hdrFw = document.getElementById('hdr-fw');
+  const hdrBoard = document.getElementById('hdr-board');
+  if (hdrFw) hdrFw.textContent = '—';
+  if (hdrBoard) hdrBoard.textContent = '—';
+}
+
+// --- jtts config form <-> JSON ---
+
+const JTTS_NUM_FIELDS = {
+  f0_hz:           'jtts-f0',
+  formant_scale:   'jtts-formant',
+  mora_ms:         'jtts-mora',
+  gain:            'jtts-gain',
+  breathiness:     'jtts-breath',
+  vibrato_rate_hz: 'jtts-vibrate',
+  vibrato_cents:   'jtts-vibratoc',
+  glottal_oq:      'jtts-oq',
+  tilt_db:         'jtts-tilt',
+  bw_scale:        'jtts-bwscale',
+  hmm_half_tone:   'jtts-halftone',
+};
+
+function readJttsForm() {
+  // Build a minimal JSON document — fields the user left blank are omitted
+  // so the device falls back to its compile-time defaults for those.
+  const obj = {};
+  const voice = document.getElementById('jtts-voice').value;
+  if (voice) obj.voice = voice;
+  const synth = document.getElementById('jtts-synth').value;
+  if (synth && synth !== 'v2') obj.synth = synth;
+  const engine = document.getElementById('jtts-engine').value;
+  if (engine && engine !== 'auto') obj.engine = engine;
+  for (const [key, id] of Object.entries(JTTS_NUM_FIELDS)) {
+    const v = document.getElementById(id).value.trim();
+    if (v !== '') {
+      const n = Number(v);
+      if (Number.isFinite(n)) obj[key] = n;
+    }
+  }
+  // `表示 | 読み` pair support shared with the Wi-Fi page (settings_common.js).
+  const phrases = StackchanSettings.jttsPhrasesFromText(
+      document.getElementById('jtts-phrases').value);
+  if (phrases.length > 0) obj.phrases = phrases;
+  return obj;
+}
+
+function writeJttsForm(json) {
+  // Reset all inputs first so leftover state never bleeds across configs.
+  document.getElementById('jtts-voice').value = 'female';
+  document.getElementById('jtts-synth').value = 'v2';
+  document.getElementById('jtts-engine').value = 'auto';
+  for (const id of Object.values(JTTS_NUM_FIELDS)) {
+    document.getElementById(id).value = '';
+  }
+  document.getElementById('jtts-phrases').value = '';
+  if (!json) return;
+  let obj;
+  try { obj = JSON.parse(json); }
+  catch (e) { log(`jtts config: JSON parse failed (${e.message})`, 'err'); return; }
+  if (obj.voice === 'male' || obj.voice === 'female') {
+    document.getElementById('jtts-voice').value = obj.voice;
+  }
+  if (obj.synth === 'classic' || obj.synth === 'v2') {
+    document.getElementById('jtts-synth').value = obj.synth;
+  }
+  if (['auto', 'formant', 'unit', 'hmm'].includes(obj.engine)) {
+    document.getElementById('jtts-engine').value = obj.engine;
+  }
+  for (const [key, id] of Object.entries(JTTS_NUM_FIELDS)) {
+    if (typeof obj[key] === 'number') {
+      document.getElementById(id).value = obj[key];
+    }
+  }
+  if (Array.isArray(obj.phrases)) {
+    document.getElementById('jtts-phrases').value =
+        StackchanSettings.jttsPhrasesToText(obj.phrases);
+  }
+}
+
+// Serialise form state for change-detection. JSON.stringify on a fresh object
+// with sorted keys gives us a canonical form we can compare against.
+function canonicaliseJttsForm() {
+  const obj = readJttsForm();
+  const sorted = {};
+  for (const k of Object.keys(obj).sort()) sorted[k] = obj[k];
+  return JSON.stringify(sorted);
+}
+
+// --- Capability gating ---
+// Some firmware revisions don't expose every characteristic. Show only the UI
+// sections backed by characteristics that resolved during connect. The OTA
+// section is the lightest dependency (just KeyExchange + OtaCtrl + OtaData),
+// so very old firmware still gets a path to upgrade itself.
+function applyCapabilityGating() {
+  const hasSettings = !!(chrSsid && chrPass && chrApply && chrStatus);
+  const hasOpenAiKey = !!chrKey;
+  const hasGemini = !!(chrProvider && chrGeminiKey);
+  const hasXiaozhi = !!(chrProvider && chrXiaozhiUrl && chrXiaozhiToken);
+  const hasEnable = !!chrEn;
+  const hasRtpEnable = !!chrRtpEn;
+  const hasBatGauge = !!chrBatGauge;
+  const hasStartupArp = !!chrStartupArp;
+  const hasServoEnabled = !!chrServoEnabled;
+  const hasMcpToken = !!chrMcpToken;
+  const hasJtts = !!chrJtts;
+  const hasOta = !!(chrOtaCtrl && chrOtaData);
+
+  // Hide individual form fields when the backing chr is missing.
+  const setVisible = (selector, visible) => {
+    for (const el of document.querySelectorAll(selector)) {
+      el.style.display = visible ? '' : 'none';
+    }
+  };
+  setVisible('label[for="provider"], #provider', hasGemini);
+  setVisible('#provider + p.hint', hasGemini);
+  setVisible('label[for="gemini-apikey"], #gemini-apikey', hasGemini);
+  setVisible('label[for="xiaozhi-url"], #xiaozhi-url', hasXiaozhi);
+  setVisible('label[for="xiaozhi-token"], #xiaozhi-token', hasXiaozhi);
+  // Hide the XiaoZhi provider choice entirely on firmware that lacks its chrs.
+  const xzOption = document.querySelector('#provider option[value="2"]');
+  if (xzOption) xzOption.hidden = !hasXiaozhi;
+  setVisible('label[for="apikey"], #apikey', hasOpenAiKey);
+  setVisible('label.toggle-label[for="openai-enabled"]', hasEnable);
+  setVisible('#openai-enabled + span', hasEnable);
+  setVisible('label.toggle-label[for="rtp-enabled"]', hasRtpEnable);
+  setVisible('label.toggle-label[for="rtp-enabled"] + p.hint', hasRtpEnable);
+  setVisible('label.toggle-label[for="bat-gauge-enabled"]', hasBatGauge);
+  setVisible('label.toggle-label[for="bat-gauge-enabled"] + p.hint', hasBatGauge);
+  setVisible('label.toggle-label[for="startup-arpeggio-enabled"]', hasStartupArp);
+  setVisible('label.toggle-label[for="startup-arpeggio-enabled"] + p.hint', hasStartupArp);
+  setVisible('label.toggle-label[for="servo-enabled"]', hasServoEnabled);
+  setVisible('label.toggle-label[for="servo-enabled"] + p.hint', hasServoEnabled);
+  setVisible('#mcp-section', hasMcpToken);
+  setVisible('#lt-section', !!chrLtConfig);
+  document.getElementById('jtts-section').style.display = hasJtts ? '' : 'none';
+  document.getElementById('ota-section').style.display = hasOta ? '' : 'none';
+  document.getElementById('audio-metrics-section').style.display = chrAudioMetrics ? '' : 'none';
+  document.getElementById('btn-audio-metrics-reload').disabled = !chrAudioMetrics || !aesKey;
+  document.getElementById('led-section').style.display = chrLedState ? '' : 'none';
+  for (const id of ['led-mode','led-color','led-brightness','led-period']) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !chrLedState || !aesKey;
+  }
+  for (const id of ['mic-lip-input','mic-lip-output']) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !chrMicLipGain || !aesKey;
+  }
+  document.getElementById('btn-apply').style.display = hasSettings ? '' : 'none';
+
+  // Per-board gating: hide controls for hardware the board doesn't carry.
+  // Older firmware that doesn't expose CHR_BOARD_KIND leaves boardKind = null
+  // → fall back to the historical M5-base assumption (everything visible) so
+  // we don't regress those installs.
+  // No-servo boards: AtomS3R / AtomS3 / StopWatch all lack the M5 base servo
+  // bus (StopWatch's back-side UART0 servo route is Phase-3 opt-in and not
+  // surfaced here yet).
+  const noServo = (boardKind === BOARD_ATOM_NYAN) ||
+                  (boardKind === BOARD_ATOM_S3) ||
+                  (boardKind === BOARD_STOPWATCH);
+  document.getElementById('servo-section').style.display = noServo ? 'none' : '';
+  if (noServo) {
+    setVisible('label.toggle-label[for="servo-enabled"]', false);
+    setVisible('label.toggle-label[for="servo-enabled"] + p.hint', false);
+  }
+  // Battery telemetry: M5 base = INA226, StopWatch = M5PM1 PMIC (M5Unified
+  // M5.Power surfaces it). Takao / AtomNyan / AtomS3 = none.
+  const noBattery = (boardKind === BOARD_TAKAO_BASE) ||
+                    (boardKind === BOARD_ATOM_NYAN) ||
+                    (boardKind === BOARD_ATOM_S3);
+  document.getElementById('dis-battery-row').style.display = noBattery ? 'none' : '';
+  if (noBattery) {
+    setVisible('label.toggle-label[for="bat-gauge-enabled"]', false);
+    setVisible('label.toggle-label[for="bat-gauge-enabled"] + p.hint', false);
+  }
+  // Surface the board name in the DIS Model row (the firmware's DIS
+  // model_number_string is the same "Stack-chan" string across all variants,
+  // so this overwrite turns it into something that actually distinguishes
+  // M5 base vs Takao vs Atom-nyan). Older firmware that doesn't expose
+  // BoardKind leaves boardKind == null → keep the original DIS value.
+  if (boardKind != null) {
+    const modelEl = document.getElementById('dis-model');
+    if (modelEl) {
+      modelEl.textContent = StackchanSettings.boardLabel(boardKind);
+    }
+    const hdrBoard = document.getElementById('hdr-board');
+    if (hdrBoard) {
+      hdrBoard.textContent = StackchanSettings.boardLabel(boardKind);
+    }
+  }
+  // Also mirror the firmware revision into the compact page header so the
+  // user can see "what version is on this device" without expanding the full
+  // device info card (which lives inside the 接続 tab).
+  const fwEl = document.getElementById('dis-fw');
+  const hdrFw = document.getElementById('hdr-fw');
+  const headerInfo = document.getElementById('header-info');
+  if (fwEl && hdrFw && fwEl.textContent && fwEl.textContent !== '—') {
+    hdrFw.textContent = fwEl.textContent;
+    if (headerInfo) headerInfo.hidden = false;
+  }
+}
+
+// --- ZIP extraction (deflate-raw via DecompressionStream, no deps) ---
+// Same algorithm as docs/index.html; duplicated here so settings.html stays
+// usable as a single-file artifact (file:// / sshfs / local http.server).
+async function extractZip(buffer) {
+  const dv = new DataView(buffer);
+  const view = new Uint8Array(buffer);
+  const len = buffer.byteLength;
+  let eocd = -1;
+  const minOffset = Math.max(0, len - (0xffff + 22));
+  for (let i = len - 22; i >= minOffset; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('ZIP: EOCD not found');
+  const totalEntries = dv.getUint16(eocd + 10, true);
+  const cdOffset = dv.getUint32(eocd + 16, true);
+  const decoder = new TextDecoder('utf-8');
+  const entries = new Map();
+  let p = cdOffset;
+  for (let i = 0; i < totalEntries; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('ZIP: bad central dir entry');
+    const compMethod = dv.getUint16(p + 10, true);
+    const compSize   = dv.getUint32(p + 20, true);
+    const nameLen    = dv.getUint16(p + 28, true);
+    const extraLen   = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const localOff   = dv.getUint32(p + 42, true);
+    const name = decoder.decode(view.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+    if (name.endsWith('/')) continue;
+    if (dv.getUint32(localOff, true) !== 0x04034b50) throw new Error('ZIP: bad local header');
+    const lNameLen  = dv.getUint16(localOff + 26, true);
+    const lExtraLen = dv.getUint16(localOff + 28, true);
+    const dataStart = localOff + 30 + lNameLen + lExtraLen;
+    const compData = view.subarray(dataStart, dataStart + compSize);
+    let outBuf;
+    if (compMethod === 0) {
+      outBuf = compData.slice().buffer;
+    } else if (compMethod === 8) {
+      const stream = new Blob([compData]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      outBuf = await new Response(stream).arrayBuffer();
+    } else {
+      throw new Error(`ZIP: unsupported compression method ${compMethod} for ${name}`);
+    }
+    entries.set(name.split('/').pop(), outBuf);
+  }
+  return entries;
+}
+
+// Load release list (same versions.json the Web Flasher uses). Populates the
+// OTA release dropdown — independent of BLE state, so a user can pick a
+// release before the device is even connected.
+let otaReleases = [];
+async function loadOtaReleases() {
+  const sel = document.getElementById('ota-release');
+  if (!sel) return;
+  try {
+    const r = await fetch('./versions.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    otaReleases = await r.json();
+    sel.innerHTML = '<option value="">(使用本地文件)</option>';
+    for (const rel of otaReleases) {
+      const o = document.createElement('option');
+      o.value = rel.tag;
+      o.textContent = rel.tag;
+      sel.appendChild(o);
+    }
+  } catch (e) {
+    sel.innerHTML = '<option value="">(获取版本列表失败)</option>';
+  }
+}
+
+async function fetchReleaseFirmware(tag) {
+  const rel = otaReleases.find((r) => r.tag === tag);
+  if (!rel) throw new Error(`unknown release ${tag}`);
+  // Pick the ZIP that matches the connected board. Newer versions.json
+  // publishes per-board zips under .boards.<cores3|atoms3r|atoms3|stopwatch>;
+  // legacy single-zip releases (pre-AtomS3R) used a flat .zip field that
+  // only ever held a cores3 image. boardKind = null = pre-CHR_BOARD_KIND
+  // firmware; assume cores3 there (= original behaviour).
+  const boardName = StackchanSettings.boardSlug(boardKind);
+  let zipName = null;
+  if (rel.boards && rel.boards[boardName]) zipName = rel.boards[boardName];
+  else if (rel.zip && boardName === 'cores3') zipName = rel.zip;
+  if (!zipName) {
+    throw new Error(`${tag} has no firmware ZIP for board "${boardName}"`);
+  }
+  const zipUrl = `./firmware/${rel.tag}/${zipName}`;
+  log(`Downloading ${zipName}…`);
+  const r = await fetch(zipUrl);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const zipBuf = await r.arrayBuffer();
+  const entries = await extractZip(zipBuf);
+  const bin = entries.get('stackchan_idf.bin');
+  if (!bin) throw new Error('stackchan_idf.bin not found in ZIP');
+  return new Blob([bin], { type: 'application/octet-stream' });
+}
+
+// --- OTA over BLE ---
+// Drives the begin / chunked write / end flow, posts progress + B/s into the
+// status box. All traffic goes through the AES-GCM session.
+
+function fmtBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function setOtaProgress(received, total, rateBps) {
+  const pct = total > 0 ? Math.min(100, (received / total) * 100) : 0;
+  document.getElementById('ota-bar-fill').style.width = pct.toFixed(1) + '%';
+  const rateStr = rateBps != null ? `, ${fmtBytes(rateBps)}/s` : '';
+  document.getElementById('ota-stats').textContent =
+    `${fmtBytes(received)} / ${fmtBytes(total)} (${pct.toFixed(1)}%)${rateStr}`;
+}
+
+async function readOtaStatus() {
+  const bytes = await readEncrypted(chrOtaCtrl);
+  return JSON.parse(dec.decode(bytes));
+}
+
+async function performOta(file) {
+  if (otaInFlight) return;
+  otaInFlight = true;
+  document.getElementById('btn-ota').disabled = true;
+  document.getElementById('btn-apply').disabled = true;
+  document.getElementById('btn-disconnect').disabled = true;
+  try {
+    const total = file.size;
+    log(`OTA 开始：${file.name}（${fmtBytes(total)}）`);
+
+    // begin
+    await writeEncrypted(chrOtaCtrl, strToBytes(JSON.stringify({op: 'begin', size: total})));
+    const st = await readOtaStatus();
+    if (st.state !== 'receiving') {
+      throw new Error(`begin 失败（${st.state}: ${st.error || ''}）`);
+    }
+    setOtaProgress(0, total, null);
+
+    // stream
+    // Probe the firmware's capability once: try a single
+    // writeValueWithoutResponse with an empty payload. On v0.0.4+ the
+    // OtaData chr has BLE_GATT_CHR_F_WRITE_NO_RSP and this succeeds; on
+    // older firmware Chrome rejects the call because the chr doesn't
+    // advertise the no-response property. Either way the chunked loop
+    // below picks the right writer for the rest of the transfer.
+    let fastPath = true;
+    try {
+      // A real probe would require a chunk that the firmware will accept;
+      // instead just look for the property bit on the GATT object.
+      // chr.properties.writeWithoutResponse is set in the WebBluetooth
+      // descriptor when the firmware advertised WRITE_NO_RSP.
+      fastPath = !!chrOtaData.properties.writeWithoutResponse;
+    } catch (_) {
+      fastPath = false;
+    }
+    const writeChunk = fastPath
+      ? (bytes) => writeEncryptedNoResp(chrOtaData, bytes)
+      : (bytes) => writeEncrypted(chrOtaData, bytes);
+    log(fastPath
+        ? '快速路径：writeValueWithoutResponse + 每 16 块同步状态'
+        : '兼容路径：writeValueWithResponse（firmware < v0.0.4）');
+
+    // Flow control: in the fast path the browser fires chunks without
+    // waiting for ATT_WRITE_RSP, so neither end has back-pressure visible
+    // at the app layer. Every FLUSH_EVERY chunks we read OtaControl to
+    // confirm the firmware has caught up. The firmware buffers ATT writes
+    // in NimBLE's host queue; this caps the in-flight window.
+    const FLUSH_EVERY = fastPath ? 16 : 1;
+    let chunksSinceFlush = 0;
+    async function maybeFlush(forceLog) {
+      const st = await readOtaStatus();
+      if (st.state !== 'receiving') {
+        throw new Error(`flush 过程中会话丢失（${st.state}: ${st.error || ''}）`);
+      }
+      // Reuse st.received as the canonical progress source — bytes the
+      // device actually wrote to flash, not what we shipped over the wire.
+      const now = performance.now();
+      if (forceLog || (now - lastProgressMs) >= 250) {
+        const bps = ((st.received - lastProgressBytes) * 1000) / Math.max(1, now - lastProgressMs);
+        setOtaProgress(st.received, total, bps);
+        lastProgressMs = now;
+        lastProgressBytes = st.received;
+      }
+    }
+
+    const reader = file.stream().getReader();
+    let received = 0;
+    let pending = new Uint8Array(0);
+    const t0 = performance.now();
+    let lastProgressMs = t0;
+    let lastProgressBytes = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      let buf;
+      if (pending.length === 0) {
+        buf = value;
+      } else {
+        buf = new Uint8Array(pending.length + value.length);
+        buf.set(pending, 0);
+        buf.set(value, pending.length);
+      }
+      let off = 0;
+      while (off + OTA_CHUNK_SIZE <= buf.length) {
+        await writeChunk(buf.subarray(off, off + OTA_CHUNK_SIZE));
+        off += OTA_CHUNK_SIZE;
+        received += OTA_CHUNK_SIZE;
+        if (++chunksSinceFlush >= FLUSH_EVERY) {
+          await maybeFlush(false);
+          chunksSinceFlush = 0;
+        }
+      }
+      pending = buf.subarray(off);
+    }
+    if (pending.length > 0) {
+      await writeChunk(pending);
+      received += pending.length;
+    }
+    // Sync once at the end so the byte count is exact before we send `end`.
+    await maybeFlush(true);
+    const elapsed = (performance.now() - t0) / 1000;
+    setOtaProgress(received, total, received / elapsed);
+    log(`数据发送完成（${elapsed.toFixed(1)} 秒，平均 ${fmtBytes(received / elapsed)}/s）`);
+
+    // end → server sets boot partition and schedules reboot
+    await writeEncrypted(chrOtaCtrl, strToBytes(JSON.stringify({op: 'end'})));
+    const final = await readOtaStatus();
+    if (final.state !== 'done') {
+      throw new Error(`end 失败（${final.state}: ${final.error || ''}）`);
+    }
+    log('OTA 完成，设备即将重启。BLE 断开后请用新固件重新连接。', 'ok');
+    document.getElementById('ota-stats').textContent = '重启中…';
+  } catch (e) {
+    log(`OTA 错误：${e.message}`, 'err');
+    try {
+      await writeEncrypted(chrOtaCtrl, strToBytes(JSON.stringify({op: 'abort'})));
+    } catch (_) { /* ignore — link may be down */ }
+    document.getElementById('ota-stats').textContent = `失败：${e.message}`;
+    document.getElementById('btn-ota').disabled = false;
+    document.getElementById('btn-apply').disabled = false;
+    document.getElementById('btn-disconnect').disabled = false;
+  } finally {
+    otaInFlight = false;
+  }
+}
+
+// Encrypt a payload and write it. Same wire format.
+async function writeEncrypted(chr, plainBytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ctTag = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plainBytes));
+  const wire = new Uint8Array(iv.length + ctTag.length);
+  wire.set(iv, 0);
+  wire.set(ctTag, iv.length);
+  await chr.writeValueWithResponse(wire);
+}
+
+// Same wire format, but the bulk OTA path uses writeValueWithoutResponse
+// so successive chunks pipeline through one connection event each — no
+// per-chunk ATT_WRITE_RSP wait. Throws if the chr doesn't expose the
+// WRITE_NO_RSP flag (pre-v0.0.4 firmware) so the caller can fall back to
+// the response variant.
+async function writeEncryptedNoResp(chr, plainBytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ctTag = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plainBytes));
+  const wire = new Uint8Array(iv.length + ctTag.length);
+  wire.set(iv, 0);
+  wire.set(ctTag, iv.length);
+  await chr.writeValueWithoutResponse(wire);
+}
+
+// --- Audio streaming (WebCodecs AudioEncoder → AAC-LC → ADTS → BLE) ---
+//
+// We re-encode the user's file to 24 kHz mono AAC-LC at 64 kbps so the
+// stream sits comfortably within BLE's ~10–20 KB/s effective bandwidth
+// (raw AAC-LC payload at 64 kbps is ~8 KB/s). The device decodes from
+// ADTS, so we prepend a 7-byte ADTS header to each encoded chunk that
+// the WebCodecs encoder hands back as a raw frame.
+// Chrome's WebCodecs AAC encoder accepts only {44100, 48000} Hz and
+// bitrates >= 96000. We use 48 kHz to skip an explicit resample step (the
+// OfflineAudioContext renders straight to 48 kHz). Wire rate is fixed by
+// the bitrate (96 kbps ≈ 12 KB/s) regardless of sample rate. The device's
+// AAC decoder auto-detects sample rate from the ADTS header and configures
+// the speaker accordingly.
+const AAC_SAMPLE_RATE = 48000;
+const AAC_CHANNELS = 1;
+const AAC_BITRATE = 96000;
+// Sample-rate index table from ISO/IEC 14496-3 §1.6.3.4.
+const AAC_SRI = { 96000:0, 88200:1, 64000:2, 48000:3, 44100:4, 32000:5, 24000:6, 22050:7, 16000:8, 12000:9, 11025:10, 8000:11 };
+
+let audioInFlight = false;
+let audioAbortRequested = false;
+
+function adtsHeader(payloadLen, sampleRate, channels) {
+  // AAC-LC profile (= AOT 2) → ADTS profile field = AOT - 1 = 1
+  const profile = 1;
+  const sri = AAC_SRI[sampleRate];
+  if (sri === undefined) throw new Error('unsupported AAC sample rate: ' + sampleRate);
+  const totalLen = payloadLen + 7;
+  const h = new Uint8Array(7);
+  h[0] = 0xFF;
+  h[1] = 0xF1; // sync(8..11) | MPEG-4(0) | layer(00) | protection_absent(1)
+  h[2] = ((profile & 0x3) << 6) | ((sri & 0xF) << 2) | ((channels >> 2) & 0x1);
+  h[3] = ((channels & 0x3) << 6) | ((totalLen >> 11) & 0x3);
+  h[4] = (totalLen >> 3) & 0xFF;
+  h[5] = ((totalLen & 0x7) << 5) | 0x1F;
+  h[6] = 0xFC;
+  return h;
+}
+
+async function audioPlay() {
+  if (audioInFlight) return;
+  if (!chrAudioCtrl || !chrAudioData) {
+    log('当前固件不支持音频流式传输', 'err');
+    return;
+  }
+  if (document.getElementById('openai-enabled').checked) {
+    log('对话功能开启时互斥，无法播放。请关闭后保存并重启。', 'err');
+    return;
+  }
+  const fileInput = document.getElementById('audio-file');
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) { log('请选择音频文件', 'err'); return; }
+  if (typeof AudioEncoder === 'undefined') {
+    log('无法使用 WebCodecs AudioEncoder（需要 Chrome / Edge 94+）', 'err');
+    return;
+  }
+
+  audioInFlight = true;
+  audioAbortRequested = false;
+  const playBtn = document.getElementById('btn-audio-play');
+  const stopBtn = document.getElementById('btn-audio-stop');
+  const stats = document.getElementById('audio-stats');
+  const barFill = document.getElementById('audio-bar-fill');
+  playBtn.disabled = true;
+  stopBtn.disabled = false;
+  barFill.style.width = '0%';
+  stats.textContent = '解码中…';
+
+  try {
+    // 1. Decode the source file to PCM (any format AudioContext understands).
+    const arr = await file.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await ctx.decodeAudioData(arr);
+    await ctx.close();
+
+    // 2. Mix to mono.
+    const mono = new Float32Array(decoded.length);
+    if (decoded.numberOfChannels === 1) {
+      mono.set(decoded.getChannelData(0));
+    } else {
+      const l = decoded.getChannelData(0);
+      const r = decoded.getChannelData(1);
+      for (let i = 0; i < decoded.length; ++i) mono[i] = 0.5 * (l[i] + r[i]);
+    }
+
+    // 3. Resample mono to the target rate via an OfflineAudioContext —
+    // shortest path that preserves quality without us writing a kernel.
+    let resampled = mono;
+    if (decoded.sampleRate !== AAC_SAMPLE_RATE) {
+      const offline = new OfflineAudioContext(
+        1,
+        Math.ceil(mono.length * AAC_SAMPLE_RATE / decoded.sampleRate),
+        AAC_SAMPLE_RATE);
+      const src = offline.createBufferSource();
+      const srcBuf = offline.createBuffer(1, mono.length, decoded.sampleRate);
+      srcBuf.copyToChannel(mono, 0);
+      src.buffer = srcBuf;
+      src.connect(offline.destination);
+      src.start();
+      const rendered = await offline.startRendering();
+      resampled = rendered.getChannelData(0);
+    }
+
+    const totalSamples = resampled.length;
+    const durationMs = Math.round(totalSamples * 1000 / AAC_SAMPLE_RATE);
+    log(`开始 AAC 编码：${(file.size/1024).toFixed(1)} KiB → ${durationMs} ms @ ${AAC_SAMPLE_RATE}Hz 单声道`);
+
+    // 4. Tell the device to spin up the decoder.
+    const beginPayload = strToBytes(JSON.stringify({
+      op: 'begin', codec: 'aac', sample_rate: AAC_SAMPLE_RATE, channels: AAC_CHANNELS,
+    }));
+    // Audio chr writes go plaintext. Payload is ephemeral playback audio,
+    // not credentials, and the AES-GCM overhead (~11% wire + per-chunk
+    // CPU) directly cuts into the BLE bandwidth the streaming decoder
+    // depends on.
+    await chrAudioCtrl.writeValueWithResponse(beginPayload);
+
+    // 5. Build encoder. Each encoded chunk is appended to a queue and
+    // drained by a sender that fires writes-without-response back-to-back
+    // (same trick as OTA, just over the AudioData chr).
+    const sendQueue = [];
+    let encodeDone = false;
+    let bytesSent = 0;
+    let firstSentAt = 0;
+
+    const encoder = new AudioEncoder({
+      output: (chunk) => {
+        const aac = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(aac);
+        const header = adtsHeader(aac.length, AAC_SAMPLE_RATE, AAC_CHANNELS);
+        const frame = new Uint8Array(header.length + aac.length);
+        frame.set(header, 0);
+        frame.set(aac, header.length);
+        sendQueue.push(frame);
+      },
+      error: (e) => { log('AAC encoder error: ' + e, 'err'); },
+    });
+    encoder.configure({
+      codec: 'mp4a.40.2',
+      sampleRate: AAC_SAMPLE_RATE,
+      numberOfChannels: AAC_CHANNELS,
+      bitrate: AAC_BITRATE,
+    });
+
+    // Submit the PCM in 1024-sample windows (1 AAC frame each). Run in a
+    // microtask loop so we don't block the UI thread.
+    const FRAME = 1024;
+    let submittedSamples = 0;
+    const submitNext = () => {
+      while (submittedSamples < totalSamples) {
+        if (audioAbortRequested) break;
+        const n = Math.min(FRAME, totalSamples - submittedSamples);
+        const slice = resampled.subarray(submittedSamples, submittedSamples + n);
+        const ad = new AudioData({
+          format: 'f32-planar',
+          sampleRate: AAC_SAMPLE_RATE,
+          numberOfFrames: n,
+          numberOfChannels: AAC_CHANNELS,
+          timestamp: submittedSamples * 1e6 / AAC_SAMPLE_RATE,
+          data: slice,
+        });
+        encoder.encode(ad);
+        ad.close();
+        submittedSamples += n;
+      }
+    };
+
+    // 6. Sender drain — pull frames off the queue as they appear and
+    // pipeline them out. Bulk frames use writeValueWithoutResponse (no
+    // per-frame ATT_WRITE_RSP wait), but every 16th frame is sent with
+    // response so the browser's BLE stack gets a sync point. Without
+    // that, Chrome lets the write queue grow unbounded and drops the
+    // link after ~30–40 s with HCI 0x13 "remote user terminated"
+    // (observed). Same rate-limit mechanism the OTA path relies on
+    // (OtaStatus read every 16 chunks).
+    const fastPath = !!chrAudioData.properties.writeWithoutResponse;
+    const FLUSH_EVERY = fastPath ? 16 : 1;
+    // Credit-based flow control. AudioData is written without response (for
+    // throughput), so there's no per-write backpressure. Instead the device
+    // exposes its current buffer free space (uint32 LE) on AudioCredit; we
+    // never send more than we last read free. Free space only grows between
+    // reads (single producer; the device drains as it plays), so the value
+    // is a safe lower bound and we can't overflow it. When the device buffer
+    // fills (playback can't keep up) the read returns ~0 and we poll until it
+    // frees space — that's what paces the stream to the playback rate so the
+    // PCM ring never overruns. Replaces the old fixed-rate guesswork that
+    // overran the ring (garbled "overwritten" playback) or starved it.
+    let framesSinceFlush = 0;
+    let credit = 0;        // bytes we believe the device can still accept
+    let creditReads = 0;
+    const readCredit = async () => {
+      const dv = await chrAudioCredit.readValue();
+      creditReads++;
+      return dv.byteLength >= 4 ? dv.getUint32(0, /*littleEndian=*/true) : 0;
+    };
+    if (chrAudioCredit) credit = await readCredit();
+
+    const senderPromise = (async () => {
+      while (!audioAbortRequested && (!encodeDone || sendQueue.length > 0)) {
+        if (sendQueue.length === 0) {
+          await new Promise(r => setTimeout(r, 5));
+          continue;
+        }
+        const frame = sendQueue.shift();
+
+        // Wait for device room. Refresh the credit window whenever our
+        // running estimate dips below this frame; poll while it reports full.
+        if (chrAudioCredit) {
+          while (!audioAbortRequested && credit < frame.length) {
+            credit = await readCredit();
+            if (credit < frame.length) await new Promise(r => setTimeout(r, 15));
+          }
+          if (audioAbortRequested) break;
+        }
+
+        const useNoResp = fastPath && (++framesSinceFlush % FLUSH_EVERY) !== 0;
+        if (useNoResp) {
+          await chrAudioData.writeValueWithoutResponse(frame);
+        } else {
+          await chrAudioData.writeValueWithResponse(frame);
+          framesSinceFlush = 0;
+        }
+        if (firstSentAt === 0) firstSentAt = performance.now();
+        bytesSent += frame.length;
+        credit = Math.max(0, credit - frame.length);
+
+        const elapsedS = (performance.now() - firstSentAt) / 1000;
+        const pct = Math.min(100, Math.floor(submittedSamples * 100 / totalSamples));
+        barFill.style.width = pct + '%';
+        const rate = elapsedS > 0.1 ? (bytesSent / elapsedS / 1024).toFixed(1) : '—';
+        stats.textContent = `发送中 ${pct}% / ${(bytesSent/1024).toFixed(1)} KiB / ${rate} KiB/s / 余量 ${(credit/1024).toFixed(1)} KiB`;
+      }
+    })();
+
+    submitNext();
+    await encoder.flush();
+    encoder.close();
+    encodeDone = true;
+    await senderPromise;
+
+    if (audioAbortRequested) {
+      try { await chrAudioCtrl.writeValueWithResponse(strToBytes(JSON.stringify({op: 'abort'}))); }
+      catch (_) { /* ignore */ }
+      stats.textContent = '已中断';
+      log('已中断音频发送', 'info');
+    } else {
+      await chrAudioCtrl.writeValueWithResponse(strToBytes(JSON.stringify({op: 'end'})));
+      stats.textContent = `完成 ${(bytesSent/1024).toFixed(1)} KiB`;
+      log('音频发送完成', 'ok');
+    }
+  } catch (e) {
+    log('音频发送错误：' + e.message, 'err');
+    try { await chrAudioCtrl.writeValueWithResponse(strToBytes(JSON.stringify({op: 'abort'}))); }
+    catch (_) { /* ignore */ }
+    document.getElementById('audio-stats').textContent = '失败：' + e.message;
+  } finally {
+    audioInFlight = false;
+    audioAbortRequested = false;
+    document.getElementById('btn-audio-play').disabled = !chrAudioData;
+    document.getElementById('btn-audio-stop').disabled = true;
+  }
+}
+
+function audioStop() {
+  audioAbortRequested = true;
+}
+
+// --- Connect ---
+document.getElementById('btn-connect').addEventListener('click', async () => {
+  if (!navigator.bluetooth) {
+    log('无法使用 Web Bluetooth。请用 Chrome / Edge 桌面版打开。', 'err');
+    return;
+  }
+  try {
+    await ensureX25519Supported();
+  } catch (e) {
+    log(e.message, 'err');
+    return;
+  }
+  document.getElementById('ble-dot').className = 'dot ble-connecting';
+  document.getElementById('ble-label').textContent = '连接中…';
+  document.getElementById('btn-connect').disabled = true;
+
+  try {
+    log('正在搜索设备…');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SVC_UUID] }],
+      optionalServices: [SVC_UUID, DIS_SVC],
+    });
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+    log(`设备：${bleDevice.name || '（名称未知）'}`);
+    bleServer = await bleDevice.gatt.connect();
+    log('GATT 连接完成', 'ok');
+
+    svc = await bleServer.getPrimaryService(SVC_UUID);
+
+    // Probe every characteristic independently. Older firmware revisions
+    // may not expose the newer ones (Provider / GeminiApiKey / JttsConfig
+    // / OpenAiEnabled / OTA), and we still want the UI to come up with
+    // whatever IS available — particularly OTA, so a user can flash the
+    // current build to a device too old to know about the new chrs.
+    const probes = [
+      ['ssid',       CHR_SSID],
+      ['pass',       CHR_PASS],
+      ['key',        CHR_KEY],
+      ['apply',      CHR_APPLY],
+      ['status',     CHR_STATUS],
+      ['kx',         CHR_KX],
+      ['en',         CHR_EN],
+      ['rtpEn',      CHR_RTP_EN],
+      ['jttsIdleEn', CHR_JTTS_IDLE_EN],
+      ['batGauge',   CHR_BAT_GAUGE],
+      ['startupArp', CHR_STARTUP_ARP],
+      ['servoEnabled', CHR_SERVO_ENABLED],
+      ['mcpToken',   CHR_MCP_TOKEN],
+      ['ltConfig',   CHR_LT_CONFIG],
+      ['servoLimits',CHR_SERVO_LIMITS],
+      ['servoRangeMode', CHR_SERVO_RANGE_MODE],
+      ['servoPositions', CHR_SERVO_POSITIONS],
+      ['boardKind', CHR_BOARD_KIND],
+      ['jtts',       CHR_JTTS],
+      ['otaCtrl',    CHR_OTA_CTRL],
+      ['otaData',    CHR_OTA_DATA],
+      ['provider',   CHR_PROVIDER],
+      ['geminiKey',  CHR_GEMINI_KEY],
+      ['xiaozhiUrl', CHR_XIAOZHI_URL],
+      ['xiaozhiToken', CHR_XIAOZHI_TOKEN],
+      ['faceConfig', CHR_FACE_CONFIG],
+      ['battery',    CHR_BATTERY],
+      ['wifiIp',     CHR_WIFI_IP],
+      ['wifiMac',    CHR_WIFI_MAC],
+      ['audioCtrl',  CHR_AUDIO_CTRL],
+      ['audioData',  CHR_AUDIO_DATA],
+      ['audioCredit',CHR_AUDIO_CREDIT],
+      ['audioMetrics', CHR_AUDIO_METRICS],
+      ['ledState',  CHR_LED_STATE],
+      ['micLipGain', CHR_MIC_LIP_GAIN],
+      ['ledMouthSync', CHR_LED_MOUTH_SYNC],
+      ['lipSyncMode',  CHR_LIP_SYNC_MODE],
+      ['micLipAgc',    CHR_MIC_LIP_AGC],
+      ['speakerVolume', CHR_SPEAKER_VOLUME],
+      ['jttsSay',       CHR_JTTS_SAY],
+      ['operationMode', CHR_OPERATION_MODE],
+      ['audioOutput',   CHR_AUDIO_OUTPUT],
+      ['bargeIn',       CHR_BARGE_IN_ENABLED],
+      ['deviceName',    CHR_DEVICE_NAME],
+      ['authPassword',  CHR_AUTH_PASSWORD],
+      ['avatarBc',  CHR_AVATAR_BC],
+    ];
+    const settled = await Promise.allSettled(
+      probes.map(([_, uuid]) => svc.getCharacteristic(uuid)));
+    const found = {};
+    const missing = [];
+    for (let i = 0; i < probes.length; ++i) {
+      const [name] = probes[i];
+      if (settled[i].status === 'fulfilled') found[name] = settled[i].value;
+      else missing.push(name);
+    }
+    chrSsid     = found.ssid     ?? null;
+    chrPass     = found.pass     ?? null;
+    chrKey      = found.key      ?? null;
+    chrApply    = found.apply    ?? null;
+    chrStatus   = found.status   ?? null;
+    chrKx       = found.kx       ?? null;
+    chrEn       = found.en       ?? null;
+    chrRtpEn    = found.rtpEn    ?? null;
+    chrJttsIdleEn = found.jttsIdleEn ?? null;
+    chrBatGauge = found.batGauge ?? null;
+    chrStartupArp = found.startupArp ?? null;
+    chrServoEnabled = found.servoEnabled ?? null;
+    chrMcpToken = found.mcpToken ?? null;
+    chrLtConfig = found.ltConfig ?? null;
+    chrServoLimits = found.servoLimits ?? null;
+    chrServoRangeMode = found.servoRangeMode ?? null;
+    chrServoPositions = found.servoPositions ?? null;
+    chrBoardKind = found.boardKind ?? null;
+    chrJtts     = found.jtts     ?? null;
+    chrOtaCtrl  = found.otaCtrl  ?? null;
+    chrOtaData  = found.otaData  ?? null;
+    chrProvider = found.provider ?? null;
+    chrGeminiKey= found.geminiKey?? null;
+    chrXiaozhiUrl = found.xiaozhiUrl ?? null;
+    chrXiaozhiToken = found.xiaozhiToken ?? null;
+    chrFaceConfig = found.faceConfig ?? null;
+    chrBattery  = found.battery  ?? null;
+    chrWifiIp   = found.wifiIp   ?? null;
+    chrWifiMac  = found.wifiMac  ?? null;
+    chrAudioCtrl= found.audioCtrl?? null;
+    chrAudioData= found.audioData?? null;
+    chrAudioCredit = found.audioCredit ?? null;
+    chrAudioMetrics = found.audioMetrics ?? null;
+    chrLedState = found.ledState ?? null;
+    chrMicLipGain = found.micLipGain ?? null;
+    chrLedMouthSync = found.ledMouthSync ?? null;
+    chrLipSyncMode = found.lipSyncMode ?? null;
+    chrMicLipAgc = found.micLipAgc ?? null;
+    chrSpeakerVolume = found.speakerVolume ?? null;
+    chrJttsSay = found.jttsSay ?? null;
+    chrOperationMode = found.operationMode ?? null;
+    chrAudioOutput = found.audioOutput ?? null;
+    chrBargeIn = found.bargeIn ?? null;
+    chrDeviceName = found.deviceName ?? null;
+    chrAuthPassword = found.authPassword ?? null;
+    chrAvatarBc = found.avatarBc ?? null;
+    log(`Characteristics 获取完成（missing: ${missing.length ? missing.join(', ') : 'none'}）`,
+        missing.length ? 'info' : 'ok');
+
+    if (!chrKx) {
+      // No KeyExchange chr → no encrypted session → nothing else works.
+      // Bail with a clear message rather than leaving the UI half-alive.
+      log('没有 KeyExchange characteristic。固件过旧。', 'err');
+      throw new Error('KeyExchange unsupported by this firmware');
+    }
+
+    // X25519 handshake. After this, every other read/write is encrypted.
+    await setupSession();
+    log('密钥交换完成（X25519 + AES-256-GCM）', 'ok');
+    // Auth gate: if the device has an auth password set, the empty-salt
+    // session we just built doesn't match — prompt() and re-handshake.
+    await ensureAuthenticated();
+
+    // DIS is plaintext — read it once and surface in the UI.
+    try {
+      await fetchDeviceInfo();
+    } catch (e) {
+      log(`获取设备信息失败：${e.message}`, 'err');
+    }
+
+    if (chrSsid) {
+      try {
+        const ssidBytes = await readEncrypted(chrSsid);
+        const ssidStr = dec.decode(ssidBytes);
+        if (ssidStr) {
+          document.getElementById('ssid').placeholder = ssidStr + '（当前值）';
+          log(`当前 SSID：${ssidStr}`);
+        }
+      } catch (e) {
+        log(`读取 SSID 错误：${e.message}`, 'err');
+      }
+    }
+
+    if (chrStatus) {
+      try {
+        const stBytes = await readEncrypted(chrStatus);
+        updateStatus(new DataView(stBytes.buffer, stBytes.byteOffset, stBytes.byteLength));
+      } catch (e) {
+        log(`读取 Status 错误：${e.message}`, 'err');
+      }
+    }
+
+    if (chrEn) {
+      try {
+        const enBytes = await readEncrypted(chrEn);
+        const enabled = enBytes.length > 0 && enBytes[0] !== 0;
+        document.getElementById('openai-enabled').checked = enabled;
+        document.getElementById('openai-enabled').dataset.initial = enabled ? '1' : '0';
+        refreshAudioButton(); // gate streaming on the just-loaded conv state
+        log(`对话功能：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取开启状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrRtpEn) {
+      try {
+        const rtpBytes = await readEncrypted(chrRtpEn);
+        const enabled = rtpBytes.length > 0 && rtpBytes[0] !== 0;
+        document.getElementById('rtp-enabled').checked = enabled;
+        document.getElementById('rtp-enabled').dataset.initial = enabled ? '1' : '0';
+        log(`RTP 音频接收：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取 RTP 开启状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrJttsIdleEn) {
+      try {
+        const jiBytes = await readEncrypted(chrJttsIdleEn);
+        const enabled = jiBytes.length > 0 && jiBytes[0] !== 0;
+        document.getElementById('jtts-idle-enabled').checked = enabled;
+        document.getElementById('jtts-idle-enabled').dataset.initial = enabled ? '1' : '0';
+        log(`jtts 空闲播报：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取 jtts 空闲播报状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrLedMouthSync) {
+      try {
+        const lmsBytes = await readEncrypted(chrLedMouthSync);
+        const enabled = lmsBytes.length > 0 && lmsBytes[0] !== 0;
+        document.getElementById('led-mouth-sync').checked = enabled;
+        document.getElementById('led-mouth-sync').dataset.initial = enabled ? '1' : '0';
+        log(`LED 跟随口型：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取 LED 联动状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrLipSyncMode) {
+      try {
+        const lsmBytes = await readEncrypted(chrLipSyncMode);
+        if (lsmBytes.length > 0) {
+          const m = String(lsmBytes[0]);
+          document.getElementById('lip-sync-mode').value = m;
+          document.getElementById('lip-sync-mode').dataset.initial = m;
+          const labels = {'0':'亮度','1':'电平表'};
+          log(`口型同步模式：${labels[m] || `mode ${m}`}`);
+        }
+      } catch (e) {
+        log(`获取口型同步模式状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrMicLipAgc) {
+      try {
+        const agcBytes = await readEncrypted(chrMicLipAgc);
+        const enabled = agcBytes.length > 0 && agcBytes[0] !== 0;
+        document.getElementById('mic-lip-agc').checked = enabled;
+        document.getElementById('mic-lip-agc').dataset.initial = enabled ? '1' : '0';
+        log(`麦克风 AGC：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取麦克风 AGC 状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrOperationMode) {
+      try {
+        const omBytes = await readEncrypted(chrOperationMode);
+        if (omBytes.length > 0) {
+          const mode = String(omBytes[0]);
+          document.getElementById('operation-mode').value = mode;
+          document.getElementById('operation-mode').dataset.initial = mode;
+          const labels = {'0':'口型同步','1':'闲聊播报','2':'对话'};
+          log(`工作模式：${labels[mode] || `mode ${mode}`}`);
+        }
+      } catch (e) {
+        log(`获取工作模式状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrAudioOutput) {
+      try {
+        const aoBytes = await readEncrypted(chrAudioOutput);
+        if (aoBytes.length > 0) {
+          const v = String(aoBytes[0]);
+          document.getElementById('audio-output').value = v;
+          document.getElementById('audio-output').dataset.initial = v;
+          const labels = {'0':'自动','1':'内置扬声器','2':'M5 Module Audio'};
+          log(`音频输出：${labels[v] || `mode ${v}`}`);
+        }
+      } catch (e) {
+        log(`获取音频输出状态失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrBargeIn) {
+      try {
+        const biBytes = await readEncrypted(chrBargeIn);
+        const enabled = biBytes.length > 0 && biBytes[0] !== 0;
+        document.getElementById('barge-in-enabled').checked = enabled;
+        document.getElementById('barge-in-enabled').dataset.initial = enabled ? '1' : '0';
+        log(`插话（点头打断对话）：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取插话状态失败：${e.message}`, 'err');
+      }
+    }
+
+    // Device name (operator-set override; empty → device falls back to MAC).
+    if (chrDeviceName) {
+      try {
+        const dnBytes = await readEncrypted(chrDeviceName);
+        const dn = dec.decode(dnBytes);
+        const el = document.getElementById('device-name');
+        if (el) {
+          el.value = dn;
+          el.dataset.initial = dn;
+        }
+        log(`设备名：${dn || '（自动生成）'}`);
+      } catch (e) {
+        log(`获取设备名失败：${e.message}`, 'err');
+      }
+    }
+    // Auth password — read-only state surfacing. The chr itself is
+    // write-only so we don't know the password, just whether it's set.
+    // We infer "set" from a successful encrypted READ of *any* chr — if
+    // the session were salted differently we'd already be in GCM-auth
+    // hell. Since we got this far, we just need to tell the user whether
+    // a password is currently active so they know whether subsequent
+    // central connections will need the same password. Empty status
+    // (= no chr yet, very old firmware) leaves the hint blank.
+    {
+      const hintEl = document.getElementById('auth-password-state');
+      if (hintEl && chrAuthPassword) {
+        // We can't read the password, but we can offer the UI even when
+        // the firmware exposes the chr.
+        hintEl.textContent = '（留空不改 / 清除则恢复无认证）';
+      }
+    }
+
+    // Read the board kind BEFORE applyCapabilityGating() runs (further down),
+    // so the per-board show/hide can take it into account on first paint.
+    if (chrBoardKind) {
+      try {
+        const bk = await readEncrypted(chrBoardKind);
+        if (bk.length > 0) {
+          boardKind = bk[0];
+          log(`主板：${StackchanSettings.boardLabel(boardKind)}`);
+        }
+      } catch (e) {
+        log(`获取主板类型失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrBatGauge) {
+      try {
+        const bgBytes = await readEncrypted(chrBatGauge);
+        const enabled = bgBytes.length > 0 && bgBytes[0] !== 0;
+        document.getElementById('bat-gauge-enabled').checked = enabled;
+        document.getElementById('bat-gauge-enabled').dataset.initial = enabled ? '1' : '0';
+        log(`电池电量条显示：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取电池电量条设置失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrStartupArp) {
+      try {
+        const baBytes = await readEncrypted(chrStartupArp);
+        const enabled = baBytes.length > 0 && baBytes[0] !== 0;
+        document.getElementById('startup-arpeggio-enabled').checked = enabled;
+        document.getElementById('startup-arpeggio-enabled').dataset.initial = enabled ? '1' : '0';
+        log(`启动琶音：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取启动琶音设置失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrServoEnabled) {
+      try {
+        const seBytes = await readEncrypted(chrServoEnabled);
+        const enabled = seBytes.length > 0 && seBytes[0] !== 0;
+        document.getElementById('servo-enabled').checked = enabled;
+        document.getElementById('servo-enabled').dataset.initial = enabled ? '1' : '0';
+        log(`舵机：${enabled ? '开启' : '关闭'}`);
+      } catch (e) {
+        log(`获取舵机设置失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrLtConfig) {
+      try {
+        const ltBytes = await readEncrypted(chrLtConfig);
+        const ltJson = dec.decode(ltBytes);
+        // Malformed stored JSON leaves the placeholders (seed no-ops).
+        StackchanSettings.seedLtConfigForm(ltJson);
+        log(ltJson ? `已读取 LT 设置：${ltBytes.length}B` : 'LT 设置：固件默认值');
+      } catch (e) {
+        log(`获取 LT 设置失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrServoLimits) {
+      try {
+        const slBytes = await readEncrypted(chrServoLimits);
+        const slJson = dec.decode(slBytes);
+        seedServoLimits(slJson); // populate inputs + remember initial
+        log(slJson ? `已读取舵机设置：${slBytes.length}B` : '舵机设置：固件默认值');
+      } catch (e) {
+        log(`获取舵机设置失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrProvider) {
+      try {
+        const provBytes = await readEncrypted(chrProvider);
+        const provider = provBytes.length > 0 ? provBytes[0] : 0;
+        const sel = document.getElementById('provider');
+        sel.value = String(provider);
+        sel.dataset.initial = String(provider);
+        log(`服务商：${provider === 1 ? 'Gemini Live' : 'OpenAI Realtime'}`);
+      } catch (e) {
+        log(`获取服务商失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrJtts) {
+      try {
+        const jttsBytes = await readEncrypted(chrJtts);
+        const jttsJson = dec.decode(jttsBytes);
+        writeJttsForm(jttsJson);
+        jttsInitialJson = canonicaliseJttsForm();
+        if (jttsJson) {
+          log(`已读取 jtts 设置：${jttsBytes.length}B`);
+        } else {
+          log('jtts 设置：固件默认值');
+        }
+      } catch (e) {
+        log(`获取 jtts 设置失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrFaceConfig) {
+      try {
+        const faceBytes = await readEncrypted(chrFaceConfig);
+        const faceJson = dec.decode(faceBytes);
+        seedAvatarControls(faceJson); // sets controls + updates preview, no write-back
+        log(faceJson ? `已读取形象调整：${faceBytes.length}B` : '形象调整：固件默认值');
+      } catch (e) {
+        log(`获取形象调整失败：${e.message}`, 'err');
+      }
+    }
+
+    if (chrLedState) {
+      // Initial read populates the form without triggering write-back
+      // (loadLedState sets ledStateLoaded=false around the assignment so
+      // synthetic input/change events fired by the controls don't echo).
+      await loadLedState();
+    }
+
+    if (chrMicLipGain) {
+      await loadMicLipGain();
+    }
+
+    if (chrSpeakerVolume) {
+      await loadSpeakerVolume();
+    }
+
+    // Subscribe to Status notifications — payloads are encrypted too.
+    if (chrStatus) {
+      await chrStatus.startNotifications();
+      chrStatus.addEventListener('characteristicvaluechanged', async e => {
+        try {
+          const wire = new Uint8Array(e.target.value.buffer);
+          if (wire.length < 12 + 16) return;
+          const iv = wire.subarray(0, 12);
+          const ctTag = wire.subarray(12);
+          const pt = new Uint8Array(
+            await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ctTag));
+          updateStatus(new DataView(pt.buffer, pt.byteOffset, pt.byteLength));
+        } catch (err) {
+          log(`Status 通知解密错误：${err.message}`, 'err');
+        }
+      });
+      log('已注册 Status 通知', 'ok');
+    }
+
+    // Battery: read once now, then poll (it changes slowly — no NOTIFY).
+    if (chrBattery) {
+      await refreshBattery();
+      clearInterval(batteryPollTimer);
+      batteryPollTimer = setInterval(refreshBattery, 15000);
+    }
+
+    applyCapabilityGating();
+    setBleUi(true);
+    updateSvCaptureUi();
+  } catch (e) {
+    setBleUi(false);
+    document.getElementById('ble-dot').className = 'dot';
+    document.getElementById('ble-label').textContent = '未连接';
+    document.getElementById('btn-connect').disabled = false;
+    // Surface as a modal so the user doesn't have to scroll the log
+    // panel — fires await so the prompt blocks until dismissed.
+    await showErrorPopup(`连接失败：${e.message}`, 'BLE 连接错误');
+  }
+});
+
+// --- Disconnect handler ---
+function onDisconnected() {
+  log('已断开', 'err');
+  setBleUi(false);
+  clearInterval(batteryPollTimer); batteryPollTimer = null;
+  clearInterval(audioMetricsTimer); audioMetricsTimer = null;
+  const autoEl = document.getElementById('audio-metrics-autorefresh');
+  if (autoEl) autoEl.checked = false;
+  clearTimeout(ledWriteTimer); ledWriteTimer = null;
+  ledStateLoaded = false;
+  clearTimeout(micLipWriteTimer); micLipWriteTimer = null;
+  micLipLoaded = false;
+  chrSsid = chrPass = chrKey = chrApply = chrStatus = chrKx = chrEn = chrRtpEn = chrJttsIdleEn = chrJtts = chrOtaCtrl = chrOtaData = chrProvider = chrGeminiKey = chrXiaozhiUrl = chrXiaozhiToken = chrFaceConfig = chrBattery = chrBatGauge = chrServoEnabled = chrMcpToken = chrLtConfig = chrServoLimits = chrServoRangeMode = chrServoPositions = chrBoardKind = chrWifiIp = chrWifiMac = chrAudioCtrl = chrAudioData = chrAudioCredit = chrAudioMetrics = chrLedState = chrMicLipGain = chrLedMouthSync = chrLipSyncMode = chrMicLipAgc = chrSpeakerVolume = chrJttsSay = chrOperationMode = chrAudioOutput = chrBargeIn = chrAvatarBc = null;
+  if (typeof refreshAvbcButton === 'function') refreshAvbcButton();
+  boardKind = null;
+  aesKey = null;
+  clearDeviceInfo();
+  delete document.getElementById('openai-enabled').dataset.initial;
+  delete document.getElementById('rtp-enabled').dataset.initial;
+  delete document.getElementById('jtts-idle-enabled').dataset.initial;
+  delete document.getElementById('led-mouth-sync').dataset.initial;
+  delete document.getElementById('lip-sync-mode').dataset.initial;
+  delete document.getElementById('mic-lip-agc').dataset.initial;
+  delete document.getElementById('operation-mode').dataset.initial;
+  delete document.getElementById('audio-output').dataset.initial;
+  delete document.getElementById('barge-in-enabled').dataset.initial;
+  delete document.getElementById('bat-gauge-enabled').dataset.initial;
+  delete document.getElementById('startup-arpeggio-enabled').dataset.initial;
+  delete document.getElementById('servo-enabled').dataset.initial;
+  delete document.getElementById('provider').dataset.initial;
+  jttsInitialJson = '';
+  servoLimitsInitial = '';
+  writeJttsForm('');
+  servoCal.reset(); // stop the position poll + idle display + re-gate buttons
+  document.getElementById('btn-ota').disabled = true;
+  if (!otaInFlight) {
+    document.getElementById('ota-bar-fill').style.width = '0';
+    document.getElementById('ota-stats').textContent = '未开始';
+    document.getElementById('ota-file').value = '';
+  }
+  document.getElementById('btn-audio-play').disabled = true;
+  document.getElementById('btn-audio-stop').disabled = true;
+  if (!audioInFlight) {
+    document.getElementById('audio-bar-fill').style.width = '0';
+    document.getElementById('audio-stats').textContent = '未开始';
+  }
+}
+
+// --- Manual disconnect ---
+document.getElementById('btn-disconnect').addEventListener('click', () => {
+  if (bleDevice && bleDevice.gatt.connected) {
+    bleDevice.gatt.disconnect();
+  }
+});
+
+// --- Apply ---
+document.getElementById('btn-apply').addEventListener('click', async () => {
+  const ssid = document.getElementById('ssid').value.trim();
+  const pass = document.getElementById('password').value;
+  const key  = document.getElementById('apikey').value.trim();
+  const gkey = document.getElementById('gemini-apikey').value.trim();
+  const xzUrl = document.getElementById('xiaozhi-url').value.trim();
+  const xzToken = document.getElementById('xiaozhi-token').value.trim();
+
+  const btn = document.getElementById('btn-apply');
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+
+  try {
+    // Write only fields that have input (empty = unchanged). All payloads
+    // travel through the AES-GCM session established at connect.
+    if (ssid && chrSsid) {
+      await writeEncrypted(chrSsid, strToBytes(ssid));
+      log('SSID 写入完成', 'ok');
+    }
+    if (pass && chrPass) {
+      await writeEncrypted(chrPass, strToBytes(pass));
+      log('密码写入完成', 'ok');
+    }
+    if (key && chrKey) {
+      await writeEncrypted(chrKey, strToBytes(key));
+      log('OpenAI 密钥写入完成', 'ok');
+    }
+    if (gkey && chrGeminiKey) {
+      await writeEncrypted(chrGeminiKey, strToBytes(gkey));
+      log('Gemini 密钥写入完成', 'ok');
+    }
+    if (xzUrl && chrXiaozhiUrl) {
+      await writeEncrypted(chrXiaozhiUrl, strToBytes(xzUrl));
+      log('XiaoZhi URL 写入完成', 'ok');
+    }
+    if (xzToken && chrXiaozhiToken) {
+      await writeEncrypted(chrXiaozhiToken, strToBytes(xzToken));
+      log('XiaoZhi 令牌写入完成', 'ok');
+    }
+
+    // Provider: only write if changed from initial AND chr is present.
+    const provSel = document.getElementById('provider');
+    if (chrProvider && provSel.dataset.initial !== undefined && provSel.value !== provSel.dataset.initial) {
+      await writeEncrypted(chrProvider, new Uint8Array([Number(provSel.value)]));
+      log(`已切换服务商为 ${provSel.options[provSel.selectedIndex].text}`, 'ok');
+    }
+
+    // Only push the enable flag if it changed AND chr is present.
+    const enCheckbox = document.getElementById('openai-enabled');
+    const enInitial = enCheckbox.dataset.initial;
+    const enWanted = enCheckbox.checked ? '1' : '0';
+    if (chrEn && enInitial !== undefined && enInitial !== enWanted) {
+      await writeEncrypted(chrEn, new Uint8Array([enCheckbox.checked ? 1 : 0]));
+      log(`已将 OpenAI 对话功能切换为 ${enCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // RTP audio enable: only push if it changed AND chr is present.
+    const rtpCheckbox = document.getElementById('rtp-enabled');
+    const rtpInitial = rtpCheckbox.dataset.initial;
+    const rtpWanted = rtpCheckbox.checked ? '1' : '0';
+    if (chrRtpEn && rtpInitial !== undefined && rtpInitial !== rtpWanted) {
+      await writeEncrypted(chrRtpEn, new Uint8Array([rtpCheckbox.checked ? 1 : 0]));
+      log(`已将 RTP 音频接收切换为 ${rtpCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // jtts idle babble enable: only push if it changed AND chr is present.
+    const jiCheckbox = document.getElementById('jtts-idle-enabled');
+    const jiInitial = jiCheckbox.dataset.initial;
+    const jiWanted = jiCheckbox.checked ? '1' : '0';
+    if (chrJttsIdleEn && jiInitial !== undefined && jiInitial !== jiWanted) {
+      await writeEncrypted(chrJttsIdleEn, new Uint8Array([jiCheckbox.checked ? 1 : 0]));
+      log(`已将 jtts 空闲播报切换为 ${jiCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // LED mouth-sync: only push if it changed AND chr is present.
+    const lmsCheckbox = document.getElementById('led-mouth-sync');
+    const lmsInitial = lmsCheckbox.dataset.initial;
+    const lmsWanted = lmsCheckbox.checked ? '1' : '0';
+    if (chrLedMouthSync && lmsInitial !== undefined && lmsInitial !== lmsWanted) {
+      await writeEncrypted(chrLedMouthSync, new Uint8Array([lmsCheckbox.checked ? 1 : 0]));
+      log(`已将 LED 口型联动切换为 ${lmsCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // Lip-sync mode: only push if it changed AND chr is present.
+    const lsmSel = document.getElementById('lip-sync-mode');
+    const lsmInitial = lsmSel.dataset.initial;
+    if (chrLipSyncMode && lsmInitial !== undefined && lsmInitial !== lsmSel.value) {
+      const v = Number(lsmSel.value);
+      await writeEncrypted(chrLipSyncMode, new Uint8Array([v]));
+      const labels = {0:'亮度',1:'电平表'};
+      log(`已将口型同步模式切换为 ${labels[v] || `mode ${v}`}`, 'ok');
+    }
+
+    // Mic lip-sync AGC: only push if it changed AND chr is present.
+    const agcCheckbox = document.getElementById('mic-lip-agc');
+    const agcInitial = agcCheckbox.dataset.initial;
+    const agcWanted = agcCheckbox.checked ? '1' : '0';
+    if (chrMicLipAgc && agcInitial !== undefined && agcInitial !== agcWanted) {
+      await writeEncrypted(chrMicLipAgc, new Uint8Array([agcCheckbox.checked ? 1 : 0]));
+      log(`已将麦克风 AGC 切换为 ${agcCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // Operation mode: only push if it changed AND chr is present.
+    const omSel = document.getElementById('operation-mode');
+    const omInitial = omSel.dataset.initial;
+    if (chrOperationMode && omInitial !== undefined && omInitial !== omSel.value) {
+      const v = Number(omSel.value);
+      await writeEncrypted(chrOperationMode, new Uint8Array([v]));
+      const labels = {0:'口型同步',1:'闲聊播报',2:'对话'};
+      log(`已将工作模式切换为 ${labels[v] || `mode ${v}`}`, 'ok');
+    }
+
+    // Audio output: only push if it changed AND chr is present.
+    const aoSel = document.getElementById('audio-output');
+    const aoInitial = aoSel.dataset.initial;
+    if (chrAudioOutput && aoInitial !== undefined && aoInitial !== aoSel.value) {
+      const v = Number(aoSel.value);
+      await writeEncrypted(chrAudioOutput, new Uint8Array([v]));
+      const labels = {0:'自动',1:'内置扬声器',2:'M5 Module Audio'};
+      log(`已将音频输出切换为 ${labels[v] || `mode ${v}`}`, 'ok');
+    }
+
+    // Barge-in: only push if it changed AND chr is present.
+    const biCheckbox = document.getElementById('barge-in-enabled');
+    const biInitial = biCheckbox.dataset.initial;
+    const biWanted = biCheckbox.checked ? '1' : '0';
+    if (chrBargeIn && biInitial !== undefined && biInitial !== biWanted) {
+      await writeEncrypted(chrBargeIn, new Uint8Array([biCheckbox.checked ? 1 : 0]));
+      log(`已将插话切换为 ${biCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // Device name: only push when the input actually differs from the
+    // value we loaded at handshake. Empty new value is meaningful — it
+    // resets to the auto-generated name.
+    const dnEl = document.getElementById('device-name');
+    if (chrDeviceName && dnEl && dnEl.dataset.initial !== undefined &&
+        dnEl.value !== dnEl.dataset.initial) {
+      await writeEncrypted(chrDeviceName, strToBytes(dnEl.value));
+      log(`已更新设备名：${dnEl.value || '（自动生成）'}`, 'ok');
+    }
+
+    // Auth password (write-only): push when the user typed something OR
+    // explicitly hit Clear (data-cleared=1 → send empty body to disable).
+    const authEl = document.getElementById('auth-password');
+    if (chrAuthPassword && authEl && (authEl.value || authEl.dataset.cleared === '1')) {
+      await writeEncrypted(chrAuthPassword, strToBytes(authEl.value));
+      log(authEl.value ? `已发送认证密码（${authEl.value.length}B）` : '已清除认证密码', 'ok');
+      authEl.value = '';
+      delete authEl.dataset.cleared;
+    }
+
+    // Battery gauge: only push if it changed AND chr is present.
+    const bgCheckbox = document.getElementById('bat-gauge-enabled');
+    const bgInitial = bgCheckbox.dataset.initial;
+    const bgWanted = bgCheckbox.checked ? '1' : '0';
+    if (chrBatGauge && bgInitial !== undefined && bgInitial !== bgWanted) {
+      await writeEncrypted(chrBatGauge, new Uint8Array([bgCheckbox.checked ? 1 : 0]));
+      log(`已将电池电量条显示切换为 ${bgCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // Startup arpeggio: only push if it changed AND chr is present.
+    const baCheckbox = document.getElementById('startup-arpeggio-enabled');
+    const baInitial = baCheckbox.dataset.initial;
+    const baWanted = baCheckbox.checked ? '1' : '0';
+    if (chrStartupArp && baInitial !== undefined && baInitial !== baWanted) {
+      await writeEncrypted(chrStartupArp, new Uint8Array([baCheckbox.checked ? 1 : 0]));
+      log(`已将启动琶音切换为 ${baCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // Servo master enable (NVS-persisted): only push if it changed AND chr is present.
+    const seCheckbox = document.getElementById('servo-enabled');
+    const seInitial = seCheckbox.dataset.initial;
+    const seWanted = seCheckbox.checked ? '1' : '0';
+    if (chrServoEnabled && seInitial !== undefined && seInitial !== seWanted) {
+      await writeEncrypted(chrServoEnabled, new Uint8Array([seCheckbox.checked ? 1 : 0]));
+      log(`已将舵机切换为 ${seCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+    }
+
+    // MCP API token (write-only). Push only when the user typed a value OR
+    // explicitly hit Clear (data-cleared=1 ⇒ send empty body to wipe NVS).
+    const mcpTokenEl = document.getElementById('mcp-token');
+    if (chrMcpToken && (mcpTokenEl.value || mcpTokenEl.dataset.cleared === '1')) {
+      await writeEncrypted(chrMcpToken, strToBytes(mcpTokenEl.value));
+      log(`MCP API 令牌写入完成（${mcpTokenEl.value.length}B）`, 'ok');
+      mcpTokenEl.value = '';
+      delete mcpTokenEl.dataset.cleared;
+    }
+
+    // LT timekeeper: write whatever's in the form (live apply + staged).
+    // Form -> JSON mapping shared with the Wi-Fi page (settings_common.js).
+    if (chrLtConfig) {
+      const ltJson = StackchanSettings.buildLtConfigJson();
+      if (ltJson) {
+        await writeEncrypted(chrLtConfig, strToBytes(ltJson));
+        log(`LT 设置写入完成（${ltJson.length}B）`, 'ok');
+      }
+    }
+
+    // Servo limits: write the JSON if any field changed.
+    if (chrServoLimits) {
+      const slCanonical = canonicaliseServoLimits();
+      if (slCanonical !== servoLimitsInitial) {
+        await writeEncrypted(chrServoLimits, strToBytes(slCanonical));
+        log(`舵机设置写入完成（${slCanonical.length}B）`, 'ok');
+      }
+    }
+
+    // jtts: only write if the form contents differ AND chr is present.
+    if (chrJtts) {
+      const jttsCanonical = canonicaliseJttsForm();
+      if (jttsCanonical !== jttsInitialJson) {
+        const jttsObj = readJttsForm();
+        // Object.keys==0 means "fall back to firmware defaults" — send empty.
+        const payload = Object.keys(jttsObj).length === 0 ? '' : JSON.stringify(jttsObj);
+        await writeEncrypted(chrJtts, strToBytes(payload));
+        log(`已更新 jtts 设置（${payload.length}B）`, 'ok');
+      }
+    }
+
+    if (!chrApply) {
+      log('没有 Apply characteristic，跳过应用（固件过旧？）', 'err');
+      btn.disabled = false;
+      btn.textContent = '保存并重启';
+      return;
+    }
+    log('正在发送 Apply…');
+    // Sentinel: single byte 0x01, encrypted like everything else.
+    await writeEncrypted(chrApply, new Uint8Array([0x01]));
+    log('Apply 完成，设备即将重启', 'ok');
+    btn.textContent = '重启中…';
+    // Device reboots ~200 ms after Apply; disconnection event will fire shortly.
+  } catch (e) {
+    // A disconnection during/after Apply is expected (device restarted).
+    if (e.message && e.message.toLowerCase().includes('disconnect')) {
+      log('已应用，正在重启…', 'ok');
+      btn.textContent = '重启中…';
+    } else {
+      log(`Apply 错误：${e.message}`, 'err');
+      btn.disabled = false;
+      btn.textContent = '保存并重启';
+    }
+  }
+});
+
+// --- Audio streaming controls ---
+document.getElementById('btn-audio-play').addEventListener('click', audioPlay);
+document.getElementById('btn-audio-stop').addEventListener('click', audioStop);
+document.getElementById('audio-file').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  if (file) {
+    document.getElementById('audio-stats').textContent = `${file.name} (${fmtBytes(file.size)})`;
+  }
+  refreshAudioButton();
+});
+// Conversation toggle is mutually exclusive with streaming — re-gate the
+// audio button (and show/hide the note) whenever it changes.
+document.getElementById('openai-enabled').addEventListener('change', refreshAudioButton);
+
+// --- OTA controls ---
+function refreshOtaButton() {
+  const fileChosen = document.getElementById('ota-file').files.length > 0;
+  const releaseChosen = document.getElementById('ota-release').value !== '';
+  document.getElementById('btn-ota').disabled =
+    !chrOtaCtrl || (!fileChosen && !releaseChosen);
+}
+document.getElementById('ota-file').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  if (file) {
+    // Selecting a file overrides any release pick (mutually exclusive).
+    document.getElementById('ota-release').value = '';
+    document.getElementById('ota-stats').textContent = `${file.name} (${fmtBytes(file.size)})`;
+  }
+  refreshOtaButton();
+});
+document.getElementById('ota-release').addEventListener('change', e => {
+  if (e.target.value) {
+    // Selecting a release overrides any file pick.
+    document.getElementById('ota-file').value = '';
+    document.getElementById('ota-stats').textContent = `Release: ${e.target.value}`;
+  }
+  refreshOtaButton();
+});
+document.getElementById('btn-ota').addEventListener('click', async () => {
+  const fileInput = document.getElementById('ota-file');
+  const releaseSel = document.getElementById('ota-release');
+  const releaseTag = releaseSel.value;
+
+  let blob, name;
+  if (releaseTag) {
+    try {
+      blob = await fetchReleaseFirmware(releaseTag);
+      name = `${releaseTag}/stackchan_idf.bin`;
+    } catch (e) {
+      log(`获取版本失败：${e.message}`, 'err');
+      return;
+    }
+  } else if (fileInput.files[0]) {
+    blob = fileInput.files[0];
+    name = fileInput.files[0].name;
+  } else {
+    return;
+  }
+
+  if (!confirm(`即将写入新固件 ${name}（${fmtBytes(blob.size)}）。确定吗？`)) return;
+  // performOta expects .name / .size / .stream() — File satisfies all three,
+  // so wrap a raw Blob in a File constructor.
+  const carrier = (blob instanceof File) ? blob :
+    new File([blob], name.replace('/', '_'), { type: 'application/octet-stream' });
+  performOta(carrier);
+});
+
+// Kick off the release list early — independent of BLE connect.
+loadOtaReleases();
+
+// ===== Avatar face tuning (in-page live preview + BLE mirror) ================
+// Slider/colour changes update the embedded WASM preview and, while connected,
+// are mirrored to the device over the FaceConfig characteristic (debounced, no
+// reboot). "保存 & 再起動" persists the last value to NVS device-side.
+const AV_READOUT = { 'av-eye-r': 1, 'av-eye-ox': 0, 'av-eye-oy': 0,
+  'av-brow-ox': 0, 'av-brow-oy': 0, 'av-mouth-ox': 0, 'av-mouth-oy': 0,
+  'av-mouth-minw': 0, 'av-mouth-maxw': 0, 'av-mouth-minh': 0, 'av-mouth-maxh': 0,
+  'av-cheek-r': 1, 'av-cheek-ox': 0, 'av-cheek-oy': 0 };
+const AV_CONTROL_IDS = ['av-brow-show', 'av-eye-r', 'av-eye-ox', 'av-eye-oy',
+  'av-brow-ox', 'av-brow-oy', 'av-mouth-ox', 'av-mouth-oy',
+  'av-mouth-minw', 'av-mouth-maxw', 'av-mouth-minh', 'av-mouth-maxh',
+  'av-cheek-show', 'av-cheek-r', 'av-cheek-ox', 'av-cheek-oy',
+  'av-col-face', 'av-col-bg'];
+
+let avModule = null;     // resolved AvatarModule instance, or null when absent
+let avWriteTimer = null; // debounce handle for the BLE write
+let avSeeding = false;   // suppress the BLE write while seeding from the device
+
+function avEl(id) { return document.getElementById(id); }
+function avNum(id) { return parseFloat(avEl(id).value); }
+function avInt(id) { return parseInt(avEl(id).value, 10); }
+function avHexRgb(hex) { return parseInt(hex.replace('#', ''), 16) | 0; }
+
+function avUpdateReadouts() {
+  for (const id in AV_READOUT) {
+    const v = avEl(id + '-v');
+    if (v) v.textContent = parseFloat(avEl(id).value).toFixed(AV_READOUT[id]);
+  }
+}
+
+// Push the current control values into the in-page preview module.
+function avPushPreview() {
+  const m = avModule;
+  if (!m) return;
+  m._avatar_set_eyebrows_visible(avEl('av-brow-show').checked ? 1 : 0);
+  m._avatar_set_eye_params(avNum('av-eye-r'), avNum('av-eye-ox'), avNum('av-eye-oy'));
+  m._avatar_set_eyebrow_params(avNum('av-brow-ox'), avNum('av-brow-oy'));
+  m._avatar_set_mouth_params(avNum('av-mouth-ox'), avNum('av-mouth-oy'),
+    avInt('av-mouth-minw'), avInt('av-mouth-maxw'), avInt('av-mouth-minh'), avInt('av-mouth-maxh'));
+  if (typeof m._avatar_set_cheeks_visible === 'function') {
+    m._avatar_set_cheeks_visible(avEl('av-cheek-show').checked ? 1 : 0);
+    m._avatar_set_cheek_params(avNum('av-cheek-r'), avNum('av-cheek-ox'), avNum('av-cheek-oy'));
+  }
+  m._avatar_set_colors(avHexRgb(avEl('av-col-face').value), avHexRgb(avEl('av-col-bg').value));
+}
+
+// Compact JSON matching main/face_config.hpp's parse_face_tuning schema.
+function avFaceConfigJson() {
+  return JSON.stringify({
+    brow: avEl('av-brow-show').checked ? 1 : 0,
+    eye_r: avNum('av-eye-r'), eye_ox: avNum('av-eye-ox'), eye_oy: avNum('av-eye-oy'),
+    brow_ox: avNum('av-brow-ox'), brow_oy: avNum('av-brow-oy'),
+    mouth_ox: avNum('av-mouth-ox'), mouth_oy: avNum('av-mouth-oy'),
+    mouth_minw: avInt('av-mouth-minw'), mouth_maxw: avInt('av-mouth-maxw'),
+    mouth_minh: avInt('av-mouth-minh'), mouth_maxh: avInt('av-mouth-maxh'),
+    cheek: avEl('av-cheek-show').checked ? 1 : 0,
+    cheek_r: avNum('av-cheek-r'), cheek_ox: avNum('av-cheek-ox'), cheek_oy: avNum('av-cheek-oy'),
+    face_color: avEl('av-col-face').value, bg_color: avEl('av-col-bg').value });
+}
+
+function avScheduleWrite() {
+  if (avSeeding || !chrFaceConfig || !aesKey) return;
+  clearTimeout(avWriteTimer);
+  avWriteTimer = setTimeout(async () => {
+    try { await writeEncrypted(chrFaceConfig, strToBytes(avFaceConfigJson())); }
+    catch (e) { log(`发送形象调整失败：${e.message}`, 'err'); }
+  }, 120);
+}
+
+function avOnInput() {
+  avUpdateReadouts();
+  avPushPreview();
+  avScheduleWrite();
+}
+
+// Apply a device-provided JSON to the controls + preview WITHOUT writing back.
+// Called from the connect flow after the FaceConfig read. Empty/invalid JSON
+// leaves the HTML defaults (which match the firmware's built-in face).
+function seedAvatarControls(json) {
+  let o = {};
+  if (json) { try { o = JSON.parse(json); } catch (e) { o = {}; } }
+  avSeeding = true;
+  const set = (id, v) => { if (v !== undefined && v !== null && avEl(id)) avEl(id).value = v; };
+  if ('brow' in o) avEl('av-brow-show').checked = !!o.brow;
+  set('av-eye-r', o.eye_r); set('av-eye-ox', o.eye_ox); set('av-eye-oy', o.eye_oy);
+  set('av-brow-ox', o.brow_ox); set('av-brow-oy', o.brow_oy);
+  set('av-mouth-ox', o.mouth_ox); set('av-mouth-oy', o.mouth_oy);
+  set('av-mouth-minw', o.mouth_minw); set('av-mouth-maxw', o.mouth_maxw);
+  set('av-mouth-minh', o.mouth_minh); set('av-mouth-maxh', o.mouth_maxh);
+  if ('cheek' in o) avEl('av-cheek-show').checked = !!o.cheek;
+  set('av-cheek-r', o.cheek_r); set('av-cheek-ox', o.cheek_ox); set('av-cheek-oy', o.cheek_oy);
+  if (typeof o.face_color === 'string') set('av-col-face', o.face_color);
+  if (typeof o.bg_color === 'string') set('av-col-bg', o.bg_color);
+  avUpdateReadouts();
+  avPushPreview();
+  avSeeding = false;
+}
+
+function avReset() {
+  AV_CONTROL_IDS.forEach((id) => {
+    const el = avEl(id);
+    if (el.type === 'checkbox') el.checked = el.defaultChecked;
+    else el.value = el.defaultValue;
+  });
+  avOnInput(); // refresh preview + (if connected) push the defaults to the device
+}
+
+AV_CONTROL_IDS.forEach((id) => avEl(id).addEventListener('input', avOnInput));
+avEl('av-reset').addEventListener('click', avReset);
+avUpdateReadouts();
+
+// Load the optional preview module and start its render loop (320x240, fixed —
+// matches the device canvas). Absence (404 / unsupported) degrades gracefully.
+function setupAvatarPreview() {
+  const note = avEl('av-preview-note');
+  if (typeof AvatarModule === 'undefined' || window.__avatarModuleMissing) {
+    note.textContent = '找不到预览模块（avatar_module.js），仅能通过 BLE 调整';
+    return;
+  }
+  AvatarModule().then((m) => {
+    if (!m._avatar_init()) { note.textContent = 'avatar_init 失败'; return; }
+    avModule = m;
+    const cnv = avEl('av-preview');
+    const W = m._avatar_width(), H = m._avatar_height();
+    cnv.width = W; cnv.height = H;
+    const ctx2d = cnv.getContext('2d');
+    const img = ctx2d.createImageData(W, H);
+    avPushPreview();
+    note.textContent = '正在绘制预览（用 WASM 运行当前 C++ 代码）';
+    (function frame() {
+      m._avatar_tick(performance.now());
+      const fb = new Uint16Array(m.HEAPU16.buffer, m._avatar_framebuffer(), W * H);
+      const d = img.data;
+      for (let i = 0, o = 0; i < W * H; i++, o += 4) {
+        const p = fb[i];
+        d[o]     = ((p >> 11) & 0x1f) * 255 / 31 | 0;
+        d[o + 1] = ((p >> 5) & 0x3f) * 255 / 63 | 0;
+        d[o + 2] = (p & 0x1f) * 255 / 31 | 0;
+        d[o + 3] = 255;
+      }
+      ctx2d.putImageData(img, 0, 0);
+      requestAnimationFrame(frame);
+    })();
+  }).catch((e) => { note.textContent = '预览初始化错误：' + e.message; });
+}
+setupAvatarPreview();
+
+// ===== Servo limits + range-setting calibration =============================
+// Form serialization and the hand-driven calibration flow (torque-off range
+// mode → live position poll → capture buttons) are shared with the Wi-Fi
+// page via settings_common.js — this page supplies the BLE transport:
+// chr ServoRangeMode write to toggle, chr ServoPositions read (2 × i16 LE
+// raw steps) for the live poll. Range mode is intentionally ephemeral — it
+// auto-OFFs device-side when the BLE session resets and is not persisted.
+const servoCal = StackchanSettings.setupServoCalibration({
+  pollMs: 250,
+  canToggle: () => !!chrServoRangeMode && aesKey != null,
+  canCapture: () => !!chrServoPositions && aesKey != null,
+  async setRangeMode(on) {
+    await writeEncrypted(chrServoRangeMode, new Uint8Array([on ? 1 : 0]));
+  },
+  async readPositions() {
+    if (!chrServoPositions || !aesKey) throw new Error('未连接');
+    const b = await readEncrypted(chrServoPositions);
+    if (b.length < 4) throw new Error('short read');
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    return { yaw: dv.getInt16(0, true), pitch: dv.getInt16(2, true) };
+  },
+});
+
+function canonicaliseServoLimits() { return servoCal.formJson(); }
+function seedServoLimits(json) {
+  servoCal.seedForm(json);
+  servoLimitsInitial = canonicaliseServoLimits();
+}
+function updateSvCaptureUi() { servoCal.refreshUi(); }
+
+// ===== LED state (BLE chr 0x20) ==============================================
+//
+// 5-byte payload [mode][R][G][B][brightness]. We read once on connect to seed
+// the form, then write on every input change (debounced ~150 ms so the slider
+// doesn't hammer NVS while being dragged). The device persists each write to
+// NVS, so the same UI re-opens with the last-applied values after a reboot.
+
+let ledWriteTimer = null;
+let ledStateLoaded = false; // true after the initial read so input events don't fire feedback writes during seeding
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return { r: 0, g: 0, b: 0 };
+  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+}
+function rgbToHex(r, g, b) {
+  const h = (v) => v.toString(16).padStart(2, '0');
+  return '#' + h(r & 0xff) + h(g & 0xff) + h(b & 0xff);
+}
+
+async function loadLedState() {
+  if (!chrLedState || !aesKey) return;
+  try {
+    const b = await readEncrypted(chrLedState);
+    if (b.length < 5) return;
+    const mode = b[0], r = b[1], g = b[2], bl = b[3], bright = b[4];
+    // Period byte was added later; older firmwares return 5 bytes only.
+    const period = b.length >= 6 ? b[5] : 60;
+    ledStateLoaded = false;
+    document.getElementById('led-mode').value = String(mode);
+    document.getElementById('led-color').value = rgbToHex(r, g, bl);
+    document.getElementById('led-brightness').value = String(bright);
+    document.getElementById('led-brightness-value').textContent = String(bright);
+    document.getElementById('led-period').value = String(period);
+    document.getElementById('led-period-value').textContent = (period / 10).toFixed(1);
+    ledStateLoaded = true;
+  } catch (e) {
+    log(`读取 LED state 失败：${e?.message ?? e}`, 'err');
+  }
+}
+
+async function writeLedState() {
+  if (!chrLedState || !aesKey) return;
+  const mode = parseInt(document.getElementById('led-mode').value, 10) || 0;
+  const { r, g, b } = hexToRgb(document.getElementById('led-color').value);
+  const bright = parseInt(document.getElementById('led-brightness').value, 10) || 0;
+  const period = parseInt(document.getElementById('led-period').value, 10) || 60;
+  // Always write the 6-byte extended form; firmwares older than period
+  // support won't expose the chr at all (UI section is hidden).
+  const payload = new Uint8Array([mode, r, g, b, bright, period]);
+  try {
+    await writeEncrypted(chrLedState, payload);
+  } catch (e) {
+    log(`写入 LED state 失败：${e?.message ?? e}`, 'err');
+  }
+}
+
+function scheduleLedWrite() {
+  if (!ledStateLoaded) return; // skip the synthetic events fired while we seed the form
+  clearTimeout(ledWriteTimer);
+  ledWriteTimer = setTimeout(writeLedState, 150);
+}
+
+// Mic-driven lip-sync calibration (BLE chr 0x23). Same shape as LED above:
+// initial read seeds the two sliders, every input change writes the 4-byte
+// payload back debounced 150 ms so dragging doesn't spam NVS.
+let micLipWriteTimer = null;
+let micLipLoaded = false;
+
+async function loadMicLipGain() {
+  if (!chrMicLipGain || !aesKey) return;
+  try {
+    const b = await readEncrypted(chrMicLipGain);
+    if (b.length < 4) return;
+    const inPct = b[0] | (b[1] << 8);
+    const outPct = b[2] | (b[3] << 8);
+    micLipLoaded = false;
+    document.getElementById('mic-lip-input').value = String(inPct);
+    document.getElementById('mic-lip-input-value').textContent = String(inPct);
+    document.getElementById('mic-lip-output').value = String(outPct);
+    document.getElementById('mic-lip-output-value').textContent = String(outPct);
+    micLipLoaded = true;
+  } catch (e) {
+    log(`获取麦克风口型同步设置失败：${e?.message ?? e}`, 'err');
+  }
+}
+
+async function writeMicLipGain() {
+  if (!chrMicLipGain || !aesKey) return;
+  const inPct = parseInt(document.getElementById('mic-lip-input').value, 10) || 100;
+  const outPct = parseInt(document.getElementById('mic-lip-output').value, 10) || 100;
+  const payload = new Uint8Array([
+    inPct & 0xff, (inPct >> 8) & 0xff,
+    outPct & 0xff, (outPct >> 8) & 0xff,
+  ]);
+  try {
+    await writeEncrypted(chrMicLipGain, payload);
+  } catch (e) {
+    log(`写入麦克风口型同步设置失败：${e?.message ?? e}`, 'err');
+  }
+}
+
+function scheduleMicLipWrite() {
+  if (!micLipLoaded) return;
+  clearTimeout(micLipWriteTimer);
+  micLipWriteTimer = setTimeout(writeMicLipGain, 150);
+}
+
+// Speaker volume (BLE chr 0x2c). 0..200 percent, debounced live write.
+let speakerVolumeWriteTimer = null;
+let speakerVolumeLoaded = false;
+
+async function loadSpeakerVolume() {
+  if (!chrSpeakerVolume || !aesKey) return;
+  try {
+    const b = await readEncrypted(chrSpeakerVolume);
+    if (b.length < 2) return;
+    const pct = b[0] | (b[1] << 8);
+    speakerVolumeLoaded = false;
+    document.getElementById('speaker-volume').value = String(pct);
+    document.getElementById('speaker-volume-value').textContent = String(pct);
+    speakerVolumeLoaded = true;
+  } catch (e) {
+    log(`获取扬声器音量设置失败：${e?.message ?? e}`, 'err');
+  }
+}
+
+async function writeSpeakerVolume() {
+  if (!chrSpeakerVolume || !aesKey) return;
+  let pct = parseInt(document.getElementById('speaker-volume').value, 10) || 0;
+  if (pct < 0) pct = 0;
+  if (pct > 200) pct = 200;
+  const payload = new Uint8Array([pct & 0xff, (pct >> 8) & 0xff]);
+  try {
+    await writeEncrypted(chrSpeakerVolume, payload);
+  } catch (e) {
+    log(`写入扬声器音量设置失败：${e?.message ?? e}`, 'err');
+  }
+}
+
+function scheduleSpeakerVolumeWrite() {
+  if (!speakerVolumeLoaded) return;
+  clearTimeout(speakerVolumeWriteTimer);
+  speakerVolumeWriteTimer = setTimeout(writeSpeakerVolume, 150);
+}
+
+// ===== Audio pipeline metrics (BLE chr 0x1f) =================================
+//
+// One-shot read of the JSON snapshot left by the conversation task at the end
+// of each turn (main/conversation_task.cpp::log_playback_metrics). Optionally
+// polled every 2 s so the panel reflects the most recent finished turn while
+// the user keeps the page open. Doesn't add CPU pressure to the device — the
+// snapshot is published from a mutex-protected struct, no recomputation.
+
+let audioMetricsTimer = null;
+
+function fmtUs(v) { return Number.isFinite(v) ? Math.round(v).toLocaleString() : '--'; }
+function fmtMs(v) { return Number.isFinite(v) ? v.toFixed(1) : '--'; }
+function fmtN(v, p=2) { return Number.isFinite(v) ? v.toFixed(p) : '--'; }
+function fmtInt(v) { return Number.isFinite(v) ? Math.round(v).toLocaleString() : '--'; }
+
+function renderAudioMetrics(j) {
+  const tbody = document.getElementById('audio-metrics-body');
+  const summary = document.getElementById('audio-metrics-summary');
+  if (!j || Object.keys(j).length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="hint" style="padding:0.5rem">最近一轮对话尚未结束（snapshot 为空）</td></tr>';
+    summary.textContent = '—';
+    return;
+  }
+  const r = j.recv_lag_us || {};
+  const q = j.recv_to_queued_ms || {};
+  const s = j.spk_queue || {};
+  const p = j.pcm_lag_samples || {};
+  // played_sps と nominal の比 — 0.99 切ったら明示的にハイライト
+  const sps = j.played_sps;
+  const nom = j.speaker_sample_rate;
+  const ratio = (Number.isFinite(sps) && nom) ? (sps / nom) : null;
+  const ratioCol = (ratio != null && ratio < 0.99) ? 'color:#f88' : '';
+  const rows = [
+    ['recv_lag（event 交接）μs', fmtUs(r.avg), fmtUs(r.min), fmtUs(r.max)],
+    ['recv→queued（投入播放）ms', fmtMs(q.avg), fmtMs(q.min), fmtMs(q.max)],
+    ['spk_queue 深度 (0..2)',    fmtN(s.avg, 2), fmtN(s.min, 0), fmtN(s.max, 0)],
+    ['pcm_lag 未播放 samples',   fmtInt(p.avg), '—',           fmtInt(p.max)],
+  ];
+  tbody.innerHTML = rows.map(([n,a,mn,mx]) => `
+    <tr style="border-bottom:1px solid #333">
+      <td style="padding:0.3rem 0.5rem">${n}</td>
+      <td style="padding:0.3rem 0.5rem">${a}</td>
+      <td style="padding:0.3rem 0.5rem">${mn}</td>
+      <td style="padding:0.3rem 0.5rem">${mx}</td>
+    </tr>`).join('');
+  const turnSec = (j.turn_at_ms / 1000).toFixed(1);
+  summary.innerHTML = `chunks=${j.chunks ?? '--'}, played_sps=<span style="${ratioCol}">${fmtN(sps, 1)}</span> / nominal ${nom ?? '--'} ` +
+    (ratio != null ? `(${(ratio*100).toFixed(2)}%)` : '') +
+    `, turn at boot+${turnSec}s`;
+}
+
+async function readAudioMetrics() {
+  if (!chrAudioMetrics || !aesKey) return;
+  try {
+    const b = await readEncrypted(chrAudioMetrics);
+    const txt = new TextDecoder('utf-8', { fatal: false }).decode(b).trim();
+    let j = {};
+    if (txt.length > 0) {
+      try { j = JSON.parse(txt); }
+      catch (e) { log(`audio metrics：JSON 解析失败（${e.message}）`, 'err'); return; }
+    }
+    renderAudioMetrics(j);
+  } catch (e) {
+    // Transient read failure (session reset, brief disconnect, etc.) —
+    // leave the last rendering visible.
+  }
+}
+
+function setAudioMetricsAutoRefresh(on) {
+  clearInterval(audioMetricsTimer); audioMetricsTimer = null;
+  if (on && chrAudioMetrics && aesKey) {
+    audioMetricsTimer = setInterval(readAudioMetrics, 2000);
+  }
+}
+
+// Audio metrics: manual reload + optional 2-s auto-refresh.
+document.getElementById('btn-audio-metrics-reload').addEventListener('click', () => readAudioMetrics());
+document.getElementById('audio-metrics-autorefresh').addEventListener('change', (e) => {
+  setAudioMetricsAutoRefresh(e.target.checked);
+});
+
+// LED state: change-event flushes a debounced write to BLE chr 0x20.
+document.getElementById('led-mode').addEventListener('change', scheduleLedWrite);
+document.getElementById('led-color').addEventListener('input', scheduleLedWrite);
+document.getElementById('led-brightness').addEventListener('input', (e) => {
+  document.getElementById('led-brightness-value').textContent = String(e.target.value);
+  scheduleLedWrite();
+});
+document.getElementById('led-period').addEventListener('input', (e) => {
+  document.getElementById('led-period-value').textContent = (parseInt(e.target.value, 10) / 10).toFixed(1);
+  scheduleLedWrite();
+});
+
+// Mic lip-sync sliders: same debounced-write pattern as LED.
+document.getElementById('mic-lip-input').addEventListener('input', (e) => {
+  document.getElementById('mic-lip-input-value').textContent = String(e.target.value);
+  scheduleMicLipWrite();
+});
+document.getElementById('mic-lip-output').addEventListener('input', (e) => {
+  document.getElementById('mic-lip-output-value').textContent = String(e.target.value);
+  scheduleMicLipWrite();
+});
+
+// Speaker volume slider: same debounced-write pattern.
+document.getElementById('speaker-volume').addEventListener('input', (e) => {
+  document.getElementById('speaker-volume-value').textContent = String(e.target.value);
+  scheduleSpeakerVolumeWrite();
+});
+
+// JTTS test-speak: encrypt + write the kana text to chr 0x2d. Device
+// spawns a worker that synthesises + plays through M5.Speaker.
+async function sayJtts(text) {
+  if (!chrJttsSay || !aesKey) return;
+  text = text.trim();
+  if (!text) return;
+  // Match the device-side 192-byte cap (encrypted overhead leaves
+  // plenty of margin under the 484 B encrypted-write max).
+  const utf8 = enc.encode(text);
+  if (utf8.length > 192) {
+    log('jtts 试读：超过 192 字节', 'err');
+    return;
+  }
+  try {
+    await writeEncrypted(chrJttsSay, utf8);
+    log(`jtts 试读：「${text}」`, 'ok');
+  } catch (e) {
+    log(`jtts 试读失败：${e?.message ?? e}`, 'err');
+  }
+}
+
+document.getElementById('btn-jtts-say').addEventListener('click', () => {
+  const text = document.getElementById('jtts-say-text').value;
+  sayJtts(text);
+});
+document.getElementById('jtts-say-text').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sayJtts(e.target.value);
+  }
+});
+
+// ===== Avatar DSL editor + BLE chr 0x21 chunked transport =====================
+// Mirrors the WiFi page (settings_wifi.html) — same in-browser DSL compiler
+// bundle (window.AvatarDsl) and same preset list, but the send path uses the
+// BLE chr 0x21 chunked frame instead of HTTP POST. The chr is chunked because
+// the AES-GCM plaintext cap (~484 B) is below even a small .avbc (~1.5 KB), so
+// we frame the upload as: begin([total]) → data(chunk) × N → commit(). On the
+// device side, gatt_settings.cpp accumulates the chunks, validates via
+// avatar_vm::storage::save and applies through the registered sink.
+//
+// The chunk size matches OTA_CHUNK_SIZE (480 B): same Web Bluetooth limit, but
+// the framing eats 1 byte for the op header so the payload is 479 B per write.
+const AVBC_CHUNK_PAYLOAD = OTA_CHUNK_SIZE - 1;
+
+// Send a single complete bytecode (.avbc) over chr 0x21 with the begin/data/
+// commit framing. `buf` is Uint8Array; `onProgress(sent, total)` is optional.
+// Returns the device's status JSON (parsed if possible) on success. Throws
+// when the chr isn't available, when the size is out of range, or when any
+// underlying writeEncrypted / readEncrypted fails.
+async function avbcSendBytecode(buf, onProgress) {
+  if (!chrAvatarBc) throw new Error('AvatarBytecode characteristic 未连接');
+  if (!(buf instanceof Uint8Array)) buf = new Uint8Array(buf);
+  if (buf.length === 0 || buf.length > 32 * 1024) {
+    throw new Error(`大小超出范围（${buf.length} B，允许 1..32768）`);
+  }
+  // op=begin [total:u16 LE]
+  const begin = new Uint8Array(3);
+  begin[0] = 0x00;
+  begin[1] = buf.length & 0xff;
+  begin[2] = (buf.length >> 8) & 0xff;
+  await writeEncrypted(chrAvatarBc, begin);
+
+  // op=data [bytes...]
+  let off = 0;
+  while (off < buf.length) {
+    const take = Math.min(AVBC_CHUNK_PAYLOAD, buf.length - off);
+    const chunk = new Uint8Array(1 + take);
+    chunk[0] = 0x01;
+    chunk.set(buf.subarray(off, off + take), 1);
+    await writeEncrypted(chrAvatarBc, chunk);
+    off += take;
+    if (typeof onProgress === 'function') onProgress(off, buf.length);
+  }
+  // op=commit
+  await writeEncrypted(chrAvatarBc, new Uint8Array([0x02]));
+
+  const respBytes = await readEncrypted(chrAvatarBc);
+  const resp = dec.decode(respBytes);
+  try { return { json: JSON.parse(resp), raw: resp }; }
+  catch { return { json: null, raw: resp }; }
+}
+
+// Reset (op=0xff) — clear NVS override + revert to firmware-embedded default.
+async function avbcSendReset() {
+  if (!chrAvatarBc) throw new Error('AvatarBytecode characteristic 未连接');
+  await writeEncrypted(chrAvatarBc, new Uint8Array([0xff]));
+  const respBytes = await readEncrypted(chrAvatarBc);
+  const resp = dec.decode(respBytes);
+  try { return { json: JSON.parse(resp), raw: resp }; }
+  catch { return { json: null, raw: resp }; }
+}
+
+// Editor UI (compile / presets / downloads / .avdsl load / .avbc direct
+// send) is shared with the Wi-Fi page via settings_common.js — this page
+// only supplies the BLE transport adapter. avbcSendBytecode's response
+// JSON ({state, received, error}) is normalised to the shared
+// {ok, saved, note, raw} shape here.
+const dslEditor = StackchanSettings.setupDslEditor({
+  isConnected: () => !!chrAvatarBc,
+  notConnectedMsg: 'BLE 未连接',
+  compilerMissingMsg: 'DSL 编译器包加载失败（离线 file:// 下尚未注入）',
+  async send(u8, onProgress) {
+    const r = await avbcSendBytecode(u8, onProgress);
+    if (r.json && r.json.state === 'done') {
+      return { ok: true, saved: r.json.received, note: '', raw: r.raw };
+    }
+    if (r.json && r.json.state === 'failed') {
+      return { ok: false, error: r.json.error || 'unknown', raw: r.raw };
+    }
+    return { ok: true, saved: null, raw: r.raw };
+  },
+  async reset() {
+    const r = await avbcSendReset();
+    return { raw: r.raw };
+  },
+});
+
+function refreshAvbcButton() {
+  if (dslEditor) dslEditor.refreshButtons();
+}
+
+// MCP API token gen/show/clear + auth-password clear — shared with the
+// Wi-Fi page (settings_common.js). The clear paths set dataset.cleared so
+// the Apply path sends an explicit empty value.
+StackchanSettings.setupSecretFields();
+
+// ===== Battery (READ + poll) ================================================
+// Decode the 5-byte Battery payload [mV u16 LE][mA i16 LE][pct i8] into a label.
+function formatBattery(mv, ma, pct) {
+  if (mv === 0xFFFF || mv < 0) return '—';
+  const v = (mv / 1000).toFixed(2) + 'V';
+  const c = ma + 'mA';
+  return (pct >= 0 ? pct + '% ' : '') + v + ' ' + c;
+}
+async function refreshBattery() {
+  if (!chrBattery || !aesKey) return;
+  try {
+    const b = await readEncrypted(chrBattery);
+    if (b.length < 5) return;
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    const mv = dv.getUint16(0, true);
+    const ma = dv.getInt16(2, true);
+    const pct = dv.getInt8(4);
+    document.getElementById('dis-battery').textContent = formatBattery(mv, ma, pct);
+  } catch (e) {
+    // Transient read error (e.g. mid-disconnect) — leave the last value.
+  }
+}
+
+// ===== Tab switching ========================================================
+// Activates a `.tab-panel` by its data-tab name and persists the choice to
+// localStorage so a reload returns to the same tab. The 5 tabs replace the old
+// <details> stack (see plan-md-lucky-dongarra.md). All existing section IDs
+// (#avatar-section, #led-section, etc.) live inside their respective panels so
+// no event listener or chr-probing code needed to change.
+StackchanSettings.setupTabs('stackchan.settings.ble.activeTab');
+</script>
+</body>
+</html>

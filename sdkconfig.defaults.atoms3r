@@ -1,0 +1,31 @@
+# M5Stack AtomS3R + Atomic ECHO BASE — Atom-nyan board profile.
+# Selected by `make build BOARD=atoms3r`.
+#
+# AtomS3R is built on the ESP32-S3-PICO-1-N8R8 module, whose 8 MB PSRAM is
+# wired as Octal (OPI). The bootloader picks the mode at link time and a
+# Quad-mode firmware can't probe the chip at all (PSRAM ID read error 0xff),
+# so this is a separate firmware image from the CoreS3 one.
+CONFIG_SPIRAM_MODE_OCT=y
+# Octal PSRAM on the S3 supports 80 MHz reliably with the standard 40 MHz
+# flash. (120 MHz is possible but requires CONFIG_ESPTOOLPY_FLASH_SAMPLE_MODE
+# tuning that we don't need for the small avatar canvas.)
+CONFIG_SPIRAM_SPEED_80M=y
+
+# 8 MB external SPI flash (N8 half of the ESP32-S3-PICO-1-N8R8 module).
+# Our partitions.csv uses 0x710000 of flash (bootloader + nvs + 2× 3 MB OTA
+# + 1 MB storage), comfortably under 8 MB.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+
+# アプリが 3 MB を超えたため app 領域を拡張した 8 MB 表を使う (partitions_8mb.csv)。
+# 移行は USB 書き込み必須・storage データはリセット (旧表の機体は OTA 不可)。
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_8mb.csv"
+
+# HMM (hts_engine) 音声合成。専用 voice パーティションは無い (8 MB) ので、
+# hmm_voice が待機側 OTA スロットをボイス置き場に流用する (OTA 更新で消える)。
+CONFIG_JTTS_ENABLE_HMM=y
+
+# HMM の idle 合成 (ランダム発話) は main タスク (run_demo_loop) 上で走り、
+# hts のラベル生成 + 合成が既定 8 KiB スタックを溢れさせる (cores3/stopwatch と
+# 同じ理由で 16 KiB 必要)。HMM 有効ボードでは必須。
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384

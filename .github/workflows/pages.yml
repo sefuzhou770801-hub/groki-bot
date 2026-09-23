@@ -1,0 +1,207 @@
+name: Deploy GitHub Pages
+
+# Stages docs/ + every published release's firmware ZIP into a single static
+# site. Refreshed on doc edits, on each release publish, and on demand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      # tools/settings.html is the canonical source; pages.yml copies it
+      # into _site/. Without this trigger the hosted settings page stays
+      # stale when settings.html is the only file that changed.
+      - 'tools/settings.html'
+      # Shared settings-page helpers, loaded by settings.html as a sibling
+      # <script src> — deployed next to it (and inlined into the firmware's
+      # settings_wifi.html at build time).
+      - 'tools/settings_common.js'
+      # The avatar preview module (avatar_module.js) and standalone
+      # avatar.html are built from these on every deploy; rebuild when the
+      # source, the VM, the JS DSL compiler or the default DSL changes.
+      - 'wasm/**'
+      - 'components/avatar/**'
+      - 'components/avatar_vm/**'
+      - 'tools/avatar_dsl/**'
+      # All DSL preset sources (default / omega / future additions) are
+      # inlined into avatar.html + settings_wifi.html via inject.mjs, so a
+      # change to any of them must rebuild the Pages site.
+      - 'assets/*.avdsl'
+      # HMM voice catalog: the .htsvoice files + voices.json manifest served
+      # for the on-device "サーバーから取得" install path (voice_fetch).
+      - 'assets/voices/**'
+      - 'assets/voices.json'
+      - '.github/workflows/pages.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # tl_expected is a submodule that the avatar_vm now depends on
+          # (`<tl/expected.hpp>`). M5GFX / M5Unified aren't touched by the
+          # WASM build but checking everything keeps things simple.
+          submodules: recursive
+
+      - name: Build avatar preview module (Emscripten/WASM)
+        run: |
+          set -euo pipefail
+          # Same Docker image + script used locally (wasm/build.sh). Produces
+          # build/avatar_web/avatar_module.js (single-file, wasm embedded) +
+          # avatar.html (standalone shell with the DSL editor).
+          bash wasm/build.sh
+          test -f build/avatar_web/avatar_module.js
+          test -f build/avatar_web/avatar.html
+
+      - name: Stage docs/ + tools/settings.html + avatar module into _site/
+        run: |
+          mkdir -p _site
+          cp -a docs/. _site/
+          # Canonical settings page lives under tools/ for local development
+          # (file:// + sshfs / python http.server). For deploy we run
+          # tools/avatar_dsl/inject.mjs to inline the DSL compiler bundle
+          # and the preset sources — same script that processes
+          # settings_wifi.html for the firmware build, so the two pages
+          # offer identical authoring UX (the difference is the send path:
+          # HTTP POST on the Wi-Fi page, BLE chr 0x21 chunked write here).
+          # Without injection the page still works in file:// dev — the
+          # DSL editor just reports "コンパイラ未起動".
+          node tools/avatar_dsl/inject.mjs \
+              tools/settings.html \
+              _site/settings.html \
+              "default=assets/default_face.avdsl" \
+              "omega=assets/omega_mouth.avdsl" \
+              "aokko=assets/aokko_face.avdsl" \
+              "grok=assets/grok_face.avdsl"
+          # Shared settings-page helpers — settings.html references this as
+          # a sibling <script src="settings_common.js">.
+          cp tools/settings_common.js _site/settings_common.js
+          # Avatar preview module embedded by settings.html (built above).
+          cp build/avatar_web/avatar_module.js _site/avatar_module.js
+          # Standalone preview page (shell UI + canvas + DSL editor) — same
+          # WASM blob inlined via SINGLE_FILE, no sibling asset deps.
+          cp build/avatar_web/avatar.html _site/avatar.html
+          # HMM voice catalog for the on-device server-fetch install path:
+          #   _site/voices.json            (manifest the device proxies via /api/voices)
+          #   _site/voices/<id>.htsvoice   (voice_fetch downloads voices/<id>.htsvoice)
+          # Only staged when present so the repo can ship without bundled
+          # voices. .htsvoice files are license-clean (CC BY); attribution is
+          # in the manifest + the LICENSE_* files copied alongside.
+          if [ -d assets/voices ]; then
+            mkdir -p _site/voices
+            cp -a assets/voices/. _site/voices/
+          fi
+          if [ -f assets/voices.json ]; then
+            cp assets/voices.json _site/voices.json
+          fi
+
+      - name: Stage release firmware ZIPs into _site/firmware/<tag>/
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p _site/firmware
+          # Retention floor: only mirror releases >= this tag onto Pages.
+          # The site artifact bundles every mirrored release's ZIPs plus the
+          # extracted per-board stackchan_idf.bin (~25 MB per release) and
+          # was closing in on the 1 GB Pages limit (805 MB at v0.8.4).
+          # Older releases stay fully downloadable from the GitHub Releases
+          # page — raising this floor only prunes the Pages mirror (and the
+          # versions.json entries the Web Flasher / release-fetch OTA offer).
+          # groki-bot 自 v0.1.0 起独立编号，上游遗留的 v0.7.0 门槛会把我们的
+          # 全部版本跳过（2026-09-15 首发时 versions.json 为空）。
+          RETAIN_FLOOR="v0.1.0"
+          tags_json=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+                        --json tagName,isDraft,isPrerelease)
+          mapfile -t tags < <(echo "$tags_json" | jq -r '.[] | select(.isDraft|not) | .tagName')
+
+          # Per-tag JSON object. For each tag we stage every firmware-*.zip
+          # asset and classify it by board suffix in the filename:
+          #   firmware-vX.Y.Z-cores3.zip    → boards.cores3
+          #   firmware-vX.Y.Z-atoms3r.zip   → boards.atoms3r
+          #   firmware-vX.Y.Z-atoms3.zip    → boards.atoms3
+          #   firmware-vX.Y.Z-stopwatch.zip → boards.stopwatch
+          #   firmware-vX.Y.Z.zip           → boards.cores3 (legacy single-zip releases)
+          : > /tmp/per_tag.ndjson
+          for tag in "${tags[@]}"; do
+            # Version-sort against the retention floor: skip anything older.
+            # `sort -V | head -1` yields the smaller of the two; if that's
+            # $tag (and it isn't the floor itself), it's below the floor.
+            if [ "$tag" != "$RETAIN_FLOOR" ] && \
+               [ "$(printf '%s\n' "$tag" "$RETAIN_FLOOR" | sort -V | head -1)" = "$tag" ]; then
+              echo "[skip] $tag: below retention floor $RETAIN_FLOOR"
+              continue
+            fi
+            assets=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+                     --jq '.assets[] | select(.name|test("^firmware-.*\\.zip$")) | .name')
+            if [ -z "$assets" ]; then
+              echo "[skip] $tag: no firmware ZIP asset"
+              continue
+            fi
+            dest="_site/firmware/$tag"
+            mkdir -p "$dest"
+            boards_json='{}'
+            while IFS= read -r asset; do
+              [ -z "$asset" ] && continue
+              gh release download "$tag" --repo "$GITHUB_REPOSITORY" -p "$asset" -D "$dest" --clobber
+              # Extract board suffix; legacy un-suffixed zips map to cores3.
+              base="${asset%.zip}"
+              suffix="${base##*-}"
+              case "$suffix" in
+                cores3|atoms3r|atoms3|stopwatch) board="$suffix" ;;
+                *)                              board="cores3" ;; # legacy fallback
+              esac
+              boards_json=$(echo "$boards_json" | jq --arg b "$board" --arg z "$asset" '.[$b] = $z')
+              # Also extract the OTA payload (stackchan_idf.bin — app
+              # partition image only, NOT the firmware-<tag>-<board>.bin
+              # combined image which includes bootloader/partition table)
+              # and stage it at a stable URL for the on-device
+              # /api/ota/release endpoint:
+              #   firmware/<tag>/<board>/stackchan_idf.bin
+              # Skip silently if the ZIP doesn't contain one (older
+              # releases pre-OTA-release support).
+              if unzip -p "$dest/$asset" stackchan_idf.bin > /tmp/sc.bin 2>/dev/null \
+                 && [ -s /tmp/sc.bin ]; then
+                mkdir -p "$dest/$board"
+                mv /tmp/sc.bin "$dest/$board/stackchan_idf.bin"
+                echo "[ok] $tag/$board/stackchan_idf.bin ($(stat -c%s "$dest/$board/stackchan_idf.bin") bytes)"
+              fi
+              echo "[ok] $tag/$board -> $dest/$asset"
+            done <<< "$assets"
+            echo "{\"tag\":\"$tag\",\"boards\":$boards_json}" >> /tmp/per_tag.ndjson
+          done
+
+          # versions.json: ordered list of {tag, boards: {cores3?, atoms3r?, atoms3?, stopwatch?}}.
+          jq -s '.' < /tmp/per_tag.ndjson > _site/versions.json
+          echo "--- versions.json ---"
+          cat _site/versions.json
+          echo "--- _site/firmware ---"
+          find _site/firmware -maxdepth 2 -type f | sort
+
+      - uses: actions/configure-pages@v5
+        with:
+          # Auto-enable GitHub Pages with the "GitHub Actions" source on
+          # first run. Without this the action returns 404 ("Get Pages
+          # site failed") unless someone manually enables Pages in
+          # Settings → Pages first.
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

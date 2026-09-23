@@ -1,0 +1,215 @@
+# Common defaults for stackchan-idf (target-independent).
+# Per-target overrides live in sdkconfig.defaults.<target>.
+
+# OTA-friendly partition layout (see partitions.csv).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_TWO_OTA=n
+CONFIG_PARTITION_TABLE_SINGLE_APP=n
+
+# Bootloader rollback.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# The app must fit two 4 MiB OTA slots; global -Os buys that headroom.
+# Render-hot components (avatar, avatar_vm, M5GFX) opt back into -O2 in
+# their CMakeLists / the project CMakeLists to keep the 30 fps loop fast.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Logging.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Main task (runs app_main → demo_loop forever, incl. jtts babble synthesis).
+# Measured peak use is ~3.9 KiB (diag_stack_hwm 2026-06-12: HWM=8432 of
+# 12288); 8 KiB leaves >4 KiB margin. The previous 12 KiB was budgeted for a
+# BLE-provisioning (protocomm) flow that no longer exists in this firmware.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# Millisecond-granularity scheduling for the 33 ms / 20 ms task loops.
+CONFIG_FREERTOS_HZ=1000
+
+# Bluetooth (NimBLE) — custom BLE settings GATT service, always-on advertising.
+# ESP32-S3 defaults the BT host to Bluedroid; disable that and pick NimBLE.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_CONTROLLER_ENABLED=y
+# CONFIG_BT_BLUEDROID_ENABLED is not set
+CONFIG_BT_NIMBLE_ENABLED=y
+
+# NimBLE host dynamic pools → PSRAM (internal-RAM regression fix, v0.8.0).
+# IDF 5.5 flipped CONFIG_BT_NIMBLE_STATIC_TO_DYNAMIC on by default: the
+# NimBLE host mbuf / msys / connection pools that used to be static .bss are
+# now malloc()'d at ble_hs init. With the default MEM_ALLOC_MODE_INTERNAL
+# those ~15-18 KiB of pools land in *internal* heap at runtime — invisible
+# to `idf.py size` (static DRAM actually shrank ~4 KiB vs 5.4) but it is the
+# bulk of the ~20 KiB steady-state `INT free` drop measured on-device
+# (5.4: INT free≈29.5K → 5.5: ≈9.7K). Routing those now-dynamic pools to
+# PSRAM reclaims the internal heap. This is what lets release-ota's 16 KiB
+# worker stack (xTaskCreate → internal RAM) spawn again.
+#   Gated by Kconfig `depends on SPIRAM_USE_MALLOC`: the no-PSRAM atoms3
+#   profile (CONFIG_SPIRAM=n) can't satisfy it, so it silently stays on
+#   INTERNAL there — correct, and harmless.
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+
+# NimBLE tuning: single connection, opportunistic Just Works pairing with
+# Secure Connections. Bonds are persisted to NVS so a paired host reconnects
+# without re-pairing after a device reboot (Apply triggers a reboot).
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_MAX_BONDS=3
+CONFIG_BT_NIMBLE_SM_SC=y
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+
+# Required for components/config_service/crypto.cpp (X25519 + AES-256-GCM
+# application-layer encryption). HKDF is off by default in IDF's mbedtls.
+CONFIG_MBEDTLS_HKDF_C=y
+
+# OTA over BLE pushes 512B chunks through cJSON parsing + esp_ota_write +
+# SPI-flash drivers on the NimBLE host task. The 4 KiB default leaves no
+# headroom and overflowed once chunked writes started landing. 8 KiB matches
+# what the bleprph OTA examples use and gives a comfortable margin.
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=8192
+CONFIG_BT_NIMBLE_TASK_STACK_SIZE=8192
+
+# Push memory-hungry users to PSRAM. The OpenAI Realtime conversation pulls a
+# 24 kHz pcm16 stream through a TLS WebSocket; with mbedtls keeping its
+# handshake / record buffers in internal RAM by default the device sat at
+# ~67 B of internal heap during peak, which made the next handshake's RSA /
+# AES allocations fail at random. The three switches below let the wifi /
+# lwIP / mbedtls layers fall back to PSRAM for the large transient buffers.
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+
+# Default 16 KiB keeps every allocation < 16 KiB pinned to internal RAM
+# first, which fragments internal SRAM heavily and starves the AES hardware
+# DMA descriptor allocator (esp-aes "Failed to allocate memory") during
+# Gemini WS reconnects. 1 KiB means only genuinely small allocations
+# (FreeRTOS queues, sockaddr_in, etc.) prefer internal; cJSON parses /
+# WebSocket buffers / TLS scratch all land in PSRAM, leaving the internal
+# heap contiguous enough for the AES DMA descriptors to slot in.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+
+# Keep hardware AES on (ESP32-S3 doesn't expose hardware-accelerated GCM
+# — GHASH is always done in software here regardless of config). The AES
+# block operation uses a small DMA descriptor in internal RAM; the
+# ALWAYSINTERNAL bump above is what keeps that allocation reliable under
+# WebSocket reconnect pressure.
+CONFIG_MBEDTLS_HARDWARE_AES=y
+
+# Bump the preferred ATT MTU to the maximum (517 bytes). Default is 256,
+# which forces our 508 B encrypted OTA chunks through a 3-frame Prepared
+# Write per chunk; with MTU 517 the chunk fits in a single
+# ATT_WRITE_REQ / ATT_WRITE_CMD, removing 2 RTTs per chunk. Combined
+# with the WRITE_NO_RSP flag on OtaData this is what makes pipelined
+# OTA possible.
+CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=517
+
+# HTTP server URI handler defaults are too small once wifi_config_service
+# registers ~20 routes plus the static root. Raise the cap so http_server
+# initialisation doesn't silently drop late registrations.
+CONFIG_HTTPD_MAX_URI_LEN=128
+
+# Chrome's HTTP request headers (Sec-CH-UA-*, Accept, User-Agent, Cookie,
+# Origin, Referer) routinely exceed 1 KiB. The default 512 B cap triggers
+# "Header fields are too long" 431 responses from esp_http_server. 4 KiB
+# leaves plenty of headroom for Chrome's growing client-hint set.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=4096
+
+# mDNS hostname is set at runtime to "stackchan-XXXXXX", but Kconfig still
+# wants a build-time default; keep it short and meaningless.
+CONFIG_MDNS_RESOLVE_TEST_SERVICES=n
+
+# Use the BSD-socket networking backend for mDNS instead of the legacy raw-lwIP
+# path. With the raw path + Wi-Fi (and IPv6 enabled, so mDNS also joins the
+# IPv6 group) the IPv4 mDNS group 224.0.0.251 stops being delivered to the
+# station — its multicast MAC never makes it into the Wi-Fi RX filter, so the
+# responder never sees multicast queries and `stackchan-XXXXXX.local` won't
+# resolve (unicast / HTTP / RTP still work). A plain BSD socket joining the
+# same group receives it fine, so the socket backend fixes reception.
+CONFIG_MDNS_NETWORKING_SOCKET=y
+
+# Advertise preferred connection parameters via the GAP service so the
+# central can pick a tight interval from the start. Values are in
+# 1.25 ms units: 12–24 = 15–30 ms. Combined with the active update
+# we issue in BLE_GAP_EVENT_CONNECT (config_service.cpp) this drops
+# the typical 30–50 ms Chrome default to ~15 ms, which is the single
+# biggest lever on OTA throughput. Supervision timeout 400 = 4 s.
+# 6 × 1.25 ms = 7.5 ms minimum, 12 × 1.25 ms = 15 ms max. The audio streamer
+# wants the tightest CI the central can stomach; if the peer narrows the
+# range we'll still end up at whatever it accepts. Without this we landed
+# at 30 ms which capped throughput at ~5 KiB/s.
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_MIN_CONN_INTERVAL=6
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_MAX_CONN_INTERVAL=12
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_SLAVE_LATENCY=0
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_SUPERVISION_TMO=400
+
+# Free internal (DMA-capable) RAM for the esp-aes hardware accelerator.
+# Symptom: after a Gemini WebSocket transport error, the reconnect's TLS
+# handshake fails with "esp-aes: Failed to allocate memory" → SSL write
+# error → immediate disconnect, looping forever. Cause: internal heap
+# largest-free-block stuck at ~6.6 KiB because Wi-Fi static RX buffers +
+# NimBLE ACL pool consume most DMA-capable SRAM. Trimming both reclaims
+# ~10 KiB of contiguous internal RAM, enough for the AES DMA descriptor +
+# transient mbedtls handshake buffers.
+#   - Static RX 10 → 6: 4 × ~1.6 KiB internal DMA buffers freed. 6 is
+#     still ample for a single STA streaming ~12 KiB/s of audio.
+# NimBLE ACL stays at the IDF default (24). An earlier 16 here cut BLE
+# audio RX headroom for no real benefit once ALWAYSINTERNAL=1024 freed the
+# internal heap; the real esp-aes fix is the ALWAYSINTERNAL value, not
+# trimming ACL buffers.
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+# IDF enforces WIFI_RX_BA_WIN <= 2 × WIFI_STATIC_RX_BUFFER_NUM at compile
+# time (esp_wifi/src/wifi_init.c). With static RX dropped to 6 the window
+# must be <= 12; pin it to 6 (the conservative default) so a fresh build
+# from defaults doesn't trip the #error.
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+
+# Full 16 KiB TLS inbound record. Must equal the TLS spec max (2^14) because
+# a peer may legally send a record whose plaintext is up to 16384 B, and
+# mbedtls has no way to negotiate a smaller inbound limit unless the server
+# honours max_fragment_length (Fastly / GitHub-Pages-CDN do NOT).
+#
+# Symptom this fixes: device-side release-fetch OTA (release_ota.cpp) pulls
+# the ~3 MB .bin from www.fugafuga.org (GitHub Pages custom domain → Fastly).
+# fetch_headers succeeded but the FIRST esp_http_client_read failed with
+#     esp-tls-mbedtls: read error :-0x7100
+# -0x7100 is MBEDTLS_ERR_SSL_BAD_INPUT_DATA, returned by
+# mbedtls_ssl_fetch_input() (ssl_msg.c ~L2163: "requesting more data than
+# fits") — NOT the -0x7200 INVALID_RECORD path. For bulk bodies Fastly emits
+# full 16 KiB TLS records; ssl_parse_record_header() does NOT clamp the TLS
+# (non-DTLS) record length against IN_CONTENT_LEN, so ssl_get_next_record()
+# calls fetch_input(rec.buf_len) with buf_len > MBEDTLS_SSL_IN_BUFFER_LEN
+# (derived from IN_CONTENT_LEN=8192) and the "fits" check trips. 16384 is the
+# only value that guarantees any conformant record fits.
+#
+# Internal-RAM cost of the bump is ~zero on this (PSRAM) profile:
+#   - MBEDTLS_EXTERNAL_MEM_ALLOC=y (above) puts the in/out record buffers in
+#     PSRAM, so the +8 KiB in-buffer growth is PSRAM, not internal SRAM.
+#   - MBEDTLS_DYNAMIC_BUFFER=y only allocates the RX buffer while a TLS conn
+#     is live (freed at handshake end / close), and the WSS conversation +
+#     OTA fetch are the only two TLS conns; even both live = +16 KiB PSRAM.
+#   - The esp-aes hardware path does NOT bounce the whole record into
+#     internal RAM. On ESP32-S3 esp_aes_process_dma_ext_ram() chunks a
+#     PSRAM-resident record into internal RAM AES_MAX_CHUNK_WRITE_SIZE=1600 B
+#     at a time (mbedtls/port/aes/dma/esp_aes_dma_core.c), so the internal
+#     bounce peak is fixed at ~1.6 KiB regardless of IN_CONTENT_LEN. (The old
+#     "8 KiB halves the 16 KiB bounce" comment here predated that chunking
+#     and no longer holds for 5.5.4.)
+# ASYMMETRIC_CONTENT_LEN=y (IDF default) keeps OUT_CONTENT_LEN at 4096, so
+# raising IN does not inflate the (client→server) out buffer.
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=16384
+CONFIG_MBEDTLS_DYNAMIC_FREE_CONFIG_DATA=y
+
+# SRAM-shortage diagnostics: enable uxTaskGetSystemState() so main/diag.cpp
+# can dump per-task stack high-water marks (the data the stack-size budget
+# decisions are based on — guessing sizes broke boot twice, see plan notes).
+# TCB cost is a few tens of bytes per task; ~10 tasks ≈ <1 KiB internal RAM.
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+
+# Wi-Fi static TX buffers are DMA-capable internal RAM, ~1.6 KiB each.
+# 16 was ~25.6 KiB of the exact pool conversation_task's seg_buf_ and the
+# TLS/esp-aes bounce buffers fight over at boot (measured: Wi-Fi bring-up
+# consumed ~39 KiB in the 2 s before conv-task init, leaving largest=7.6 KiB
+# and failing an 8 KiB alloc). Gemini Live keeps <6 frames in flight
+# (TX BA window = 6), so 10 buffers is still comfortable; failure mode if
+# exhausted is a TCP retransmit (latency, not loss).
+CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=10

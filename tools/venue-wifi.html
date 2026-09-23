@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>螃蟹会场一键配网</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
+    max-width: 420px; margin: 40px auto; padding: 0 20px;
+    background: #f6f4f0; color: #1a1a1a;
+  }
+  h1 { font-size: 1.35rem; margin: 0 0 0.35rem; }
+  .sub { color: #666; font-size: 0.9rem; margin-bottom: 1.4rem; line-height: 1.45; }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin: 0.85rem 0 0.3rem; }
+  input {
+    width: 100%; box-sizing: border-box; font-size: 1rem;
+    padding: 0.7rem 0.8rem; border: 1px solid #ccc; border-radius: 10px;
+  }
+  .hint { font-size: 0.78rem; color: #888; margin-top: 0.25rem; }
+  .lock { background: #eee; color: #555; }
+  button {
+    width: 100%; margin-top: 0.7rem; padding: 0.85rem;
+    font-size: 1.05rem; font-weight: 650; border: 0; border-radius: 12px;
+    cursor: pointer;
+  }
+  #btn-go { background: #1d6b3a; color: white; }
+  #btn-go:disabled { background: #9bb5a5; cursor: not-allowed; }
+  .status {
+    margin-top: 1rem; padding: 0.75rem 0.9rem; border-radius: 10px;
+    background: #fff; font-size: 0.88rem; line-height: 1.5;
+    min-height: 3.2em;
+  }
+  .ok { color: #1d6b3a; }
+  .err { color: #b42318; }
+  .note { margin-top: 1.2rem; font-size: 0.78rem; color: #888; line-height: 1.45; }
+</style>
+</head>
+<body>
+  <h1>螃蟹会场一键配网</h1>
+  <p class="sub">Chrome 打开这一页。只改热点，网关不动。必须是桌面 Chrome 或 Edge。</p>
+
+  <label for="ssid">手机热点名称（2.4G）</label>
+  <input id="ssid" type="text" maxlength="32" autocomplete="off" placeholder="热点名">
+
+  <label for="password">热点密码</label>
+  <input id="password" type="password" maxlength="64" autocomplete="off">
+  <p class="hint">空密码留空即可。</p>
+
+  <label>网关（设备里已配置，本页不改）</label>
+  <input class="lock" value="ws://&lt;网关局域网地址&gt;:8765" readonly>
+
+  <button id="btn-go">连接螃蟹并写入</button>
+  <div class="status" id="log">还没开始。</div>
+  <p class="note">写完蟹会重启。蓝牙用完立刻断开。网关电脑要先连上同一个热点并启动网关。</p>
+
+<script>
+const SVC_UUID  = 'e3f0a000-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_SSID  = 'e3f0a001-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_PASS  = 'e3f0a002-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_APPLY = 'e3f0a004-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_STATUS= 'e3f0a005-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const CHR_KX    = 'e3f0a006-7b1c-4d2a-9e6f-2c5a8d4b1f00';
+const GATEWAY   = 'ws://<网关局域网地址>:8765'; // 仅作提示；本页不写网关
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const logEl = document.getElementById('log');
+function log(msg, cls) {
+  logEl.className = 'status' + (cls ? ' ' + cls : '');
+  logEl.textContent = msg;
+}
+
+let aesKey = null;
+let chrSsid = null, chrPass = null, chrApply = null, chrStatus = null, chrKx = null;
+
+function strToBytes(s) { return enc.encode(s); }
+
+async function ensureX25519Supported() {
+  try {
+    await crypto.subtle.generateKey({ name: 'X25519' }, false, ['deriveBits']);
+  } catch (e) {
+    throw new Error('浏览器太旧，需要 Chrome / Edge 133 以上');
+  }
+}
+
+async function setupSession(saltBytes = new Uint8Array(0)) {
+  const devicePubRaw = new Uint8Array((await chrKx.readValue()).buffer);
+  if (devicePubRaw.length !== 32) throw new Error('设备公钥长度不对');
+  const ourKp = await crypto.subtle.generateKey({ name: 'X25519' }, false, ['deriveBits']);
+  const devicePub = await crypto.subtle.importKey('raw', devicePubRaw, { name: 'X25519' }, false, []);
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: 'X25519', public: devicePub }, ourKp.privateKey, 256);
+  const ikm = await crypto.subtle.importKey('raw', sharedBits, { name: 'HKDF' }, false, ['deriveKey']);
+  aesKey = await crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: saltBytes, info: enc.encode('stackchan-config-v1') },
+    ikm, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const ourPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', ourKp.publicKey));
+  await chrKx.writeValueWithResponse(ourPubRaw);
+}
+
+async function writeEncrypted(chr, plainBytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ctTag = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plainBytes));
+  const wire = new Uint8Array(iv.length + ctTag.length);
+  wire.set(iv, 0);
+  wire.set(ctTag, iv.length);
+  await chr.writeValueWithResponse(wire);
+}
+
+async function readEncrypted(chr) {
+  const wire = new Uint8Array((await chr.readValue()).buffer);
+  if (wire.length < 12 + 16) throw new Error('encrypted read too short');
+  const iv = wire.subarray(0, 12);
+  const ctTag = wire.subarray(12);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ctTag));
+}
+
+async function ensureAuthenticated() {
+  if (!chrStatus) return;
+  try {
+    await readEncrypted(chrStatus);
+    return;
+  } catch (_) {}
+  const pwd = window.prompt('螃蟹设了蓝牙密码，请输入：') || '';
+  if (!pwd) throw new Error('没填蓝牙密码');
+  const salt = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(pwd)));
+  await setupSession(salt);
+  try {
+    await readEncrypted(chrStatus);
+  } catch (e) {
+    throw new Error('蓝牙密码不对');
+  }
+}
+
+document.getElementById('btn-go').addEventListener('click', async () => {
+  const ssid = document.getElementById('ssid').value.trim();
+  const pass = document.getElementById('password').value;
+  if (!ssid) { log('先填热点名。', 'err'); return; }
+  if (!navigator.bluetooth) {
+    log('必须用桌面 Chrome 或 Edge 打开这一页。Safari 不行。', 'err');
+    return;
+  }
+  const btn = document.getElementById('btn-go');
+  btn.disabled = true;
+  try {
+    await ensureX25519Supported();
+    log('正在找螃蟹…');
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SVC_UUID] }],
+      optionalServices: [SVC_UUID],
+    });
+    log('连上 ' + (device.name || '螃蟹') + '，开始握手…');
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC_UUID);
+    const grab = async (uuid) => {
+      try { return await svc.getCharacteristic(uuid); } catch { return null; }
+    };
+    chrSsid = await grab(CHR_SSID);
+    chrPass = await grab(CHR_PASS);
+    chrApply = await grab(CHR_APPLY);
+    chrStatus = await grab(CHR_STATUS);
+    chrKx = await grab(CHR_KX);
+    if (!chrKx || !chrSsid || !chrPass || !chrApply) {
+      throw new Error('这台固件缺配网通道，没法写 Wi-Fi');
+    }
+    await setupSession();
+    await ensureAuthenticated();
+    try {
+      const cur = dec.decode(await readEncrypted(chrSsid));
+      if (cur) log('当前热点是 ' + cur + '。正在写入新热点…');
+    } catch (_) {
+      log('正在写入热点…');
+    }
+    await writeEncrypted(chrSsid, strToBytes(ssid));
+    if (pass) await writeEncrypted(chrPass, strToBytes(pass));
+    log('已写入。网关仍是 ' + GATEWAY + '。正在保存并重启…');
+    try {
+      await writeEncrypted(chrApply, new Uint8Array([0x01]));
+    } catch (e) {
+      if (!(e.message && e.message.toLowerCase().includes('disconnect'))) throw e;
+    }
+    log('写完了。螃蟹在重启。请断开蓝牙，等它连上新热点。', 'ok');
+    try { device.gatt.disconnect(); } catch (_) {}
+  } catch (e) {
+    if (e.name === 'NotFoundError') {
+      log('没选设备。再点一次，选螃蟹。', 'err');
+    } else {
+      log(e.message || String(e), 'err');
+    }
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

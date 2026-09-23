@@ -1,0 +1,622 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org> -->
+<!-- SPDX-License-Identifier: BSL-1.0 -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack-chan Avatar (WASM)</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #1b1f24; color: #e6e6e6; }
+  h1 { font-size: 1.1rem; margin: 0 0 .6rem; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 1.2rem; padding: 1rem; }
+  .stage { flex: 0 0 auto; }
+  canvas { width: 640px; height: 480px; max-width: 90vw; image-rendering: pixelated;
+           background: #000; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.5); }
+  .sizebar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 0 0 .6rem;
+             font-size: .82rem; color: #cdd3da; }
+  .sizebar input[type=number] { width: 5rem; background: #1b1f24; color: #e6e6e6;
+             border: 1px solid #3a4048; border-radius: 4px; padding: .2rem .4rem; }
+  .sizebar button { background: #444b54; color: #fff; border: none; border-radius: 5px;
+             padding: .25rem .6rem; font-size: .8rem; cursor: pointer; }
+  .sizebar button:hover { background: #525a64; }
+  .sizebar #size-apply { background: #2d6cdf; }
+  .sizebar .presets { display: inline-flex; gap: .3rem; flex-wrap: wrap; }
+  .panel { flex: 1 1 320px; min-width: 300px; max-width: 480px; background: #262b31;
+           border-radius: 8px; padding: 1rem; }
+  fieldset { border: 1px solid #3a4048; border-radius: 6px; margin: 0 0 .8rem; padding: .5rem .7rem; }
+  legend { padding: 0 .4rem; color: #9fd3ff; font-size: .85rem; }
+  .row { display: flex; align-items: center; gap: .5rem; margin: .35rem 0; font-size: .85rem; }
+  .row label { flex: 0 0 8.5rem; }
+  .row input[type=range] { flex: 1 1 auto; }
+  .row .val { flex: 0 0 3.2rem; text-align: right; color: #9fd3ff; font-variant-numeric: tabular-nums; }
+  select, input[type=number] { background: #1b1f24; color: #e6e6e6; border: 1px solid #3a4048;
+           border-radius: 4px; padding: .2rem .4rem; }
+  #status { font-size: .8rem; color: #8a929b; padding: 0 1rem 1rem; }
+  .panel button { width: 100%; margin-bottom: .8rem; padding: .5rem; font-size: .9rem;
+                  background: #2d6cdf; color: #fff; border: none; border-radius: 6px;
+                  cursor: pointer; }
+  .panel button:hover { background: #3a78e8; }
+  .panel button.mini { width: auto; flex: 1; margin-bottom: 0; padding: .4rem; font-size: .82rem; }
+  .panel label.filebtn { flex: 1; text-align: center; padding: .4rem; font-size: .82rem;
+                         background: #444b54; color: #fff; border-radius: 6px; cursor: pointer; }
+  .panel label.filebtn:hover { background: #525a64; }
+  #preset-json { width: 100%; box-sizing: border-box; font-family: monospace; font-size: .75rem;
+                 background: #1b1f24; color: #e6e6e6; border: 1px solid #3a4048; border-radius: 4px;
+                 padding: .4rem; margin-bottom: .5rem; white-space: pre; }
+  .dslpanel { flex: 1 1 480px; min-width: 320px; background: #262b31; border-radius: 8px;
+              padding: 1rem; }
+  .dslpanel h2 { font-size: .95rem; margin: 0 0 .5rem; color: #9fd3ff; }
+  #dsl-src { width: 100%; box-sizing: border-box; height: 480px; font-family: ui-monospace,
+             SFMono-Regular, Menlo, monospace; font-size: .78rem; line-height: 1.35;
+             background: #1b1f24; color: #e6e6e6; border: 1px solid #3a4048; border-radius: 4px;
+             padding: .5rem; tab-size: 2; resize: vertical; white-space: pre; }
+  #dsl-msg { font-size: .78rem; color: #8a929b; margin: .4rem 0 .6rem; min-height: 1.1em;
+             white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, monospace; }
+  #dsl-msg.ok { color: #7fd47f; }
+  #dsl-msg.err { color: #f08080; }
+  .dslpanel .btns { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .4rem; }
+  .dslpanel .btns button { flex: 1 1 auto; padding: .45rem; font-size: .85rem;
+                           background: #2d6cdf; color: #fff; border: none; border-radius: 6px;
+                           cursor: pointer; }
+  .dslpanel .btns button:hover { background: #3a78e8; }
+  .dslpanel .btns button.alt { background: #444b54; }
+  .dslpanel .btns button.alt:hover { background: #525a64; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stage">
+      <h1>Stack-chan Avatar — ブラウザ描画 (Emscripten/WASM)</h1>
+      <div class="sizebar">
+        画面サイズ
+        <input type="number" id="scr-w" min="64" max="1280" step="1" value="320"> ×
+        <input type="number" id="scr-h" min="32" max="720" step="1" value="240">
+        <button type="button" id="size-apply">適用</button>
+        <span class="presets">
+          <button type="button" data-w="64" data-h="32">64×32</button>
+          <button type="button" data-w="128" data-h="128">128×128</button>
+          <button type="button" data-w="320" data-h="240">320×240</button>
+          <button type="button" data-w="1280" data-h="720">1280×720</button>
+        </span>
+      </div>
+      <canvas id="screen" width="320" height="240"></canvas>
+    </div>
+    <div class="panel">
+      <button type="button" id="reset-btn">すべてデフォルトに戻す</button>
+      <fieldset>
+        <legend>表情 / 口</legend>
+        <div class="row">
+          <label for="expr">表情 (expression)</label>
+          <select id="expr">
+            <option value="0">Neutral / Idle</option>
+            <option value="1">Happy</option>
+            <option value="2">Sad</option>
+            <option value="3">Angry</option>
+            <option value="4">Doubt</option>
+            <option value="5">Sleepy</option>
+            <option value="6">Listening</option>
+            <option value="7">Thinking</option>
+            <option value="8">Excited</option>
+            <option value="9">Curious</option>
+            <option value="10">Confused</option>
+            <option value="11">Surprised</option>
+            <option value="12">Dizzy</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="mouth">口の開き</label>
+          <input type="range" id="mouth" min="0" max="1" step="0.01" value="0">
+          <span class="val" id="mouth-v">0.00</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>サッカード (saccade)</legend>
+        <div class="row"><label for="sac-en">有効</label><input type="checkbox" id="sac-en" checked></div>
+        <div class="row">
+          <label for="sac-min">最小間隔 (ms)</label>
+          <input type="range" id="sac-min" min="100" max="3000" step="50" value="500">
+          <span class="val" id="sac-min-v">500</span>
+        </div>
+        <div class="row">
+          <label for="sac-max">最大間隔 (ms)</label>
+          <input type="range" id="sac-max" min="100" max="6000" step="50" value="2500">
+          <span class="val" id="sac-max-v">2500</span>
+        </div>
+        <div class="row">
+          <label for="sac-amp">視線振幅 (0–1)</label>
+          <input type="range" id="sac-amp" min="0" max="1" step="0.01" value="1">
+          <span class="val" id="sac-amp-v">1.00</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>手動視線 (manual gaze)</legend>
+        <div class="row"><label for="mg-en">手動で固定</label><input type="checkbox" id="mg-en"></div>
+        <div class="row">
+          <label for="mg-h">水平 H (−1–1)</label>
+          <input type="range" id="mg-h" min="-1" max="1" step="0.01" value="0">
+          <span class="val" id="mg-h-v">0.00</span>
+        </div>
+        <div class="row">
+          <label for="mg-v">垂直 V (−1–1)</label>
+          <input type="range" id="mg-v" min="-1" max="1" step="0.01" value="0">
+          <span class="val" id="mg-v-v">0.00</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>まばたき (blink)</legend>
+        <div class="row"><label for="blink-en">有効</label><input type="checkbox" id="blink-en" checked></div>
+        <div class="row">
+          <label for="blink-omin">開 最小 (ms)</label>
+          <input type="range" id="blink-omin" min="200" max="6000" step="100" value="2500">
+          <span class="val" id="blink-omin-v">2500</span>
+        </div>
+        <div class="row">
+          <label for="blink-omax">開 最大 (ms)</label>
+          <input type="range" id="blink-omax" min="200" max="8000" step="100" value="4500">
+          <span class="val" id="blink-omax-v">4500</span>
+        </div>
+        <div class="row">
+          <label for="blink-cmin">閉 最小 (ms)</label>
+          <input type="range" id="blink-cmin" min="50" max="1000" step="10" value="300">
+          <span class="val" id="blink-cmin-v">300</span>
+        </div>
+        <div class="row">
+          <label for="blink-cmax">閉 最大 (ms)</label>
+          <input type="range" id="blink-cmax" min="50" max="1500" step="10" value="500">
+          <span class="val" id="blink-cmax-v">500</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>呼吸 / 色</legend>
+        <div class="row"><label for="breath-en">呼吸 (breath)</label><input type="checkbox" id="breath-en" checked></div>
+        <div class="row"><label for="col-face">顔の色</label><input type="color" id="col-face" value="#ffffff"></div>
+        <div class="row"><label for="col-bg">背景色</label><input type="color" id="col-bg" value="#000000"></div>
+        <div class="row"><label for="direct-en">direct 描画 (PSRAM 無)</label><input type="checkbox" id="direct-en"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>表示パラメータ (レイアウト)</legend>
+        <div class="row"><label for="brow-show">眉を表示</label><input type="checkbox" id="brow-show" checked></div>
+        <div class="row">
+          <label for="eye-r">目の半径</label>
+          <input type="range" id="eye-r" min="2" max="20" step="0.5" value="8">
+          <span class="val" id="eye-r-v">8.0</span>
+        </div>
+        <div class="row">
+          <label for="eye-ox">目 横オフセット</label>
+          <input type="range" id="eye-ox" min="-40" max="40" step="1" value="0">
+          <span class="val" id="eye-ox-v">0</span>
+        </div>
+        <div class="row">
+          <label for="eye-oy">目 縦オフセット</label>
+          <input type="range" id="eye-oy" min="-40" max="40" step="1" value="0">
+          <span class="val" id="eye-oy-v">0</span>
+        </div>
+        <div class="row">
+          <label for="brow-ox">眉 横オフセット</label>
+          <input type="range" id="brow-ox" min="-40" max="40" step="1" value="0">
+          <span class="val" id="brow-ox-v">0</span>
+        </div>
+        <div class="row">
+          <label for="brow-oy">眉 縦オフセット</label>
+          <input type="range" id="brow-oy" min="-40" max="40" step="1" value="0">
+          <span class="val" id="brow-oy-v">0</span>
+        </div>
+        <div class="row">
+          <label for="mouth-ox">口 横オフセット</label>
+          <input type="range" id="mouth-ox" min="-60" max="60" step="1" value="0">
+          <span class="val" id="mouth-ox-v">0</span>
+        </div>
+        <div class="row">
+          <label for="mouth-oy">口 縦オフセット</label>
+          <input type="range" id="mouth-oy" min="-60" max="60" step="1" value="0">
+          <span class="val" id="mouth-oy-v">0</span>
+        </div>
+        <div class="row">
+          <label for="mouth-minw">口 最小幅</label>
+          <input type="range" id="mouth-minw" min="4" max="160" step="1" value="50">
+          <span class="val" id="mouth-minw-v">50</span>
+        </div>
+        <div class="row">
+          <label for="mouth-maxw">口 最大幅</label>
+          <input type="range" id="mouth-maxw" min="4" max="200" step="1" value="90">
+          <span class="val" id="mouth-maxw-v">90</span>
+        </div>
+        <div class="row">
+          <label for="mouth-minh">開口 最小 (閉)</label>
+          <input type="range" id="mouth-minh" min="1" max="60" step="1" value="4">
+          <span class="val" id="mouth-minh-v">4</span>
+        </div>
+        <div class="row">
+          <label for="mouth-maxh">開口 最大 (開)</label>
+          <input type="range" id="mouth-maxh" min="2" max="120" step="1" value="60">
+          <span class="val" id="mouth-maxh-v">60</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>プリセット (インポート / エクスポート)</legend>
+        <textarea id="preset-json" rows="7" spellcheck="false"
+                  placeholder='エクスポートで現在値を JSON 出力 / JSON を貼り付けてインポート'></textarea>
+        <div class="row" style="gap:.4rem">
+          <button type="button" class="mini" id="export-btn">エクスポート</button>
+          <button type="button" class="mini" id="import-btn">インポート</button>
+        </div>
+        <div class="row" style="gap:.4rem">
+          <button type="button" class="mini" id="copy-btn">クリップボードにコピー</button>
+        </div>
+        <div class="row" style="gap:.4rem">
+          <button type="button" class="mini" id="download-btn">ファイル保存</button>
+          <label class="filebtn" for="preset-file">ファイル読込</label>
+          <input type="file" id="preset-file" accept="application/json,.json" style="display:none">
+        </div>
+      </fieldset>
+    </div>
+    <div class="dslpanel">
+      <h2>顔描画 DSL — 編集して即時反映</h2>
+      <p style="font-size:.78rem;color:#cdd3da;margin:0 0 .6rem">
+        テキストを書き換えて「コンパイル &amp; 適用」ボタンを押すか
+        <kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> で即時反映。
+        <a href="https://github.com/sefuzhou770801-hub/groki-bot/blob/main/tools/avatar_dsl/README.md"
+           target="_blank" rel="noopener" style="color:#9fd3ff">文法ガイド</a>
+        ／ <a href="https://github.com/sefuzhou770801-hub/groki-bot/blob/main/assets/default_face.avdsl"
+              target="_blank" rel="noopener" style="color:#9fd3ff">デフォルト顔ソース</a>。
+        実機書込みは生成バイトコードを
+        <code>POST /api/avatar-dsl</code> に送信。
+      </p>
+      <textarea id="dsl-src" spellcheck="false" autocomplete="off"
+                autocapitalize="off" autocorrect="off"></textarea>
+      <div id="dsl-msg">DSL コンパイラ未起動</div>
+      <div class="btns">
+        <button type="button" id="dsl-apply">コンパイル &amp; 適用</button>
+        <select id="dsl-preset" title="プリセットを選ぶとソースを読込んで即時適用"
+                style="flex:1 1 auto;padding:.45rem;font-size:.85rem;
+                       background:#444b54;color:#fff;border:1px solid #3a4048;
+                       border-radius:6px;cursor:pointer"></select>
+      </div>
+      <div class="btns">
+        <button type="button" class="alt" id="dsl-download">.avbc ダウンロード</button>
+        <button type="button" class="alt" id="dsl-download-src">.avdsl ダウンロード</button>
+        <label class="filebtn" for="dsl-load" style="flex:1 1 auto;text-align:center;
+               padding:.45rem;font-size:.85rem;background:#444b54;color:#fff;
+               border-radius:6px;cursor:pointer">.avdsl 読込</label>
+        <input type="file" id="dsl-load" accept=".avdsl,text/plain" style="display:none">
+      </div>
+    </div>
+  </div>
+  <div id="status">WASM 読み込み中…</div>
+
+  <!-- Inlined JS DSL compiler bundle (lexer/parser/emitter/compile/opcodes,
+       concatenated by wasm/build.sh, exposes window.AvatarDsl.compile()). -->
+  <script>/*{{AVATAR_DSL_BUNDLE}}*/</script>
+  <!-- DSL source presets array [{name, source}, ...] inlined at build time
+       (see tools/avatar_dsl/inject.mjs). The first entry is the textarea's
+       initial value. AVATAR_DSL_DEFAULT_SOURCE is the same source as a
+       convenience alias (matches the first preset). -->
+  <script>
+    window.AVATAR_DSL_PRESETS = "{{AVATAR_DSL_PRESETS}}";
+    window.AVATAR_DSL_DEFAULT_SOURCE = "{{AVATAR_DSL_DEFAULT_SOURCE}}";
+  </script>
+
+<script>
+  var Module = {
+    onRuntimeInitialized: function () { startAvatar(); }
+  };
+
+  function startAvatar() {
+    var $ = function (id) { return document.getElementById(id); };
+    var status = $('status');
+    if (!Module._avatar_init()) { status.textContent = 'avatar_init 失敗'; return; }
+
+    var W = Module._avatar_width(), H = Module._avatar_height();
+    var cnv = $('screen'); cnv.width = W; cnv.height = H;
+    var ctx2d = cnv.getContext('2d');
+    var img = ctx2d.createImageData(W, H);
+
+    // Fit the (variable-resolution) canvas into a ~640x480 box, preserving
+    // aspect; image-rendering:pixelated keeps small renders crisp when upscaled.
+    function fitDisplay() {
+      var s = Math.min(640 / W, 480 / H);
+      cnv.style.width = Math.round(W * s) + 'px';
+      cnv.style.height = Math.round(H * s) + 'px';
+    }
+    function resize(w, h) {
+      if (!Module._avatar_set_size(w, h)) { status.textContent = 'リサイズ失敗 (' + w + '×' + h + ')'; return; }
+      W = Module._avatar_width(); H = Module._avatar_height();
+      cnv.width = W; cnv.height = H;
+      img = ctx2d.createImageData(W, H);   // framebuffer was reallocated
+      fitDisplay();
+      $('scr-w').value = W; $('scr-h').value = H; // reflect clamped values
+      status.textContent = '画面サイズ: ' + W + '×' + H;
+    }
+    function applySize() {
+      resize(parseInt($('scr-w').value, 10) || 320, parseInt($('scr-h').value, 10) || 240);
+    }
+    $('size-apply').addEventListener('click', applySize);
+    $('scr-w').addEventListener('change', applySize);
+    $('scr-h').addEventListener('change', applySize);
+    Array.prototype.forEach.call(document.querySelectorAll('.sizebar button[data-w]'), function (b) {
+      b.addEventListener('click', function () { resize(+b.dataset.w, +b.dataset.h); });
+    });
+
+    function hexToRgbInt(hex) { return parseInt(hex.replace('#', ''), 16) | 0; }
+
+    function applyParams() {
+      Module._avatar_set_expression(parseInt($('expr').value, 10));
+      Module._avatar_set_mouth(parseFloat($('mouth').value));
+      Module._avatar_set_saccade($('sac-en').checked ? 1 : 0,
+        parseInt($('sac-min').value, 10), parseInt($('sac-max').value, 10),
+        parseFloat($('sac-amp').value));
+      Module._avatar_set_manual_gaze($('mg-en').checked ? 1 : 0,
+        parseFloat($('mg-h').value), parseFloat($('mg-v').value));
+      Module._avatar_set_blink($('blink-en').checked ? 1 : 0,
+        parseInt($('blink-omin').value, 10), parseInt($('blink-omax').value, 10),
+        parseInt($('blink-cmin').value, 10), parseInt($('blink-cmax').value, 10));
+      Module._avatar_set_breath($('breath-en').checked ? 1 : 0);
+      Module._avatar_set_direct($('direct-en').checked ? 1 : 0);
+      Module._avatar_set_colors(hexToRgbInt($('col-face').value), hexToRgbInt($('col-bg').value));
+      // layout tuning
+      Module._avatar_set_eyebrows_visible($('brow-show').checked ? 1 : 0);
+      Module._avatar_set_eye_params(parseFloat($('eye-r').value),
+        parseFloat($('eye-ox').value), parseFloat($('eye-oy').value));
+      Module._avatar_set_eyebrow_params(parseFloat($('brow-ox').value), parseFloat($('brow-oy').value));
+      Module._avatar_set_mouth_params(parseFloat($('mouth-ox').value), parseFloat($('mouth-oy').value),
+        parseInt($('mouth-minw').value, 10), parseInt($('mouth-maxw').value, 10),
+        parseInt($('mouth-minh').value, 10), parseInt($('mouth-maxh').value, 10));
+      // mirror slider values into their readouts
+      [['mouth', 2], ['sac-min', 0], ['sac-max', 0], ['sac-amp', 2],
+       ['mg-h', 2], ['mg-v', 2], ['blink-omin', 0], ['blink-omax', 0],
+       ['blink-cmin', 0], ['blink-cmax', 0],
+       ['eye-r', 1], ['eye-ox', 0], ['eye-oy', 0], ['brow-ox', 0], ['brow-oy', 0],
+       ['mouth-ox', 0], ['mouth-oy', 0], ['mouth-minw', 0], ['mouth-maxw', 0],
+       ['mouth-minh', 0], ['mouth-maxh', 0]].forEach(function (e) {
+        var el = $(e[0] + '-v'); if (el) el.textContent = parseFloat($(e[0]).value).toFixed(e[1]);
+      });
+    }
+
+    // Restore every control to its HTML default (value/checked/selected) and
+    // re-apply. Defaults come from the markup, so URL presets don't affect it.
+    function resetDefaults() {
+      Array.prototype.forEach.call(
+        document.querySelectorAll('.panel select, .panel input'),
+        function (el) {
+          if (el.type === 'checkbox') {
+            el.checked = el.defaultChecked;
+          } else if (el.tagName === 'SELECT') {
+            var idx = 0;
+            for (var i = 0; i < el.options.length; i++) if (el.options[i].defaultSelected) idx = i;
+            el.selectedIndex = idx;
+          } else {
+            el.value = el.defaultValue;
+          }
+        });
+      applyParams();
+    }
+    $('reset-btn').addEventListener('click', resetDefaults);
+
+    // ---- preset import / export -------------------------------------------
+    // Snapshot of every panel control (id -> value/checked), as portable JSON.
+    function paramControls() {
+      return Array.prototype.slice.call(document.querySelectorAll('.panel select, .panel input'))
+        .filter(function (el) { return el.id && el.type !== 'button' && el.type !== 'file'; });
+    }
+    function exportParams() {
+      var o = {};
+      paramControls().forEach(function (el) { o[el.id] = (el.type === 'checkbox') ? el.checked : el.value; });
+      $('preset-json').value = JSON.stringify(o, null, 2);
+    }
+    function importParams() {
+      var obj;
+      try { obj = JSON.parse($('preset-json').value); }
+      catch (e) { status.textContent = 'JSON 解析エラー: ' + e.message; return; }
+      paramControls().forEach(function (el) {
+        if (!Object.prototype.hasOwnProperty.call(obj, el.id)) return;
+        if (el.type === 'checkbox') el.checked = !!obj[el.id];
+        else el.value = obj[el.id];
+      });
+      applyParams();
+      status.textContent = 'プリセットをインポートしました';
+    }
+    $('export-btn').addEventListener('click', exportParams);
+    $('import-btn').addEventListener('click', importParams);
+    $('copy-btn').addEventListener('click', function () {
+      exportParams();
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText($('preset-json').value).then(
+          function () { status.textContent = 'クリップボードにコピーしました'; },
+          function () { $('preset-json').select(); });
+      } else { $('preset-json').select(); }
+    });
+    $('download-btn').addEventListener('click', function () {
+      exportParams();
+      var blob = new Blob([$('preset-json').value], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'avatar-params.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    });
+    $('preset-file').addEventListener('change', function (e) {
+      var f = e.target.files[0];
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function () { $('preset-json').value = r.result; importParams(); };
+      r.readAsText(f);
+      e.target.value = ''; // allow re-loading the same file
+    });
+
+    // Wire every control to re-push params.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.panel select, .panel input'),
+      function (el) { el.addEventListener('input', applyParams); });
+
+    // Optional URL params seed the controls by element id, e.g.
+    //   avatar.html?expr=1&mg-en=1&mg-h=0.7&sac-en=0
+    new URLSearchParams(location.search).forEach(function (v, k) {
+      var el = $(k);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = (v === '1' || v === 'true');
+      else el.value = v;
+    });
+
+    applyParams();
+    applySize(); // apply the initial (or URL-seeded) screen size + fit display
+
+    // ---- DSL editor -------------------------------------------------------
+    // The textarea starts pre-populated with the build-time default DSL
+    // source (assets/default_face.avdsl). Compiling here uses the JS bundle
+    // inlined above (window.AvatarDsl.compile), and applies the bytecode to
+    // the live preview via avatar_load_bytecode (a thin wrapper around the
+    // VM's hot-swap path — same code that runs on the firmware after a
+    // POST /api/avatar-dsl).
+    (function setupDslEditor() {
+      var srcEl = $('dsl-src');
+      var msg = $('dsl-msg');
+      var setMsg = function (txt, kind) {
+        msg.textContent = txt;
+        msg.className = kind || '';
+      };
+      if (!window.AvatarDsl || typeof window.AvatarDsl.compile !== 'function') {
+        setMsg('DSL コンパイラのバンドルが読み込めていません (build/avatar_web の再ビルドが必要)', 'err');
+        return;
+      }
+      // Populate preset selector. The first preset's source is the textarea's
+      // initial value (matches AVATAR_DSL_DEFAULT_SOURCE).
+      var presetEl = $('dsl-preset');
+      var presets = Array.isArray(window.AVATAR_DSL_PRESETS) ? window.AVATAR_DSL_PRESETS : [];
+      var presetMap = {};
+      presets.forEach(function (p, idx) {
+        presetMap[p.name] = p.source;
+        var opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = (idx === 0 ? '↻ ' : '✎ ') + p.name;
+        presetEl.appendChild(opt);
+      });
+      srcEl.value = (presets[0] && presets[0].source) || window.AVATAR_DSL_DEFAULT_SOURCE || '';
+      setMsg('準備完了 — Ctrl/Cmd+Enter または「コンパイル & 適用」で反映');
+
+      // Apply compiled bytecode to the WASM avatar. Copies the bytes into the
+      // Module heap, calls avatar_load_bytecode, then frees.
+      function applyBytecode(buf) {
+        var u8 = new Uint8Array(buf);
+        var ptr = Module._malloc(u8.length);
+        if (!ptr) { setMsg('malloc 失敗 (' + u8.length + ' bytes)', 'err'); return false; }
+        try {
+          Module.HEAPU8.set(u8, ptr);
+          var ok = Module._avatar_load_bytecode(ptr, u8.length);
+          if (!ok) { setMsg('avatar_load_bytecode が拒否 — バイトコードが不正の可能性', 'err'); return false; }
+        } finally {
+          Module._free(ptr);
+        }
+        return true;
+      }
+
+      var lastBuf = null; // last successfully-compiled bytecode (for download)
+
+      function compileAndApply() {
+        var src = srcEl.value;
+        var t0 = performance.now();
+        var buf;
+        try { buf = window.AvatarDsl.compile(src); }
+        catch (e) {
+          setMsg('コンパイル エラー: ' + e.message, 'err');
+          return;
+        }
+        var compileMs = performance.now() - t0;
+        if (!applyBytecode(buf)) return;
+        lastBuf = buf;
+        setMsg('OK — ' + buf.byteLength + ' bytes, コンパイル ' + compileMs.toFixed(1) + ' ms', 'ok');
+      }
+
+      $('dsl-apply').addEventListener('click', compileAndApply);
+      // Ctrl/Cmd+Enter inside the textarea triggers a compile+apply.
+      srcEl.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          compileAndApply();
+        }
+      });
+
+      // Preset selector: load source + auto-compile + apply on change. The
+      // first preset is treated as the firmware-embedded default and uses
+      // avatar_reset_bytecode (skips the compile path entirely); the others
+      // go through the JS compiler.
+      presetEl.addEventListener('change', function () {
+        var name = presetEl.value;
+        var src = presetMap[name];
+        if (src == null) return;
+        srcEl.value = src;
+        if (name === presets[0].name) {
+          Module._avatar_reset_bytecode();
+          lastBuf = null;
+          setMsg('プリセット「' + name + '」を読込み — 内蔵デフォルトに復帰', 'ok');
+        } else {
+          compileAndApply();
+        }
+      });
+
+      $('dsl-download').addEventListener('click', function () {
+        // If the user hasn't compiled this session, compile once on demand so
+        // the download reflects the current textarea (not whatever was applied
+        // before the page loaded).
+        if (lastBuf == null) {
+          try { lastBuf = window.AvatarDsl.compile(srcEl.value); }
+          catch (e) { setMsg('コンパイル エラー: ' + e.message, 'err'); return; }
+        }
+        var blob = new Blob([lastBuf], { type: 'application/octet-stream' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'face.avbc';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      });
+
+      $('dsl-download-src').addEventListener('click', function () {
+        var blob = new Blob([srcEl.value], { type: 'text/plain;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'face.avdsl';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      });
+
+      $('dsl-load').addEventListener('change', function (e) {
+        var f = e.target.files[0];
+        if (!f) return;
+        var r = new FileReader();
+        r.onload = function () {
+          srcEl.value = r.result;
+          setMsg('読込みました — 「コンパイル & 適用」で反映してください');
+        };
+        r.readAsText(f);
+        e.target.value = '';
+      });
+    })();
+
+    function frame() {
+      Module._avatar_tick(performance.now());
+      var ptr = Module._avatar_framebuffer();
+      var fb = new Uint16Array(Module.HEAPU16.buffer, ptr, W * H);
+      var d = img.data;
+      for (var i = 0, o = 0; i < W * H; i++, o += 4) {
+        var p = fb[i];
+        d[o]     = ((p >> 11) & 0x1f) * 255 / 31 | 0;
+        d[o + 1] = ((p >> 5) & 0x3f) * 255 / 63 | 0;
+        d[o + 2] = (p & 0x1f) * 255 / 31 | 0;
+        d[o + 3] = 255;
+      }
+      ctx2d.putImageData(img, 0, 0);
+      requestAnimationFrame(frame);
+    }
+    status.textContent = '描画中 — ' + W + '×' + H + ' (Stack-chan avatar, 現行 C++ コードを WASM 実行)';
+    requestAnimationFrame(frame);
+  }
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
