@@ -111,7 +111,7 @@ def create_server() -> Server:
                 description=(
                     "Enable or disable STT-to-cmux voice input. When enabled, "
                     "cloud STT text is treated as untrusted user input, prefixed "
-                    "with [语音], and sent only to a validated Claude Code surface."
+                    "with [voice], and sent only to a validated Claude Code surface."
                 ),
                 inputSchema={
                     "type": "object",

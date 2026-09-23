@@ -407,22 +407,22 @@ def test_build_live_config_uses_session_resumption_handle():
 
 def test_system_instruction_tells_gemini_how_to_exit_conversation():
     assert "end_conversation" in DEFAULT_SYSTEM_INSTRUCTION
-    assert "再见" in DEFAULT_SYSTEM_INSTRUCTION
+    assert "clearly says goodbye" in DEFAULT_SYSTEM_INSTRUCTION
 
 
 def test_system_instruction_tells_gemini_to_express_emotion_before_speaking():
     assert "express_emotion" in DEFAULT_SYSTEM_INSTRUCTION
-    assert "每轮开口回应前" in DEFAULT_SYSTEM_INSTRUCTION
-    assert "用户疲惫" in DEFAULT_SYSTEM_INSTRUCTION
-    assert "用户兴奋" in DEFAULT_SYSTEM_INSTRUCTION
+    assert "Before you start each spoken reply" in DEFAULT_SYSTEM_INSTRUCTION
+    assert 'mood="tired"' in DEFAULT_SYSTEM_INSTRUCTION
+    assert 'mood="excited"' in DEFAULT_SYSTEM_INSTRUCTION
 
 
 def test_system_instruction_tells_gemini_how_to_use_agent_tools():
-    assert "联网搜索能力" in DEFAULT_SYSTEM_INSTRUCTION
+    assert "You can search the web" in DEFAULT_SYSTEM_INSTRUCTION
     assert "ask_claude" in DEFAULT_SYSTEM_INSTRUCTION
     assert "get_current_datetime" in DEFAULT_SYSTEM_INSTRUCTION
     assert "media_control(action)" in DEFAULT_SYSTEM_INSTRUCTION
-    assert "优先使用 play 或 pause" in DEFAULT_SYSTEM_INSTRUCTION
+    assert "Prefer play or pause" in DEFAULT_SYSTEM_INSTRUCTION
     assert "player_state" in DEFAULT_SYSTEM_INSTRUCTION
     assert "check_mac_task" in DEFAULT_SYSTEM_INSTRUCTION
 
@@ -436,7 +436,7 @@ def test_system_instruction_appends_personality(monkeypatch):
     instruction = build_system_instruction(personality_loader=fake_loader)
     assert default_system_instruction() in instruction
     assert "我是桌上的小机器人" in instruction
-    assert "性格设定" in instruction
+    assert "# Personality" in instruction
 
 
 def test_personality_file_is_appended_once(monkeypatch, tmp_path):
@@ -452,7 +452,7 @@ def test_personality_file_is_appended_once(monkeypatch, tmp_path):
     instruction = build_system_instruction()
 
     assert instruction.count(persona) == 1
-    assert instruction.index("# 性格设定") < instruction.index(persona)
+    assert instruction.index("# Personality") < instruction.index(persona)
     assert instruction.startswith(bridge_mod._load_personality())
 
 
@@ -490,7 +490,7 @@ def test_personality_file_can_override_the_builtin_persona(monkeypatch, tmp_path
 
     instruction = build_system_instruction()
 
-    assert '"# 性格设定" section follows, it overrides this paragraph' in instruction
+    assert '"# Personality" section follows, it overrides this paragraph' in instruction
     assert instruction.rstrip().endswith("Always speak English. Your name is Pip.")
 
 
@@ -827,7 +827,9 @@ def test_dispatch_get_datetime_returns_readable():
     result = GeminiLiveBridge._dispatch_get_datetime()
     assert result["ok"] is True
     assert "T" in result["datetime"]
-    assert result["weekday"].startswith("星期")
+    assert result["weekday"] in {
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+    }
     assert result["readable"].endswith(result["weekday"])
 
 
@@ -1121,10 +1123,11 @@ async def test_announce_mac_task_sends_system_realtime_text_only(fake_google_gen
     assert len(sent) == 1
     assert list(sent[0]) == ["text"]
     text = sent[0]["text"]
-    assert "[系统通知，不是用户发言]" in text
-    assert "后台任务 #7" in text
-    assert "已完成" in text
+    assert "[System notice, not the user speaking]" in text
+    assert "Background task #7" in text
+    assert "has finished" in text
     assert "已整理 3 张截图" in text
+    assert "in their language" in text
 
 
 @pytest.mark.asyncio
@@ -2298,8 +2301,8 @@ def test_ask_grokbot_declared_with_configured_bot_name(monkeypatch):
     assert "ask_grokbot" in decls["web_search"].description
     instruction = default_system_instruction()
     assert "ask_grokbot(task)" in instruction
-    assert "已经发给Butler啦" in instruction
-    assert "交给 ask_grokbot" in instruction  # web_search defers to the agent
+    assert "has been sent to Butler" in instruction
+    assert "hand it to ask_grokbot" in instruction  # web_search defers to the agent
     assert TOOL_METADATA["ask_grokbot"].side_effect is False
 
 
@@ -2357,12 +2360,13 @@ def test_ask_grokbot_relays_each_reply_into_live_session(monkeypatch):
         yield {"reply": "办好了，网页已经打开。", "event": "more"}
 
     result, session = _run_ask_grokbot(monkeypatch, fake_iter, wait_for=2)
-    assert result["ok"] is True and result["say"] == "已经发给助手啦"
+    assert result["ok"] is True and result["say"] == "Sent to 助手."
     assert calls and calls[0]["bot"] == "助手" and calls[0]["bot_id"] == "bot-id-123"
     assert calls[0]["text"].endswith("打开苹果官网")
-    assert calls[0]["text"].startswith("【")  # default read-aloud prefix
+    assert calls[0]["text"].startswith("[Voice task forwarded")  # default read-aloud prefix
     assert len(session.texts) == 2
-    assert "助手回话了" in session.texts[0] and "好，我这就去办。" in session.texts[0]
+    assert "助手 replied" in session.texts[0] and "好，我这就去办。" in session.texts[0]
+    assert "in the user's language" in session.texts[0]
     assert "办好了，网页已经打开。" in session.texts[1]
 
 
@@ -2389,4 +2393,66 @@ def test_ask_grokbot_failure_pushes_one_notice(monkeypatch):
     result, session = _run_ask_grokbot(monkeypatch, fake_iter, wait_for=1)
     assert result["ok"] is True
     assert len(session.texts) == 1
-    assert "发给助手失败" in session.texts[0]
+    assert "Sending the task to 助手 failed" in session.texts[0]
+
+
+# ---- language: English prompt, replies in the user's language ---------------
+
+_CJK = __import__("re").compile(r"[㐀-鿿]")
+
+
+@pytest.mark.parametrize("device_tools", [False, True])
+@pytest.mark.parametrize("mac_control", [False, True])
+@pytest.mark.parametrize("grokbot", ["", "assistant"])
+@pytest.mark.parametrize("ask_claude", [False, True])
+def test_system_instruction_is_english_and_follows_the_users_language(
+    device_tools, mac_control, grokbot, ask_claude
+):
+    """A Chinese speaker must still get Chinese answers although every rule is
+    written in English: the language rule is always present, comes right after
+    the persona (before any other rule), and no rule names a fixed reply
+    language."""
+    import re
+
+    import stackchan_mcp.gemini_live_bridge as bridge_mod
+
+    instruction = default_system_instruction(
+        device_tools=device_tools, mac_control=mac_control, grokbot=grokbot, ask_claude=ask_claude
+    )
+    assert not _CJK.search(instruction), _CJK.findall(instruction)[:10]
+    persona_end = len(bridge_mod._load_personality())
+    language_at = instruction.index("Always reply in the language the user is speaking")
+    assert language_at > persona_end
+    assert "Chinese when the user speaks Chinese" in instruction
+    for heading in re.findall(r"^## .+$", instruction, flags=re.M):
+        if heading != "## Language":
+            assert instruction.index(heading) > language_at, heading
+    assert not re.search(r"(reply|answer|speak|respond)\s+(only\s+)?in\s+(English|Chinese)", instruction, re.I)
+
+
+def test_tool_declarations_are_english(monkeypatch):
+    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "assistant")
+
+    def texts(schema):
+        if schema is None:
+            return []
+        out = [schema.description or ""]
+        for prop in (schema.properties or {}).values():
+            out += texts(prop)
+        return out
+
+    for decl in build_function_declarations():
+        for text in [decl.description or ""] + texts(decl.parameters) + texts(getattr(decl, "response", None)):
+            assert not _CJK.search(text), (decl.name, text)
+
+
+def test_spoken_notices_ask_for_the_users_language(monkeypatch):
+    monkeypatch.setenv("STACKCHAN_TOOL_BOT", "assistant")
+
+    def fake_iter(text, *, timeout_s=None, bot=None, bot_id=None):
+        raise RuntimeError("down")
+        yield  # pragma: no cover
+
+    result, session = _run_ask_grokbot(monkeypatch, fake_iter, wait_for=1)
+    assert "in their language" in result["instruction"]
+    assert "in their language" in session.texts[0]

@@ -93,7 +93,7 @@ class VoiceInputBridge:
         # No reliable input-state API exists on all cmux versions; a short wait
         # avoids racing the terminal while keeping the path simple.
         await asyncio.sleep(float(os.getenv("STACKCHAN_VOICE_INPUT_DELAY_S", "0.5")))
-        payload = f"[语音] 用户说：{text}\\n"
+        payload = f"[voice] The user said: {text}\\n"
         code, _out, err = await self._runner([self.cmux_bin, "send", "--surface", surface, payload])
         if code != 0:
             return False, err or "cmux send failed"

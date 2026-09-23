@@ -140,7 +140,7 @@ sequenceDiagram
     P-->>G: {"event": "done"}
 ```
 
-**Task out.** Gemini decides when to call `ask_grokbot(task)`. The routing rules added to Gemini's instructions say: small talk and "who are you" stay with Gemini; tasks that take time (look something up, research, write something, ask an assistant) go to the agent; with Mac control on, questions that only need an answer go to the agent instead of opening a browser search. The tool returns at once with "已经发给{agent}啦" ("sent to {agent}"), which Gemini says immediately so the user is not left in silence. The gateway puts a short prefix in front of the task (`STACKCHAN_TOOL_BOT_PREFIX`; the default asks the agent for one or two spoken sentences without lists, links or markdown) and posts it to the forwarding service with `X-Stackchan-Stream: 1`.
+**Task out.** Gemini decides when to call `ask_grokbot(task)`. The routing rules added to Gemini's instructions say: small talk and "who are you" stay with Gemini; tasks that take time (look something up, research, write something, ask an assistant) go to the agent; with Mac control on, questions that only need an answer go to the agent instead of opening a browser search. The tool returns at once ("Sent to {agent}.") with an instruction to tell the user right away, in their language, that the task has been sent, so the user is not left in silence. The gateway puts a short prefix in front of the task (`STACKCHAN_TOOL_BOT_PREFIX`; the default asks the agent for one or two spoken sentences without lists, links or markdown) and posts it to the forwarding service with `X-Stackchan-Stream: 1`.
 
 **Inside the forwarding service** (`gateway/stackchan_mcp/gbot_http_proxy.py`):
 
@@ -153,7 +153,7 @@ sequenceDiagram
 
 Errors come back as `{"ok": false, "error": "..."}` with HTTP 400 (bad request, no target), 502 (`gbot` missing or failing) or 504 (no first sentence within 30 s).
 
-**Replies back.** In the gateway, `gbot_brain.iter_gbot_replies` reads the NDJSON lines and yields each reply. For each one the bridge pushes a system notice into the Gemini Live session: "[系统通知，不是用户发言] {agent}回话了：{reply}" (system notice, not the user: the agent replied), asking Gemini to relay it briefly in its own voice without calling tools. Gemini speaks, and the audio goes to the robot as in section 2. If nothing comes back, one notice asks Gemini to tell the user the task was not delivered, and not to make up an answer.
+**Replies back.** In the gateway, `gbot_brain.iter_gbot_replies` reads the NDJSON lines and yields each reply. For each one the bridge pushes a system notice into the Gemini Live session: "[System notice, not the user speaking] {agent} replied: {reply}", asking Gemini to relay it briefly in its own voice and in the user's language, without calling tools. Gemini speaks, and the audio goes to the robot as in section 2. If nothing comes back, one notice asks Gemini to tell the user the task was not delivered, and not to make up an answer.
 
 **Configuration** (`gateway/.env`):
 

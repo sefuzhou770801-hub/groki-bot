@@ -32,7 +32,7 @@ async def test_voice_bridge_sends_prefixed_text_to_valid_claude_surface(monkeypa
     assert result.ok is True
     send = calls[-1]
     assert send[:4] == ["cmux", "send", "--surface", "surface:263"]
-    assert send[4] == "[语音] 用户说：帮我看一下状态\\n"
+    assert send[4] == "[voice] The user said: 帮我看一下状态\\n"
 
 
 @pytest.mark.asyncio

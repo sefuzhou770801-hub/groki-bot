@@ -47,20 +47,27 @@ from .wake_gate import WakeGateState
 
 logger = logging.getLogger(__name__)
 
-EMOTION_SYSTEM_INSTRUCTION = """## 情绪表达
+EMOTION_SYSTEM_INSTRUCTION = """## Expressing emotion
 
-你能从用户声音里听出语气和情绪。每轮开口回应前，先调用一次 express_emotion(mood, intensity)，每轮最多一次，让身体先于语言做出反应。
-示例：用户疲惫地说话 → express_emotion(mood="tired", intensity="low")；用户兴奋地分享进展 → express_emotion(mood="excited", intensity="high")。
-这条规则不改变对话结束约束：只在用户明确说“再见”“不聊了”“结束”时才调用 end_conversation。"""
+You can hear the user's tone and mood in their voice. Before you start each spoken reply, call express_emotion(mood, intensity) once (at most once per turn), so the body reacts before the words.
+Examples: the user sounds tired → express_emotion(mood="tired", intensity="low"); the user is excited about some progress → express_emotion(mood="excited", intensity="high").
+This does not change when a conversation ends: call end_conversation only when the user clearly says goodbye or that they are done talking."""
 
 # Used when the device does not run the face/LED/head tools (for example the
 # Groki Bot firmware, whose XiaoZhi client announces features.mcp=false). In
 # that case those tools are hidden from Gemini: calling them first would stall
 # the reply until the tool call times out.
-VOICE_ONLY_SYSTEM_INSTRUCTION = """## 出声优先
+VOICE_ONLY_SYSTEM_INSTRUCTION = """## Speak first
 
-闲聊必须先出声，直接用声音回答。
-只在用户明确说“再见”“不聊了”“结束”时才调用 end_conversation。"""
+In small talk, answer out loud right away.
+Call end_conversation only when the user clearly says goodbye or that they are done talking."""
+
+# Every rule above and below is written in English, but the robot talks in
+# whatever language the user speaks; this rule says so explicitly so the
+# English prompt does not pull replies towards English.
+LANGUAGE_INSTRUCTION = """## Language
+
+Always reply in the language the user is speaking (for example, Chinese when the user speaks Chinese). These instructions are written in English only for convenience. When a tool result or system notice gives you a sentence to say, say it in the user's language."""
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -99,67 +106,71 @@ def grokbot_instruction(bot: str, *, mac_control: bool) -> str:
     it, so a user who named the agent differently hears that name.
     """
     lines = [
-        f"## 交给{bot}",
+        f"## Handing tasks to {bot}",
         "",
-        "用户只是闲聊、问好、问「你是谁」时，直接用自己的声音回答，不要调用 ask_grokbot。",
-        "只有用户明确要办事（派人、调研、查资料、写东西、叫助手、安排任务）时，才调用 ask_grokbot(task)。",
-        f"ask_grokbot 一调用立刻返回「已经发给{bot}啦」：你必须马上用自己的声音对用户说出这句，不要沉默干等。",
-        f"{bot}办完会回话，你会收到「{bot}回话了」的系统通知，届时用自己的声音把{bot}的话简短转述给用户。"
-        "在那之前不要编造结果。",
+        "When the user is only chatting, saying hello or asking who you are, answer in your own voice"
+        " and do not call ask_grokbot.",
+        "Call ask_grokbot(task) only when the user clearly wants something done (look something up,"
+        " research, write something, ask an assistant, arrange a task).",
+        f"ask_grokbot returns at once. Immediately tell the user, in your own voice, that the task has been"
+        f" sent to {bot}; do not wait in silence.",
+        f"When {bot} answers you get a system notice \"{bot} replied\"; then briefly pass on what {bot}"
+        " said, in your own voice. Do not make up a result before that.",
     ]
     if mac_control:
         lines.append(
-            f"用户说「查资料」「查一下 X 上……」「调研」「让{bot}……」这类要花时间办的事，"
-            "用 ask_grokbot，不要用 web_search 打开浏览器。"
+            f"Tasks that take time, such as looking something up, researching a topic or asking {bot} to"
+            " do something, go to ask_grokbot; do not open a browser with web_search for them."
         )
     return "\n".join(lines)
 
 
-AGENT_TOOLS_INSTRUCTION = """## 智能工具
+AGENT_TOOLS_INSTRUCTION = """## Tools
 
-你有联网搜索能力——事实性问题（天气、新闻、知识）直接回答，搜索结果自动融入。
+You can search the web: answer factual questions (weather, news, general knowledge) directly; search results are merged in automatically.
 
-用户问时间时，调用 get_current_datetime 获取准确时间。
+When the user asks for the time or date, call get_current_datetime to get it exactly.
 """
 
 # Only added when ask_claude is declared (see ask_claude_enabled()).
 ASK_CLAUDE_INSTRUCTION = (
-    "遇到需要深度分析、代码解读、复杂推理或详细规划的问题，"
-    "调用 ask_claude(question) 获取回答，用自己的话简洁转述。"
+    "For questions that need deep analysis, reading code, complex reasoning or detailed planning, "
+    "call ask_claude(question) and pass on the answer briefly in your own words."
 )
 
 
 def agent_tools_instruction(*, ask_claude: bool) -> str:
-    """The 智能工具 rules; the ask_claude line only when that tool exists."""
+    """The Tools rules; the ask_claude line only when that tool exists."""
     head, _, tail = AGENT_TOOLS_INSTRUCTION.strip().rpartition("\n\n")
     if ask_claude:
         return f"{head}\n\n{ASK_CLAUDE_INSTRUCTION}\n\n{tail}"
     return f"{head}\n\n{tail}"
 
-MAC_CONTROL_INSTRUCTION = """## Mac 控制
+MAC_CONTROL_INSTRUCTION = """## Mac control
 
-你能控制用户的 Mac。秒级动作直接调工具，调完简短确认一句即可：
-- open_app(name) 打开应用；open_url(url) 打开网页；web_search(query) 用浏览器搜索（默认 Grok 网页版）
-- media_control(action) 控制音乐播放；优先使用 play 或 pause 表达"确保播放/确保停止"，next/previous 用于切歌；play_pause 是开关切换，只有用户明确要求切换时才谨慎使用。工具返回 player_state，必须按真实状态向用户播报，不要只按意图播报
+You can control the user's Mac. For quick actions call the tool directly and confirm in one short sentence:
+- open_app(name) opens an app; open_url(url) opens a web page; web_search(query) searches in the browser (Grok on the web by default)
+- media_control(action) controls music playback. Prefer play or pause to make sure music is playing or stopped, and next/previous to change tracks; play_pause toggles, so use it only when the user explicitly asks to toggle. The tool returns player_state: report the real state to the user, not what you intended
 
 {web_search_rule}
-- set_volume(level 或 mute) 调音量
-- lock_screen() 锁屏；take_screenshot() 截屏保存到桌面
-- run_shortcut(name) 运行快捷指令；list_shortcuts() 列出可用的快捷指令
+- set_volume(level or mute) changes the volume
+- lock_screen() locks the screen; take_screenshot() saves a screenshot to the desktop
+- run_shortcut(name) runs a Shortcut; list_shortcuts() lists the available Shortcuts
 
-复杂任务（整理文件、查资料写东西、代码相关）调用 run_mac_task(task)，任务描述写清楚完整。它会立即返回"已开始"——告诉用户任务开始了，不要干等。慢动作和后台任务完成后你会收到系统通知，届时用一两句话口头汇报结果。用户问进度时调用 check_mac_task。
+For complex tasks (organising files, researching and writing, anything with code) call run_mac_task(task) with a complete, clear task description. It returns "started" at once: tell the user the task has started and do not wait. When slow actions and background tasks finish you get a system notice; then report the result in one or two sentences. When the user asks about progress, call check_mac_task.
 
-安全规则：删除文件、覆盖数据、对外发送消息或邮件等不可逆操作，必须先口头向用户复述要做的事并得到明确同意，才能执行。"""
+Safety: before anything irreversible, such as deleting files, overwriting data or sending messages or email, repeat back to the user what you are about to do and get their explicit agreement first."""
 
 WEB_SEARCH_RULE = (
-    "web_search(query) 用浏览器搜索；用户说「搜一下/查一下 xxx」默认走 grok（打开 grok.com 提交）；"
-    "明确说「用谷歌/百度/必应搜」才传 engine。"
+    "web_search(query) searches in the browser; when the user says \"search for X\" or \"look up X\" it uses "
+    "Grok (grok.com) by default. Pass engine only when the user names a search engine (Google, Baidu, Bing)."
 )
 # With ask_grokbot available, questions that only need an answer go to the
 # Grok Bot agent; web_search is kept for "open a browser and search".
 WEB_SEARCH_RULE_WITH_GROKBOT = (
-    "web_search(query) 在浏览器里打开搜索页；只在用户明确要「打开浏览器搜」「用谷歌/百度/必应搜」时使用，"
-    "明确说引擎才传 engine。用户只是想知道答案（查一下、搜一下、帮我查）时交给 ask_grokbot。"
+    "web_search(query) opens a search page in the browser; use it only when the user explicitly asks to search "
+    "in the browser or names a search engine (Google, Baidu, Bing), and pass engine only then. When the user "
+    "just wants an answer (look it up, search for it, find out), hand it to ask_grokbot."
 )
 
 
@@ -178,14 +189,14 @@ def _personality_path() -> Path:
 
 
 # Short and neutral on purpose: a personality file appended under
-# "# 性格设定" can change the name, language and style.
+# "# Personality" can change the name, language and style.
 BUILTIN_PERSONALITY = (
     "You are Groki, a small robot that lives on the user's desk. "
     "Reply in the language the user speaks, in one or two short sentences, "
     "like a friend, without a customer-service tone. "
     "If you are asked which AI model you run on, answer truthfully. "
     "Only call end_conversation when the user clearly says goodbye. "
-    "If a \"# 性格设定\" section follows, it overrides this paragraph "
+    "If a \"# Personality\" section follows, it overrides this paragraph "
     "wherever the two differ."
 )
 
@@ -223,6 +234,7 @@ def default_system_instruction(
         ask_claude = ask_claude_enabled()
     parts = [
         _load_personality(),
+        LANGUAGE_INSTRUCTION,
         EMOTION_SYSTEM_INSTRUCTION if device_tools else VOICE_ONLY_SYSTEM_INSTRUCTION,
         agent_tools_instruction(ask_claude=ask_claude),
     ]
@@ -349,7 +361,7 @@ def build_system_instruction(
     extra = personality_loader().strip()
     if not extra:
         return base
-    return f"{base}\n\n# 性格设定\n\n{extra}"
+    return f"{base}\n\n# Personality\n\n{extra}"
 
 
 # Mapping from Gemini function name to the (esp32_tool_name, arg_transform).
@@ -500,8 +512,8 @@ def build_function_declarations() -> list[Any]:
     ask_claude = types.FunctionDeclaration(
         name="ask_claude",
         description=(
-            "复杂问题交给 Claude 分析。用户问需要深度推理、代码分析、"
-            "复杂规划的问题时调用。"
+            "Hand a hard question to Claude. Call it when the user asks something that needs deep "
+            "reasoning, code analysis or complex planning."
         ),
         parameters=types.Schema(
             type="OBJECT",
@@ -516,15 +528,15 @@ def build_function_declarations() -> list[Any]:
     ask_grokbot = types.FunctionDeclaration(
         name="ask_grokbot",
         description=(
-            f"把办事任务交给 Grok Bot 里的{bot}。"
-            f"一调用立刻返回「已经发给{bot}啦」，你必须马上对用户说出这句，不要干等。"
-            "闲聊、问好、问你是谁不要调用。"
-            f"{bot}办完后你会收到「{bot}回话了」的系统通知，届时简短转述。"
+            f"Hand a task to {bot} in the Grok Bot app. "
+            f"Returns at once: immediately tell the user the task has been sent to {bot}; do not wait. "
+            "Do not call it for small talk, greetings or \"who are you\". "
+            f"When {bot} answers you get a system notice \"{bot} replied\"; then pass it on briefly."
         ),
         parameters=types.Schema(
             type="OBJECT",
             properties={
-                "task": types.Schema(type="STRING", description="要办的事，原话或简要任务"),
+                "task": types.Schema(type="STRING", description="What needs doing: the user's words or a short task description"),
             },
             required=["task"],
         ),
@@ -532,7 +544,7 @@ def build_function_declarations() -> list[Any]:
 
     get_current_datetime = types.FunctionDeclaration(
         name="get_current_datetime",
-        description="获取当前日期时间和星期几",
+        description="Get the current date, time and day of the week",
         parameters=types.Schema(
             type="OBJECT",
             properties={},
@@ -559,44 +571,44 @@ def _build_mac_declarations(types: Any) -> list[Any]:
     media_control_response = types.Schema(
         type="OBJECT",
         properties={
-            "ok": types.Schema(type="BOOLEAN", description="工具是否成功"),
+            "ok": types.Schema(type="BOOLEAN", description="Whether the tool succeeded"),
             "action": types.Schema(
                 type="STRING",
                 format="enum",
                 enum=MEDIA_ACTION_ENUM,
-                description="已执行的媒体动作",
+                description="The media action that was performed",
             ),
-            "player": types.Schema(type="STRING", description="实际控制的播放器"),
+            "player": types.Schema(type="STRING", description="The player that was controlled"),
             "player_state": types.Schema(
                 type="STRING",
-                description="回读到的真实播放状态，如 playing、paused、stopped",
+                description="The real playback state read back afterwards, such as playing, paused or stopped",
             ),
-            "auto_opened": types.Schema(type="STRING", description="自动打开的播放器"),
-            "error": types.Schema(type="STRING", description="失败原因"),
+            "auto_opened": types.Schema(type="STRING", description="The player that was opened automatically"),
+            "error": types.Schema(type="STRING", description="Why it failed"),
         },
         required=["ok"],
     )
     run_mac_task_response = types.Schema(
         type="OBJECT",
         properties={
-            "ok": types.Schema(type="BOOLEAN", description="任务是否成功启动"),
+            "ok": types.Schema(type="BOOLEAN", description="Whether the task started"),
             "status": types.Schema(
                 type="STRING",
                 format="enum",
                 enum=["started"],
-                description="后台任务启动状态",
+                description="Background task start status",
             ),
-            "state": types.Schema(type="STRING", description="后台任务状态"),
-            "task_id": types.Schema(type="INTEGER", description="后台任务编号"),
+            "state": types.Schema(type="STRING", description="Background task state"),
+            "task_id": types.Schema(type="INTEGER", description="Background task number"),
             "estimated_seconds": types.Schema(
                 type="INTEGER",
-                description="预计完成秒数",
+                description="Estimated seconds until done",
             ),
             "user_message": types.Schema(
                 type="STRING",
-                description="可以直接播报给用户的短句",
+                description="A short sentence to tell the user, in their language",
             ),
-            "error": types.Schema(type="STRING", description="失败原因"),
+            "error": types.Schema(type="STRING", description="Why it failed"),
         },
         required=["ok"],
     )
@@ -604,22 +616,22 @@ def _build_mac_declarations(types: Any) -> list[Any]:
     return [
         types.FunctionDeclaration(
             name="open_app",
-            description="在用户的 Mac 上打开一个应用，例如 Xcode、Safari、访达。",
+            description="Open an app on the user's Mac, for example Xcode, Safari or Finder.",
             parameters=types.Schema(
                 type="OBJECT",
                 properties={
-                    "name": types.Schema(type="STRING", description="应用名称"),
+                    "name": types.Schema(type="STRING", description="App name"),
                 },
                 required=["name"],
             ),
         ),
         types.FunctionDeclaration(
             name="open_url",
-            description="在用户的 Mac 默认浏览器里打开一个 http/https 网址。",
+            description="Open an http or https URL in the default browser on the user's Mac.",
             parameters=types.Schema(
                 type="OBJECT",
                 properties={
-                    "url": types.Schema(type="STRING", description="完整网址"),
+                    "url": types.Schema(type="STRING", description="Full URL"),
                 },
                 required=["url"],
             ),
@@ -627,22 +639,24 @@ def _build_mac_declarations(types: Any) -> list[Any]:
         types.FunctionDeclaration(
             name="web_search",
             description=(
-                "在用户的 Mac 浏览器里打开搜索引擎结果页（未装 Chrome 时用默认浏览器）。"
-                "query 支持中文；engine 可选 google/bing/baidu/grok，默认 grok（Grok 网页版）。"
+                "Open a search results page in the browser on the user's Mac (the default browser when "
+                "Chrome is not installed). query can be in any language; engine is optional: google, bing, "
+                "baidu or grok, default grok (Grok on the web). "
                 + (
-                    "只在用户明确要打开浏览器搜索时使用；只想要答案的交给 ask_grokbot。"
+                    "Use it only when the user explicitly wants a browser search; when they just want an "
+                    "answer, use ask_grokbot. "
                     if grokbot_enabled()
-                    else "用户说“搜一下/查一下 xxx”默认使用 grok；"
+                    else "When the user says \"search for X\" or \"look up X\", use grok. "
                 )
-                + "明确说用谷歌等才传对应 engine。不要自己构造搜索 URL。"
+                + "Pass engine only when the user names a search engine. Do not build search URLs yourself."
             ),
             parameters=types.Schema(
                 type="OBJECT",
                 properties={
-                    "query": types.Schema(type="STRING", description="搜索关键词"),
+                    "query": types.Schema(type="STRING", description="Search terms"),
                     "engine": types.Schema(
                         type="STRING",
-                        description="搜索引擎：google | bing | baidu | grok，默认 grok",
+                        description="Search engine: google | bing | baidu | grok, default grok",
                     ),
                 },
                 required=["query"],
@@ -651,9 +665,9 @@ def _build_mac_declarations(types: Any) -> list[Any]:
         types.FunctionDeclaration(
             name="media_control",
             description=(
-                "控制 Mac 上的音乐播放（Spotify 或 Music）。优先使用 play/pause "
-                "表达确保播放或确保停止；play_pause 是开关切换，慎用。"
-                "返回值里的 player_state 是真实终态。"
+                "Control music playback on the Mac (Spotify or Music). Prefer play or pause to make sure "
+                "music is playing or stopped; play_pause toggles, use it with care. "
+                "player_state in the result is the real final state."
             ),
             parameters=types.Schema(
                 type="OBJECT",
@@ -663,8 +677,8 @@ def _build_mac_declarations(types: Any) -> list[Any]:
                         format="enum",
                         enum=MEDIA_ACTION_ENUM,
                         description=(
-                            "play | pause | play_pause | next | previous；"
-                            "play_pause 是开关切换，慎用"
+                            "play | pause | play_pause | next | previous; "
+                            "play_pause toggles, use it with care"
                         ),
                     ),
                 },
@@ -674,52 +688,52 @@ def _build_mac_declarations(types: Any) -> list[Any]:
         ),
         types.FunctionDeclaration(
             name="set_volume",
-            description="调整 Mac 输出音量。level 是 0..100；mute 为 true/false 静音开关。",
+            description="Set the Mac output volume. level is 0..100; mute is true or false.",
             parameters=types.Schema(
                 type="OBJECT",
                 properties={
                     "level": types.Schema(type="INTEGER", description="0..100"),
-                    "mute": types.Schema(type="BOOLEAN", description="静音开关"),
+                    "mute": types.Schema(type="BOOLEAN", description="Mute on or off"),
                 },
             ),
         ),
         types.FunctionDeclaration(
             name="lock_screen",
-            description="锁定用户的 Mac 屏幕。",
+            description="Lock the user's Mac screen.",
             parameters=no_args,
         ),
         types.FunctionDeclaration(
             name="take_screenshot",
-            description="给 Mac 全屏截图，保存到桌面，返回文件路径。",
+            description="Take a full-screen screenshot on the Mac, save it to the desktop and return the file path.",
             parameters=no_args,
         ),
         types.FunctionDeclaration(
             name="run_shortcut",
-            description="运行一个 Apple 快捷指令（Shortcuts），按名称精确匹配。",
+            description="Run an Apple Shortcut, matched exactly by name.",
             parameters=types.Schema(
                 type="OBJECT",
                 properties={
-                    "name": types.Schema(type="STRING", description="快捷指令名称"),
+                    "name": types.Schema(type="STRING", description="Shortcut name"),
                 },
                 required=["name"],
             ),
         ),
         types.FunctionDeclaration(
             name="list_shortcuts",
-            description="列出 Mac 上可用的 Apple 快捷指令名称。",
+            description="List the names of the Apple Shortcuts available on the Mac.",
             parameters=no_args,
         ),
         types.FunctionDeclaration(
             name="run_mac_task",
             description=(
-                "把一个复杂任务派给 Mac 上的后台 Claude 执行（整理文件、查资料、"
-                "写文档、代码相关）。立即返回已开始；完成后会收到系统通知。"
-                "task 要写成完整清晰的任务描述。"
+                "Give a complex task to a background Claude on the Mac (organising files, research, "
+                "writing documents, anything with code). Returns \"started\" at once; you get a system "
+                "notice when it finishes. Write task as a complete, clear description."
             ),
             parameters=types.Schema(
                 type="OBJECT",
                 properties={
-                    "task": types.Schema(type="STRING", description="完整任务描述"),
+                    "task": types.Schema(type="STRING", description="Complete task description"),
                 },
                 required=["task"],
             ),
@@ -727,7 +741,7 @@ def _build_mac_declarations(types: Any) -> list[Any]:
         ),
         types.FunctionDeclaration(
             name="check_mac_task",
-            description="查询后台 Mac 任务的进度和结果。",
+            description="Check the progress and result of background Mac tasks.",
             parameters=no_args,
         ),
     ]
@@ -1493,7 +1507,7 @@ class GeminiLiveBridge:
             return self._dispatch_get_datetime()
         if name in MAC_TOOL_NAMES:
             if self._mac is None:
-                return {"ok": False, "error": "Mac 控制已停用"}
+                return {"ok": False, "error": "Mac control is turned off"}
             return await self._mac.dispatch(name, args)
 
         esp32_name = TOOL_MAP.get(name)
@@ -1751,9 +1765,9 @@ class GeminiLiveBridge:
                     continue
                 try:
                     await session.send_realtime_input(
-                        text=f"[系统通知，不是用户发言] {bot}回话了："
-                        f"{piece}\n请马上用自己的声音把这句话简短转述给用户，"
-                        "不要加工具调用，不要再调用 ask_grokbot。"
+                        text=f"[System notice, not the user speaking] {bot} replied: "
+                        f"{piece}\nPass this on to the user briefly, right away, in your own voice and "
+                        "in the user's language. Do not call any tools, and do not call ask_grokbot again."
                     )
                 except Exception:
                     logger.exception("ask_grokbot reply announcement failed")
@@ -1765,8 +1779,9 @@ class GeminiLiveBridge:
                 return
             try:
                 await session.send_realtime_input(
-                    text=f"[系统通知，不是用户发言] 发给{bot}失败。"
-                    f"请用一句话告诉用户没送到。不要编造{bot}的回复。"
+                    text=f"[System notice, not the user speaking] Sending the task to {bot} failed. "
+                    f"Tell the user in one sentence, in their language, that it did not get through. "
+                    f"Do not make up a reply from {bot}."
                 )
             except Exception:
                 logger.exception("ask_grokbot failure announcement failed")
@@ -1775,9 +1790,10 @@ class GeminiLiveBridge:
         return {
             "ok": True,
             "status": "sent",
-            "say": f"已经发给{bot}啦",
-            "instruction": f"立刻用自己的声音对用户说：已经发给{bot}啦。"
-            f"不要干等回复，{bot}回话后会有系统通知。",
+            "say": f"Sent to {bot}.",
+            "instruction": f"Right away, tell the user in your own voice and in their language that the "
+            f"task has been sent to {bot}. Do not wait for the reply; a system notice follows when "
+            f"{bot} answers.",
         }
 
     async def _dispatch_ask_claude(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -1814,14 +1830,12 @@ class GeminiLiveBridge:
         from datetime import datetime  # noqa: PLC0415
 
         now = datetime.now()
-        weekdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+        weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         return {
             "ok": True,
             "datetime": now.isoformat(timespec="seconds"),
             "weekday": weekdays[now.weekday()],
-            "readable": now.strftime("%Y年%m月%d日 %H:%M")
-            + " "
-            + weekdays[now.weekday()],
+            "readable": now.strftime("%Y-%m-%d %H:%M") + " " + weekdays[now.weekday()],
         }
 
     async def _announce_mac_task(self, record: dict[str, Any]) -> None:
@@ -1837,12 +1851,12 @@ class GeminiLiveBridge:
             )
             await self._set_face("notification")
             return
-        status = "完成" if record.get("status") == "done" else "失败"
+        status = "finished" if record.get("status") == "done" else "failed"
         result = str(record.get("result") or "").strip()
         text = (
-            f"[系统通知，不是用户发言] 后台任务 #{record.get('id')}"
-            f"（{record.get('task')}）已{status}。结果：{result or '无输出'}。"
-            "请用一两句话向用户口头汇报。"
+            f"[System notice, not the user speaking] Background task #{record.get('id')}"
+            f" ({record.get('task')}) has {status}. Result: {result or 'no output'}. "
+            "Report it to the user in one or two sentences, in their language."
         )
         try:
             await session.send_realtime_input(text=text)
