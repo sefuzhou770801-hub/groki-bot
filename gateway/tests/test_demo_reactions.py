@@ -175,3 +175,10 @@ async def test_demo_reactions_default_disabled_no_side_effects(monkeypatch):
     assert usb.tools == []
     assert esp32.tools == []
     assert esp32.spoken == []
+
+
+def test_intro_line_uses_the_public_robot_name():
+    from stackchan_mcp.demo_reactions import INTRO_LINE
+
+    assert "Groki" in INTRO_LINE
+    assert "Grok，" not in INTRO_LINE

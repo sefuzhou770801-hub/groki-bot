@@ -226,7 +226,7 @@ reconnect the MCP client, after a change).
 | `STACKCHAN_CLAUDE_BIN` | `claude` on PATH | Claude CLI used by `ask_claude` |
 | `STACKCHAN_CLAUDE_MODEL` | `claude-sonnet-5` | Model passed to the Claude CLI by `ask_claude` and Mac tasks |
 | `STACKCHAN_VOICE_BACKEND` | `gemini` | `xiaozhi` forwards voice to the XiaoZhi cloud instead |
-| `STACKCHAN_PERSONALITY_FILE` | `personality.md` in this directory, if present | Extra persona text appended to Gemini's instructions |
+| `STACKCHAN_PERSONALITY_FILE` | `personality.md` in this directory, if present | Extra persona text appended to Gemini's instructions. The built-in persona is a short one named Groki that replies in the user's language; text in this file overrides it where they differ (name, language, style) |
 | `STACKCHAN_TOOL_BOT` | empty (off) | Grok Bot agent name for `ask_grokbot`; setting it turns the hand-off on |
 | `STACKCHAN_TOOL_BOT_ID` | empty | Optional agent id sent next to the name |
 | `STACKCHAN_TOOL_BOT_PREFIX` | built-in Chinese read-aloud hint | Text put in front of every task; set it empty to send tasks as is |

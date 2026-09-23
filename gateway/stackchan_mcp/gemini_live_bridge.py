@@ -177,6 +177,19 @@ def _personality_path() -> Path:
     return Path(__file__).resolve().parents[1] / "personality.md"
 
 
+# Short and neutral on purpose: a personality file appended under
+# "# 性格设定" can change the name, language and style.
+BUILTIN_PERSONALITY = (
+    "You are Groki, a small robot that lives on the user's desk. "
+    "Reply in the language the user speaks, in one or two short sentences, "
+    "like a friend, without a customer-service tone. "
+    "If you are asked which AI model you run on, answer truthfully. "
+    "Only call end_conversation when the user clearly says goodbye. "
+    "If a \"# 性格设定\" section follows, it overrides this paragraph "
+    "wherever the two differ."
+)
+
+
 def _load_personality() -> str:
     """Built-in persona at the top of the instructions.
 
@@ -184,12 +197,7 @@ def _load_personality() -> str:
     appends it once below the rules, as the docs describe. Reading it here
     as well put the file into the prompt twice.
     """
-    return (
-        "你是 Grok，住在桌上这台小机器人里。"
-        "中文，1-2 句话，像朋友聊天。不客服腔，不叫主人。"
-        "问你是谁就答自己是 Grok，不要说 Gemini。"
-        "只在用户明确说再见时才调用 end_conversation 工具。"
-    )
+    return BUILTIN_PERSONALITY
 
 
 def default_system_instruction(

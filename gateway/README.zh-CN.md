@@ -176,7 +176,7 @@ curl -s -X POST http://127.0.0.1:18770/send \
 | `STACKCHAN_CLAUDE_BIN` | PATH 里的 `claude` | `ask_claude` 使用的 Claude CLI |
 | `STACKCHAN_CLAUDE_MODEL` | `claude-sonnet-5` | `ask_claude` 和 Mac 后台任务调用 Claude CLI 时使用的模型 |
 | `STACKCHAN_VOICE_BACKEND` | `gemini` | 设为 `xiaozhi` 改为把语音转发到 XiaoZhi 云服务 |
-| `STACKCHAN_PERSONALITY_FILE` | 本目录的 `personality.md`（存在时） | 追加到 Gemini 指令后面的人设文字 |
+| `STACKCHAN_PERSONALITY_FILE` | 本目录的 `personality.md`（存在时） | 追加到 Gemini 指令后面的人设文字。内置人设很简短：名字叫 Groki，用用户说话的语言回答；这个文件里的内容和它不一致时（名字、语言、风格）以文件为准 |
 | `STACKCHAN_TOOL_BOT` | 空（关闭） | `ask_grokbot` 使用的 Grok Bot 智能体名字；填了才开启 |
 | `STACKCHAN_TOOL_BOT_ID` | 空 | 可选，和名字一起发送的智能体 ID |
 | `STACKCHAN_TOOL_BOT_PREFIX` | 内置的朗读提示 | 加在每个任务前面的文字；设为空则原样发送任务 |
