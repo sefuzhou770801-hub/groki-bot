@@ -209,7 +209,7 @@ reconnect the MCP client, after a change).
 |---|---|---|
 | `GEMINI_API_KEY` | none | Gemini Live key. Required for voice. |
 | `STACKCHAN_GEMINI_VOICE` | `Kore` | Gemini voice name |
-| `STACKCHAN_GEMINI_MODEL` | `gemini-3.1-flash-live-preview` | Gemini Live model |
+| `STACKCHAN_GEMINI_MODEL` | `gemini-3.8-live` | Gemini Live model (set `gemini-3.1-flash-live-preview` to go back) |
 | `STACKCHAN_TOKEN` | empty | Shared secret with the robot; also protects `/capture` and `/debug/inject-text` |
 | `HOST`, `WS_PORT`, `CAPTURE_PORT` | `0.0.0.0`, `8765`, `8766` | Listen address and ports |
 | `STACKCHAN_WAKE_WORD` | on | `0` disables the wake word gate |

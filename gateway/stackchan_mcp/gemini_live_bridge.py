@@ -204,10 +204,17 @@ DEFAULT_SYSTEM_INSTRUCTION = default_system_instruction(device_tools=True, mac_c
 # Caveats noted in the model card:
 #   - No affective_dialog or proactive_audio (we don't set these).
 #   - Function calling is synchronous (matches what we already do).
-# STACKCHAN_GEMINI_MODEL overrides for bandwidth-constrained networks: 2.x
+# 2026-09-23: default moved to Gemini 3.8 Live (GA 2026-09-15, model code
+# `gemini-3.8-live`, https://ai.google.dev/gemini-api/docs/models/gemini-3.8-live).
+# Differences that matter here: TEXT response modality is rejected (1007), so
+# build_live_config remaps it like 3.1; a turn_complete arrives right after a
+# tool call, before the spoken answer; thinking_config, proactive_audio=false
+# and enable_affective_dialog are rejected (we set none of them).
+# Set STACKCHAN_GEMINI_MODEL=gemini-3.1-flash-live-preview to go back.
+# STACKCHAN_GEMINI_MODEL also overrides for bandwidth-constrained networks: 2.x
 # Live models accept a true TEXT response modality (text-only downstream,
 # ~1000x lighter than 24 kHz PCM), which pairs with STACKCHAN_GEMINI_TTS=edge.
-DEFAULT_MODEL = os.getenv("STACKCHAN_GEMINI_MODEL", "gemini-3.1-flash-live-preview")
+DEFAULT_MODEL = os.getenv("STACKCHAN_GEMINI_MODEL", "gemini-3.8-live")
 DEFAULT_VOICE = os.getenv("STACKCHAN_GEMINI_VOICE", "Kore")
 CONVERSATION_IDLE_TIMEOUT_S = 8.0
 DEFAULT_CTX_TRIGGER_TOKENS = 25_000
@@ -702,9 +709,9 @@ def build_live_config(
     instruction = system_instruction or build_system_instruction()
 
     live_modality = response_modality
-    if response_modality == "TEXT" and model.startswith("gemini-3.1"):
-        # Gemini 3.1 Flash Live currently rejects TEXT as a direct response
-        # modality (server closes with 1011).  Keep the public bridge contract
+    if response_modality == "TEXT" and model.startswith("gemini-3"):
+        # Gemini 3.x Live models reject TEXT as a direct response modality
+        # (3.1 closes with 1011, 3.8 with 1007).  Keep the public bridge contract
         # as "text to caller", but ask Live for audio plus output transcription:
         # the native audio is discarded and the transcript feeds Edge TTS.
         # 2.x Live models accept TEXT directly, so they skip this remap and
@@ -1203,6 +1210,13 @@ class GeminiLiveBridge:
         if server_content is None:
             return
 
+        # Model output means a reply is in progress. Gemini 3.8 Live sends a
+        # turn_complete right after a tool call, before the spoken answer, so
+        # a silence timer armed by that early turn_complete must not end the
+        # conversation mid-answer; the answer's own turn_complete re-arms it.
+        if self._has_model_output(server_content):
+            self._cancel_silence_timeout()
+
         # Forward any audio chunks if the caller wired up a sink. We do not
         # play them automatically — the StackChan TTS pipeline is the caller's
         # responsibility because it needs to wrap PCM in the Opus protocol.
@@ -1240,6 +1254,14 @@ class GeminiLiveBridge:
                 logger.exception("on_turn_complete callback failed")
         if getattr(server_content, "turn_complete", False):
             self._schedule_silence_timeout()
+
+    @staticmethod
+    def _has_model_output(server_content: Any) -> bool:
+        model_turn = getattr(server_content, "model_turn", None)
+        if model_turn is not None and getattr(model_turn, "parts", None):
+            return True
+        transcription = getattr(server_content, "output_transcription", None)
+        return bool(getattr(transcription, "text", None))
 
     @staticmethod
     def _extract_audio_chunk(server_content: Any) -> bytes | None:
