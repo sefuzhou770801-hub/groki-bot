@@ -126,9 +126,13 @@ jobs:
           # groki-bot 自 v0.1.0 起独立编号，上游遗留的 v0.7.0 门槛会把我们的
           # 全部版本跳过（2026-09-15 首发时 versions.json 为空）。
           RETAIN_FLOOR="v0.1.0"
-          tags_json=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
-                        --json tagName,isDraft,isPrerelease)
-          mapfile -t tags < <(echo "$tags_json" | jq -r '.[] | select(.isDraft|not) | .tagName')
+          # Look releases and their assets up by release id. The by-tag view
+          # (`gh release view <tag>`, /releases/tags/<tag>) can keep reporting
+          # zero assets long after the upload finished (seen on v0.2.1), which
+          # silently dropped that release from versions.json.
+          releases_tsv=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+                           --jq '.[] | select(.draft|not) | "\(.tag_name)\t\(.id)"')
+          mapfile -t tags < <(printf '%s\n' "$releases_tsv" | cut -f1 | sed '/^$/d')
 
           # Per-tag JSON object. For each tag we stage every firmware-*.zip
           # asset and classify it by board suffix in the filename:
@@ -147,8 +151,10 @@ jobs:
               echo "[skip] $tag: below retention floor $RETAIN_FLOOR"
               continue
             fi
-            assets=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
-                     --jq '.assets[] | select(.name|test("^firmware-.*\\.zip$")) | .name')
+            release_id=$(printf '%s\n' "$releases_tsv" | awk -F'\t' -v t="$tag" '$1 == t { print $2; exit }')
+            asset_rows=$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?per_page=100" \
+                     --jq '.[] | select(.name|test("^firmware-.*\\.zip$")) | "\(.name)\t\(.id)"')
+            assets=$(printf '%s\n' "$asset_rows" | cut -f1 | sed '/^$/d')
             if [ -z "$assets" ]; then
               echo "[skip] $tag: no firmware ZIP asset"
               continue
@@ -158,7 +164,9 @@ jobs:
             boards_json='{}'
             while IFS= read -r asset; do
               [ -z "$asset" ] && continue
-              gh release download "$tag" --repo "$GITHUB_REPOSITORY" -p "$asset" -D "$dest" --clobber
+              asset_id=$(printf '%s\n' "$asset_rows" | awk -F'\t' -v n="$asset" '$1 == n { print $2; exit }')
+              gh api -H "Accept: application/octet-stream" \
+                "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id" > "$dest/$asset"
               # Extract board suffix; legacy un-suffixed zips map to cores3.
               base="${asset%.zip}"
               suffix="${base##*-}"
