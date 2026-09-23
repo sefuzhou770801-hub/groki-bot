@@ -78,7 +78,7 @@ The firmware loads any `.htsvoice` file. These voices were used for testing and 
 
 ## Gateway (`gateway/`)
 
-The Python gateway that runs on your computer (voice through Gemini Live, the "Hi Grok" wake word, the MCP server and the Grok Bot forwarding service). It is not part of the firmware image.
+The Python gateway that runs on your computer (voice through Gemini Live, the "Hey Groki" wake word, the MCP server and the Grok Bot forwarding service). It is not part of the firmware image.
 
 ### Upstream
 

@@ -10,7 +10,7 @@ the firmware and Grok Bot is described in
 
 - **Voice conversation** through Google Gemini Live, with the robot's
   microphone and speaker.
-- **"Hi Grok" wake word**, detected on your computer, so the gateway only
+- **"Hey Groki" wake word**, detected on your computer, so the gateway only
   forwards microphone audio to Gemini after you call the robot.
 - **An MCP server** so Claude Code, Claude Desktop, or any other MCP client
   can make the robot speak and read its status.
@@ -33,7 +33,7 @@ The Groki Bot firmware can already talk on its own: flash it, enter your own
 OpenAI or Gemini API key in its settings page, and it works without any
 computer. Install this gateway if you want:
 
-- the "Hi Grok" wake word,
+- the "Hey Groki" wake word,
 - Claude (or another MCP client) to make the robot speak,
 - voice commands that reach your computer (Mac control, `ask_claude`).
 
@@ -99,6 +99,33 @@ uv run python scripts/kws_offline_repro.py --generate-say
 # prints 命中 (hit) or 未命中 (miss)
 ```
 
+### Changing the wake word
+
+The default wake word is "Hey Groki". The detector (sherpa-onnx keyword
+spotting) matches a sequence of sounds, so any phrase works without
+retraining the model. Set it in `.env` and restart the gateway:
+
+- Old wake word "Hi Grok": `STACKCHAN_WAKE_PHRASE=hi grok`.
+- Your own phrase: set `STACKCHAN_WAKE_PHRASE` to the phrase and
+  `STACKCHAN_WAKE_KEYWORD` to its sounds, then `@` and the phrase. English
+  words use CMU dictionary phonemes (ARPAbet, with stress digits); Chinese
+  uses pinyin split into initial and final, with tone marks. Every sound must
+  appear in the model's `tokens.txt`. Examples:
+
+  ```bash
+  STACKCHAN_WAKE_PHRASE=hello robot
+  STACKCHAN_WAKE_KEYWORD=HH AH0 L OW1 R OW1 B AA2 T @hello_robot
+
+  STACKCHAN_WAKE_PHRASE=小机器人
+  STACKCHAN_WAKE_KEYWORD=x iǎo j ī q ì r én @小机器人
+  ```
+
+Check a new wake word before relying on it: `kws_offline_repro.py` reads the
+same settings (`--voice` picks another macOS voice, `--wav` uses your own
+recording). Two or three syllables with clear consonants work best; if it
+triggers too rarely or too often, adjust `STACKCHAN_KWS_THRESHOLD` and
+`STACKCHAN_KWS_SCORE`.
+
 ## 3. Start it and check
 
 ```bash
@@ -157,11 +184,11 @@ or Edge), tab "对话" (Conversation):
 4. "保存并重启" (Save and restart).
 
 `/debug/status` should now show `"device": {"connected": true, ...}`. Say
-"Hi Grok" and start talking.
+"Hey Groki" and start talking.
 
 ## Optional: Grok Bot hand-off
 
-With this on, you can say "Hi Grok, look up tomorrow's weather in Tokyo" or
+With this on, you can say "Hey Groki, look up tomorrow's weather in Tokyo" or
 "research X for me": Gemini says the task has been sent to the agent
 right away, hands the task to an agent in the Grok Bot app, and reads the
 agent's replies aloud as they come in. Small talk stays with Gemini. The full
@@ -217,7 +244,7 @@ reconnect the MCP client, after a change).
 | `STACKCHAN_KWS_SCORE` | `7` | Higher makes the wake word easier to trigger |
 | `STACKCHAN_KWS_THRESHOLD` | `0.05` | Lower makes the wake word more sensitive |
 | `STACKCHAN_KWS_MODEL_DIR` | `./models/kws` | Wake word model location |
-| `STACKCHAN_WAKE_PHRASE`, `STACKCHAN_WAKE_KEYWORD` | `hi grok` | Custom wake word: phrase plus its phoneme line in sherpa-onnx keyword format; set both |
+| `STACKCHAN_WAKE_PHRASE`, `STACKCHAN_WAKE_KEYWORD` | `hey groki` | Wake word; see [Changing the wake word](#changing-the-wake-word). `STACKCHAN_WAKE_PHRASE=hi grok` alone restores the old one |
 | `STACKCHAN_WAKE_IDLE_S` | `30` | Silence before the listening window closes |
 | `STACKCHAN_MAC_CONTROL` | off | `1` lets voice commands control this Mac (see Safety) |
 | `STACKCHAN_GEMINI_DEVICE_TOOLS` | off | `1` gives Gemini face/LED/head tools; only for firmware with device MCP |

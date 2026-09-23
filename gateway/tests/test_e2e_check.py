@@ -312,3 +312,10 @@ def test_gateway_token_from_env(monkeypatch):
     assert gateway_token_from_env() == "b-token"
     monkeypatch.setenv("STACKCHAN_TOKEN", "s-token")
     assert gateway_token_from_env() == "s-token"
+
+
+def test_voice_self_check_says_the_default_wake_word():
+    from stackchan_mcp.e2e_check import VOICE_WAKE_UTTERANCE
+    from stackchan_mcp.wake_gate import WAKE_PHRASE
+
+    assert VOICE_WAKE_UTTERANCE.lower().startswith(WAKE_PHRASE)

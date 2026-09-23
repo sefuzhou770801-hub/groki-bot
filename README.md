@@ -16,7 +16,7 @@ Each path adds to the one before it. Start with path 1.
 | | What you get | What you need |
 |---|---|---|
 | **1. Firmware only** (start here) | Voice conversation with the robot through OpenAI Realtime or Google Gemini Live, using your own API key | The robot, a USB-C cable, desktop Chrome or Edge, an OpenAI or Gemini API key |
-| **2. + gateway** | A "Hi Grok" wake word and Gemini Live voice running through your computer; Claude or another MCP client can make the robot speak and read its status | Path 1, plus a computer on the same Wi-Fi running [gateway/](gateway/README.md) with a Gemini API key |
+| **2. + gateway** | A "Hey Groki" wake word and Gemini Live voice running through your computer; Claude or another MCP client can make the robot speak and read its status | Path 1, plus a computer on the same Wi-Fi running [gateway/](gateway/README.md) with a Gemini API key |
 | **3. + Grok Bot** | Say "look this up" or "research X": the robot hands the task to your agent in the Grok Bot app and reads the agent's replies aloud as they arrive | Path 2, plus the Grok Bot app signed in on that computer and the `gbot` CLI |
 
 How the pieces talk to each other (ports, protocol, message flow, what each part needs): [docs/architecture.md](docs/architecture.md).
@@ -53,7 +53,7 @@ Use this if you want the robot's voice to run through your computer, for example
    - "XiaoZhi 服务器 URL" (XiaoZhi server URL): `ws://<your computer's LAN IP>:8765`, for example `ws://192.168.1.20:8765`.
    - "XiaoZhi 令牌" (XiaoZhi token): if the gateway has `STACKCHAN_TOKEN` set, enter the same value here. If the gateway has no token, leave this empty.
    - Click "保存并重启" (Save and restart).
-4. Check <http://127.0.0.1:8766/debug/status> on the computer: `"device": {"connected": true}`. Say "Hi Grok".
+4. Check <http://127.0.0.1:8766/debug/status> on the computer: `"device": {"connected": true}`. Say "Hey Groki".
 
 What path 2 does and does not do with this firmware: the gateway handles voice conversation. Head, LED and camera control from Claude through the gateway does **not** reach this firmware, because its XiaoZhi client announces `features.mcp=false` in its hello message ([components/conversation/xiaozhi_client.cpp](components/conversation/xiaozhi_client.cpp)) and does not handle MCP requests from the server.
 
@@ -65,7 +65,7 @@ Use this if you already use the Grok Bot desktop app and want the robot to pass 
 2. On the same computer: sign in to the Grok Bot app and install the `gbot` CLI (`npm install --global grok-bot-cli`; it needs a recent Node.js, see [grok-bot-cli](https://github.com/ScriptedAlchemy/grok-bot-cli)). Check with `gbot bots list`.
 3. In `gateway/.env`, set `STACKCHAN_TOOL_BOT` to the agent's name (for example `STACKCHAN_TOOL_BOT=assistant`). The feature stays off until this is set.
 4. Start the forwarding service next to the gateway: `cd gateway && uv run stackchan-gbot-proxy` (listens on `127.0.0.1:18770` only). Restart the gateway.
-5. Say "Hi Grok, look up tomorrow's weather". The robot says the task has been sent to assistant, then reads the agent's replies.
+5. Say "Hey Groki, look up tomorrow's weather". The robot says the task has been sent to assistant, then reads the agent's replies.
 
 Details and troubleshooting: [gateway README, Grok Bot hand-off](gateway/README.md#optional-grok-bot-hand-off) and [docs/architecture.md, section 4](docs/architecture.md#4-grok-bot-hand-off).
 
