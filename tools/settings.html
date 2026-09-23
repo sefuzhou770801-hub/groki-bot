@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stack-chan 设置</title>
+<title data-i18n="page.title">Groki Settings</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -365,7 +365,919 @@
     #avatar-section .av-row label { flex: 1 0 100%; }
     #avatar-section .av-row input[type=range] { flex: 1 1 auto; }
   }
+  /* Title row with the EN / 中文 language switch. */
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+  }
+  .title-row h1 { margin-bottom: 0; }
+  .lang-switch { display: flex; gap: 0.2rem; flex-shrink: 0; }
+  .lang-switch button {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    background: #eee;
+    color: #555;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  .lang-switch button.active { background: #1976d2; color: white; border-color: #1976d2; }
 </style>
+<script>
+// --- i18n (English / Simplified Chinese) ------------------------------------
+// Language: a saved choice from the header toggle (localStorage) wins;
+// otherwise the browser's preferred language — `zh*` → Chinese, anything
+// else → English (the default and the fallback for missing keys).
+// Static markup carries data-i18n / data-i18n-html / data-i18n-placeholder /
+// data-i18n-title / data-i18n-aria-label keys; JS strings go through t().
+// Only UI text is translated: BLE protocol, setting keys and values sent to
+// the device are untouched.
+const I18N = {
+  en: {
+    'page.title': 'Groki Settings',
+    'page.heading': '🤖 Groki Settings',
+    'page.subtitle': 'Configure Wi-Fi and API keys over Web Bluetooth',
+    'page.instructions': 'ℹ️ Click <strong>Connect over Bluetooth</strong> to connect to the device with Web Bluetooth, change settings in the tabs, then click <strong>Save and restart</strong> to confirm (only needed for settings that require a restart). LED and face DSL changes take effect immediately.',
+    'page.compat': 'Works in Chrome / Edge (desktop) <strong>133 or later</strong>, including over <code>file://</code>. Firefox and Safari do not support Web Bluetooth.<br>Each connection is encrypted with X25519 + AES-256-GCM (no system pairing needed).',
+    'lang.label': 'Language',
+    'common.cancel': 'Cancel',
+    'common.clear': 'Clear',
+    'common.notStarted': 'Not started',
+    'common.failed': 'Failed: {msg}',
+    'common.on': 'on',
+    'common.off': 'off',
+    'err.title': 'Error',
+    'auth.heading': 'BLE connection password',
+    'auth.hint': 'This device has a connection password set.',
+    'auth.device': 'Device',
+    'auth.password': 'Password',
+    'auth.show': 'Show password',
+    'auth.connect': 'Connect',
+    'auth.empty': 'The password is empty, so authentication cannot continue',
+    'auth.cancelled': 'Password entry cancelled; connection aborted',
+    'auth.statusFail': 'Reading Status failed; the device may have a password set.',
+    'auth.autofilled': 'Filled in from the password manager',
+    'auth.enter': 'Enter the password.',
+    'auth.wrong': 'Wrong password; connection aborted: {msg}',
+    'auth.ok': 'BLE authentication OK',
+    'status.connected': 'BLE connected',
+    'status.disconnected': 'Not connected',
+    'status.connecting': 'Connecting…',
+    'status.wifiUp': 'Wi-Fi: connected',
+    'status.wifiDown': 'Wi-Fi: disconnected',
+    'status.readErr': 'Error reading Status: {msg}',
+    'status.notifyErr': 'Status notification decrypt error: {msg}',
+    'status.notifyOk': 'Subscribed to Status notifications',
+    'flag.ssid': 'SSID set',
+    'flag.pass': 'Password set',
+    'flag.key': 'OpenAI key set',
+    'flag.en': 'OpenAI enabled',
+    'flag.gkey': 'Gemini key set',
+    'btn.connect': 'Connect over Bluetooth',
+    'btn.apply': 'Save and restart',
+    'btn.disconnect': 'Disconnect',
+    'btn.saving': 'Saving…',
+    'btn.restarting': 'Restarting…',
+    'tab.conn': 'Connection',
+    'tab.avatar': 'Avatar',
+    'tab.audio': 'Audio',
+    'tab.chat': 'Conversation',
+    'tab.device': 'Device',
+    'tab.maint': 'Maintenance',
+    'dis.battery': 'Battery',
+    'dis.wifiMdns': 'Wi-Fi settings (mDNS)',
+    'dis.wifiIp': 'Wi-Fi settings (IP)',
+    'dis.wifiAudio': 'Wi-Fi audio over RTP (L16/AAC/μ-law, when conversation is off)',
+    'rtp.cmdL16': '# L16 (uncompressed) udp/6970',
+    'rtp.cmdAac': '# AAC (compressed)   udp/6972',
+    'mode.title': 'Operating mode',
+    'mode.hint': 'Choose how Groki behaves from three main modes. "Conversation" talks through OpenAI, Gemini or XiaoZhi, "Idle chatter" only speaks while idle, and "Mic lip sync" only moves the mouth with the microphone input. Takes effect after a restart.',
+    'mode.conv': 'Conversation',
+    'mode.jtts': 'Idle chatter (JttsRandom)',
+    'mode.lip': 'Mic lip sync (MicLipSync)',
+    'opmode.conv': 'Conversation',
+    'opmode.jtts': 'Idle chatter',
+    'opmode.lip': 'Mic lip sync',
+    'ssid.hint': 'Leave blank to keep the current value',
+    'ssid.current': '{ssid} (current)',
+    'ssid.log': 'Current SSID: {ssid}',
+    'ssid.readErr': 'Error reading SSID: {msg}',
+    'wifi.password': 'Wi-Fi password',
+    'ph.keep': '(leave blank to keep)',
+    'ph.keepAscii': '(leave blank to keep)',
+    'devname.title': 'Device name (BLE / mDNS)',
+    'devname.hint': 'Used as the base for the BLE advertising name and the mDNS host name. Leave blank to generate one automatically (Stackchan-XXXXXX). mDNS keeps only letters, digits and hyphens. Takes effect after a restart.',
+    'devname.label': 'Device name',
+    'devname.ph': '(leave blank for automatic)',
+    'devname.auto': '(generated automatically)',
+    'authcfg.title': 'Password protection',
+    'authcfg.hint': 'When set, both this BLE settings page and the Wi-Fi settings page require the password. BLE mixes a hash of the password into the encryption key, so with a wrong password every channel fails to decrypt. HTTP uses Basic Auth. Clearing it goes back to no password (compatible with the current behavior). Takes effect after a restart.',
+    'authcfg.label': 'Password',
+    'authcfg.clearTitle': 'Remove the password',
+    'authcfg.stateHint': '(blank = keep / Clear removes the password)',
+    'face.title': 'Face tuning (sliders with live preview)',
+    'face.hint': 'The preview below follows the sliders. While connected, <strong>the robot\'s face also changes live</strong> (no restart needed). To keep the current settings, click "Save and restart" (the device restarts to confirm).',
+    'face.previewLoading': 'Loading preview…',
+    'face.previewMissing': 'Preview module (avatar_module.js) not found; you can still tune over BLE',
+    'face.previewInitFail': 'avatar_init failed',
+    'face.previewRunning': 'Rendering the preview (the current C++ code running in WASM)',
+    'face.previewError': 'Preview initialization error: {msg}',
+    'face.browShow': 'Show eyebrows',
+    'face.eyeR': 'Eye radius',
+    'face.eyeOx': 'Eye offset X',
+    'face.eyeOy': 'Eye offset Y',
+    'face.browOx': 'Eyebrow offset X',
+    'face.browOy': 'Eyebrow offset Y',
+    'face.mouthOx': 'Mouth offset X',
+    'face.mouthOy': 'Mouth offset Y',
+    'face.mouthMinW': 'Mouth min width',
+    'face.mouthMaxW': 'Mouth max width',
+    'face.mouthMinH': 'Mouth min opening (closed)',
+    'face.mouthMaxH': 'Mouth max opening (open)',
+    'face.cheekShow': 'Show blush',
+    'face.cheekR': 'Blush radius',
+    'face.cheekOx': 'Blush offset X',
+    'face.cheekOy': 'Blush offset Y',
+    'face.colFace': 'Face color',
+    'face.colBg': 'Background color',
+    'face.reset': 'Restore defaults',
+    'face.sendFail': 'Failed to send face tuning: {msg}',
+    'dsl.title': 'Face drawing DSL (replaces the whole face structure)',
+    'dsl.hint': 'Write the avatar face\'s drawing logic in a Lua-like DSL. The browser compiles it to bytecode and sends it over BLE, where it takes effect immediately. It is saved to NVS and survives restarts.',
+    'dsl.syntaxGuide': 'Syntax guide',
+    'dsl.defaultSource': 'Default face source',
+    'dsl.notStarted': 'DSL compiler not started',
+    'dsl.send': 'Compile and send',
+    'dsl.presetTitle': 'Choosing a preset loads its source and sends it to the robot',
+    'dsl.reset': 'Reset robot to default',
+    'dsl.dlAvbc': 'Download .avbc',
+    'dsl.dlAvdsl': 'Download .avdsl',
+    'dsl.loadAvdsl': 'Load .avdsl',
+    'dsl.sendAvbc': 'Send .avbc directly',
+    'dsl.notConnected': 'BLE not connected',
+    'dsl.compilerMissing': 'Failed to load the DSL compiler bundle (not injected in an offline file:// copy)',
+    'dsl.chrMissing': 'AvatarBytecode characteristic not connected',
+    'dsl.sizeRange': 'Size out of range ({n} B, allowed 1..32768)',
+    'vol.title': 'Speaker volume',
+    'vol.hint': 'Applies to all output: built-in speaker, Module Audio and Atomic Echo Base. Moving the slider <strong>takes effect immediately</strong> and is saved automatically (no restart needed). 100% is each board\'s factory default; 200% is a boost (the internal master volume is doubled, capped at 255).',
+    'vol.label': 'Volume',
+    'vol.readFail': 'Failed to read the speaker volume: {msg}',
+    'vol.writeFail': 'Failed to write the speaker volume: {msg}',
+    'say.title': 'jtts test speech',
+    'say.hint': 'Type hiragana or katakana and click "Speak" to hear it through jtts. Kanji and English are not converted, so write the text in kana. Useful for checking the volume and the audio output.',
+    'say.ph': '(example) type hiragana',
+    'say.btn': 'Speak',
+    'say.tooLong': 'jtts test speech: longer than 192 bytes',
+    'say.ok': 'jtts test speech: "{text}"',
+    'say.fail': 'jtts test speech failed: {msg}',
+    'out.title': 'Audio output',
+    'out.hint': 'Choose where audio plays. "Auto" uses an installed M5 Module Audio first and falls back to the built-in speaker. "Built-in speaker" and "Module Audio" force the choice (choosing Module Audio without one installed falls back to the built-in speaker). Takes effect after a restart.',
+    'out.auto': 'Auto',
+    'out.internal': 'Built-in speaker (Internal)',
+    'outlbl.auto': 'Auto',
+    'outlbl.internal': 'Built-in speaker',
+    'rtp.title': 'Wi-Fi RTP audio receiver',
+    'rtp.enable': 'Enable the RTP audio receiver',
+    'rtp.hint': 'Receives RTP audio over Wi-Fi (L16/μ-law = udp/6970, AAC = udp/6972). Turned off automatically while conversation is on',
+    'idle.title': 'Idle speech (jtts)',
+    'idle.enable': 'Enable idle chatter',
+    'mic.title': 'Mic lip sync tuning (used in Mic lip sync mode)',
+    'mic.hint': 'Opens and closes the mouth with the microphone level. The CoreS3 microphone is not very sensitive, so a higher input gain looks better. Moving a slider <strong>takes effect immediately</strong> and is saved automatically.',
+    'mic.input': 'Input gain',
+    'mic.output': 'Mouth gain',
+    'mic.agc': 'Enable automatic gain control (AGC)',
+    'mic.agcHint': 'Tracks the background noise so the mouth reacts to speech in both quiet rooms and noisy places. When off, a fixed threshold is used (it does not adapt, but it is more predictable). Takes effect after a restart.',
+    'mic.readFail': 'Failed to read the mic lip sync settings: {msg}',
+    'mic.writeFail': 'Failed to write the mic lip sync settings: {msg}',
+    'voice.title': 'jtts voice',
+    'voice.hint': 'Fields left blank or unchanged keep their current values when you click "Save".',
+    'voice.type': 'Voice type',
+    'voice.female': 'Female (childlike)',
+    'voice.male': 'Male (lower)',
+    'voice.synth': 'Synthesis method',
+    'voice.synthV2': 'Standard (v2: glottal wave + cascade)',
+    'voice.synthClassic': 'Classic (old method: buzzer tone)',
+    'voice.engine': 'Engine',
+    'voice.engAuto': 'Auto (HMM voice > voice library > formant)',
+    'voice.engHmm': 'HMM synthesis (needs a voice, otherwise falls back)',
+    'voice.engUnit': 'Unit concatenation (needs a voice library, otherwise formant)',
+    'voice.engFormant': 'Formant synthesis only',
+    'voice.halftone': 'HMM pitch shift [semitones]',
+    'voice.uploadHint': 'HMM voices (.htsvoice) and unit-concatenation voice libraries (.jvox) can be uploaded on the Wi-Fi settings page.',
+    'voice.licenseText': 'Attribution for the speech engine (hts_engine, Modified BSD) and the bundled voices:',
+    'voice.licenseLink': 'Licenses / attribution',
+    'voice.f0': 'Pitch F0 (Hz)',
+    'voice.formant': 'Formant scale',
+    'voice.mora': 'Mora length (ms)',
+    'voice.gain': 'Volume (gain)',
+    'voice.breath': 'Breathiness',
+    'voice.vibRate': 'Vibrato rate (Hz)',
+    'voice.vibDepth': 'Vibrato depth (cents)',
+    'voice.oq': 'Glottal open quotient (softness)',
+    'voice.tilt': 'High-frequency tilt (dB)',
+    'voice.bw': 'Bandwidth scale (reduces shrillness)',
+    'voice.softHint': 'For a softer voice try: open quotient 0.65–0.75 / tilt 6–12 dB / bandwidth 1.2–1.5 (plus breathiness 0.1–0.25). All of these apply to the v2 method (bandwidth also applies to the classic method).',
+    'phr.label': 'Idle phrases (one per line)',
+    'phr.hint': 'Format: <code>display text | reading</code>. The part right of <code>|</code> (the reading) must be hiragana or katakana (kanji are skipped when speaking). Without <code>|</code> the display text is also used as the reading. Example: <code>display text | hiragana reading</code>',
+    'phr.ph': 'display text | hiragana reading',
+    'play.title': 'Play an audio file (BLE streaming)',
+    'play.hint': 'Choose a local audio file (.mp3 / .wav / .m4a / .aac, etc.) and click "Play". The browser re-encodes it to 24 kHz mono AAC-LC and streams it over BLE. Groki decodes and plays the AAC as it arrives and moves its mouth with the volume.',
+    'play.play': 'Play',
+    'play.stop': 'Stop',
+    'play.convNote': '⚠ Not available while conversation is on. Radio and CPU contention would interrupt playback, so the two are mutually exclusive. Turn off "Enable conversation", save and restart, then try again.',
+    'play.unsupported': 'This firmware does not support audio streaming',
+    'play.convOn': 'Cannot play while conversation is on (the two are mutually exclusive). Turn it off, then save and restart.',
+    'play.noFile': 'Choose an audio file',
+    'play.noEncoder': 'WebCodecs AudioEncoder is not available (Chrome / Edge 94+ required)',
+    'play.decoding': 'Decoding…',
+    'play.encodeStart': 'AAC encoding started: {kib} KiB → {ms} ms @ {rate}Hz mono',
+    'play.progress': 'Sending {pct}% / {kib} KiB / {rate} KiB/s / credit {credit} KiB',
+    'play.stopped': 'Stopped',
+    'play.stoppedLog': 'Audio sending stopped',
+    'play.done': 'Done {kib} KiB',
+    'play.doneLog': 'Audio sent',
+    'play.error': 'Audio sending error: {msg}',
+    'met.title': 'Audio pipeline diagnostics',
+    'met.hint': 'Audio pipeline statistics for the most recent conversation turn (same as BLE chr 0x1f / HTTP <code>GET /api/metrics/audio</code>). The firmware (<code>conv-task: log_playback_metrics</code>) updates them at the end of each turn; click "Read" below to see the latest values.',
+    'met.metric': 'Metric',
+    'met.none': 'Not read yet',
+    'met.read': 'Read',
+    'met.auto': 'Auto-refresh (2 s)',
+    'met.empty': 'The most recent conversation turn has not finished yet (snapshot is empty)',
+    'met.recvLag': 'recv_lag (event hand-off) μs',
+    'met.recvQueued': 'recv→queued (queued for playback) ms',
+    'met.spkQueue': 'spk_queue depth (0..2)',
+    'met.pcmLag': 'pcm_lag unplayed samples',
+    'met.jsonFail': 'audio metrics: failed to parse JSON ({msg})',
+    'lt.title': 'LT timer',
+    'lt.hint': 'Start or stop it from the "LT" tab on the robot. Set the default length and the announcements here (changes apply immediately and are kept after Save and restart). Write readings in hiragana (jtts cannot read kanji)',
+    'lt.total': 'Talk length (seconds)',
+    'lt.warn': 'Time-left warning (seconds before end)',
+    'lt.soon': 'Almost-up warning (seconds before end, 0 = off)',
+    'lt.repeat': 'Overtime repeat (seconds, 0 = once)',
+    'lt.warnText': 'Time-left warning: display text',
+    'lt.warnReading': 'Time-left warning: reading (hiragana)',
+    'lt.soonText': 'Almost-up warning: display text',
+    'lt.soonReading': 'Almost-up warning: reading (hiragana)',
+    'lt.justText': 'Time up: display text',
+    'lt.justReading': 'Time up: reading (hiragana)',
+    'lt.overText': 'Overtime: display text',
+    'lt.overReading': 'Overtime: reading (hiragana)',
+    'lt.ph.warnText': '1 minute left',
+    'lt.ph.kana': '(type hiragana)',
+    'lt.ph.soonText': '15 seconds left',
+    'lt.ph.sameAsOver': '(blank = same as overtime)',
+    'lt.ph.overText': 'Time\'s up!',
+    'chat.title': 'Conversation provider and API keys',
+    'chat.provider': 'Conversation provider',
+    'chat.xiaozhi': 'XiaoZhi server',
+    'chat.providerHint': 'Chooses which conversation backend to use. Keys and settings for each one can be saved in the fields below.',
+    'chat.openaiKey': 'OpenAI API key',
+    'chat.geminiKey': 'Gemini API key',
+    'chat.xzUrl': 'XiaoZhi server URL',
+    'chat.xzToken': 'XiaoZhi token',
+    'chat.ph.openai': 'sk-… (leave blank to keep)',
+    'chat.ph.gemini': 'AIza… (leave blank to keep)',
+    'chat.ph.xzUrl': 'ws://192.168.1.10:8000/xiaozhi/v1/ (leave blank to keep)',
+    'chat.ph.xzToken': '(optional / leave blank to keep)',
+    'chat.enable': 'Enable conversation',
+    'touch.title': 'Touch controls',
+    'touch.bargeIn': 'Tap the head to interrupt (barge-in)',
+    'touch.hint': 'While a reply is playing, tapping the avatar screen (the head) interrupts the AI reply. The touch sensor is sensitive and easily triggered by accident, so this is off by default. Petting (touching front → middle → back in sequence) is not affected by this switch and is always on. Takes effect after a restart.',
+    'dev.title': 'Device features on/off',
+    'dev.batGauge': 'Show battery gauge',
+    'dev.batHint': 'Shows a battery gauge in the top-left corner of the avatar screen (takes effect after a restart)',
+    'dev.arp': 'Play an arpeggio at startup',
+    'dev.arpHint': 'Whether to play C5–E5–G5 (a speaker self-test tone) after startup. When off, the device starts silently (takes effect after a restart)',
+    'dev.servo': 'Enable servos',
+    'dev.servoHint': 'When off, the servos get no power and the servo task does not start (takes effect after a restart). This is not the same as the torque off/on switch on the control screen: this setting is saved to NVS.',
+    'sv.title': 'Servo origin and range of motion (for custom bases such as the Takao base)',
+    'sv.hint': 'Servo mounting direction and range of motion differ between bases. Set the origin (0..1023) and the range (degrees), then click "Save and restart" to apply. The defaults are the M5 base values.',
+    'sv.yawZero': 'Yaw origin (raw)',
+    'sv.yawMin': 'Yaw min (°)',
+    'sv.yawMax': 'Yaw max (°)',
+    'sv.pitchZero': 'Pitch origin (raw)',
+    'sv.pitchMin': 'Pitch min (°)',
+    'sv.pitchMax': 'Pitch max (°)',
+    'sv.rangeHint': 'Range setting mode turns the servo torque off so you can move the head by hand and capture positions. In order: at the center click "Capture Yaw origin", at the left end "Capture Yaw min", at the right end "Capture Yaw max". Captured values fill the fields above. Finally click "Save and restart" to confirm.',
+    'sv.rangeModeOff': 'Range setting mode: OFF',
+    'sv.capYawZero': 'Capture Yaw origin',
+    'sv.capYawMin': 'Capture Yaw min',
+    'sv.capYawMax': 'Capture Yaw max',
+    'sv.capPitchZero': 'Capture Pitch origin',
+    'sv.capPitchMin': 'Capture Pitch min',
+    'sv.capPitchMax': 'Capture Pitch max',
+    'led.title': 'Cat-ear LEDs',
+    'led.hint': 'Sets the mode, color and brightness of the cat-ear NeoPixels (GPIO9 / 18 LEDs). Changes apply immediately, are saved to NVS automatically and come back after a restart. Rainbow (gradient) mode ignores the color.',
+    'led.mode': 'Mode',
+    'led.solid': 'Solid (solid)',
+    'led.breath': 'Breathing (breath)',
+    'led.gradient': 'Rainbow (gradient)',
+    'led.color': 'Color (solid / breath)',
+    'led.brightness': 'Brightness',
+    'led.period': 'Rainbow (gradient) period',
+    'led.seconds': 's',
+    'led.mouthSync': 'Drive the LEDs with lip sync',
+    'led.mouthHint': 'The LEDs react when the avatar opens its mouth (works for conversation playback, jtts speech and mic lip sync). When off, they stay at the set brightness. Takes effect after a restart.',
+    'led.lipMode': 'Lip sync mode',
+    'led.lipHint': 'Chooses how the LEDs follow the mouth when this is on. "Brightness" is the original behavior: the wider the mouth, the brighter all LEDs. "Level meter" lights the cat-ear triangle (LED1 along the base, LED5 at the tip) as a 5-step bar graph. Takes effect after a restart.',
+    'led.lipBright': 'Brightness',
+    'led.lipLevel': 'Level meter (LevelMeter)',
+    'led.readFail': 'Failed to read LED state: {msg}',
+    'led.writeFail': 'Failed to write LED state: {msg}',
+    'lip.bright': 'Brightness',
+    'lip.level': 'Level meter',
+    'mcp.title': 'Claude Code Channel (MCP): token',
+    'mcp.hint': 'When set, the <code>/mcp/*</code> HTTP API is enabled (a Channel adapter can connect to it). When cleared, <code>/mcp/*</code> returns 404. Takes effect after a restart',
+    'mcp.label': 'MCP API token (blank = keep / "Clear" writes an empty string to NVS)',
+    'mcp.gen': 'Generate',
+    'mcp.show': 'Show',
+    'ota.title': 'Firmware update (OTA)',
+    'ota.hint': 'Pick a GitHub release or a local <code>build/stackchan_idf.bin</code> and click "Write". The new firmware is written to the other partition over encrypted BLE and the device restarts. The browser\'s BLE connection drops afterwards; reconnect manually.',
+    'ota.version': 'Version',
+    'ota.useLocal': '(use a local file)',
+    'ota.listFail': '(could not load the release list)',
+    'ota.write': 'Write',
+    'ota.start': 'OTA started: {name} ({size})',
+    'ota.beginFail': 'begin failed ({state}: {error})',
+    'ota.fastPath': 'Fast path: writeValueWithoutResponse + status sync every 16 chunks',
+    'ota.compatPath': 'Compatibility path: writeValueWithResponse (firmware < v0.0.4)',
+    'ota.flushLost': 'Session lost during flush ({state}: {error})',
+    'ota.sent': 'Data sent ({sec} s, average {rate}/s)',
+    'ota.endFail': 'end failed ({state}: {error})',
+    'ota.done': 'OTA finished; the device will restart. After BLE disconnects, reconnect to use the new firmware.',
+    'ota.error': 'OTA error: {msg}',
+    'ota.releaseFail': 'Failed to download the release: {msg}',
+    'ota.confirm': 'Write the new firmware {name} ({size})?',
+    'ble.unavailable': 'Web Bluetooth is not available. Open this page in desktop Chrome or Edge.',
+    'ble.searching': 'Searching for devices…',
+    'ble.device': 'Device: {name}',
+    'ble.unknownName': '(unknown name)',
+    'ble.gattOk': 'GATT connected',
+    'ble.chrsOk': 'Characteristics discovered (missing: {list})',
+    'ble.noKx': 'No KeyExchange characteristic. The firmware is too old.',
+    'ble.kxOk': 'Key exchange complete (X25519 + AES-256-GCM)',
+    'ble.disFail': 'Failed to read device information: {msg}',
+    'ble.connectFail': 'Connection failed: {msg}',
+    'ble.connectErrTitle': 'BLE connection error',
+    'ble.disconnected': 'Disconnected',
+    'err.x25519': 'This browser does not support X25519 (Chrome / Edge 133 or later is required)',
+    'read.conv': 'Conversation: {state}',
+    'read.convFail': 'Failed to read the enabled state: {msg}',
+    'read.rtp': 'RTP audio receiver: {state}',
+    'read.rtpFail': 'Failed to read the RTP receiver state: {msg}',
+    'read.idle': 'jtts idle chatter: {state}',
+    'read.idleFail': 'Failed to read the jtts idle chatter state: {msg}',
+    'read.ledSync': 'LEDs follow the mouth: {state}',
+    'read.ledSyncFail': 'Failed to read the LED lip sync state: {msg}',
+    'read.lipMode': 'Lip sync mode: {mode}',
+    'read.lipModeFail': 'Failed to read the lip sync mode: {msg}',
+    'read.agc': 'Mic AGC: {state}',
+    'read.agcFail': 'Failed to read the mic AGC state: {msg}',
+    'read.mode': 'Operating mode: {mode}',
+    'read.modeFail': 'Failed to read the operating mode: {msg}',
+    'read.out': 'Audio output: {mode}',
+    'read.outFail': 'Failed to read the audio output: {msg}',
+    'read.bargeIn': 'Barge-in (tap the head to interrupt): {state}',
+    'read.bargeInFail': 'Failed to read the barge-in setting: {msg}',
+    'read.devName': 'Device name: {name}',
+    'read.devNameFail': 'Failed to read the device name: {msg}',
+    'read.board': 'Board: {board}',
+    'read.boardFail': 'Failed to read the board type: {msg}',
+    'read.batGauge': 'Battery gauge: {state}',
+    'read.batGaugeFail': 'Failed to read the battery gauge setting: {msg}',
+    'read.arp': 'Startup arpeggio: {state}',
+    'read.arpFail': 'Failed to read the startup arpeggio setting: {msg}',
+    'read.servo': 'Servos: {state}',
+    'read.servoFail': 'Failed to read the servo settings: {msg}',
+    'read.lt': 'Read LT settings: {n}B',
+    'read.ltDefault': 'LT settings: firmware defaults',
+    'read.ltFail': 'Failed to read the LT settings: {msg}',
+    'read.sl': 'Read servo settings: {n}B',
+    'read.slDefault': 'Servo settings: firmware defaults',
+    'read.provider': 'Provider: {name}',
+    'read.providerFail': 'Failed to read the provider: {msg}',
+    'read.jtts': 'Read jtts settings: {n}B',
+    'read.jttsDefault': 'jtts settings: firmware defaults',
+    'read.jttsFail': 'Failed to read the jtts settings: {msg}',
+    'read.face': 'Read face tuning: {n}B',
+    'read.faceDefault': 'Face tuning: firmware defaults',
+    'read.faceFail': 'Failed to read face tuning: {msg}',
+    'w.ssid': 'SSID written',
+    'w.pass': 'Password written',
+    'w.openai': 'OpenAI key written',
+    'w.gemini': 'Gemini key written',
+    'w.xzUrl': 'XiaoZhi URL written',
+    'w.xzToken': 'XiaoZhi token written',
+    'w.provider': 'Provider switched to {name}',
+    'w.conv': 'OpenAI conversation set to {state}',
+    'w.rtp': 'RTP audio receiver set to {state}',
+    'w.idle': 'jtts idle chatter set to {state}',
+    'w.ledSync': 'LED lip sync set to {state}',
+    'w.lipMode': 'Lip sync mode set to {mode}',
+    'w.agc': 'Mic AGC set to {state}',
+    'w.mode': 'Operating mode set to {mode}',
+    'w.out': 'Audio output set to {mode}',
+    'w.bargeIn': 'Barge-in set to {state}',
+    'w.devName': 'Device name updated: {name}',
+    'w.authSent': 'Password sent ({n}B)',
+    'w.authCleared': 'Password cleared',
+    'w.batGauge': 'Battery gauge set to {state}',
+    'w.arp': 'Startup arpeggio set to {state}',
+    'w.servo': 'Servos set to {state}',
+    'w.mcp': 'MCP API token written ({n}B)',
+    'w.lt': 'LT settings written ({n}B)',
+    'w.sl': 'Servo settings written ({n}B)',
+    'w.jtts': 'jtts settings updated ({n}B)',
+    'apply.noChr': 'No Apply characteristic; skipping apply (firmware too old?)',
+    'apply.sending': 'Sending Apply…',
+    'apply.done': 'Apply complete; the device will restart',
+    'apply.restarting': 'Applied; restarting…',
+    'apply.error': 'Apply error: {msg}',
+  },
+  zh: {
+    'page.title': 'Groki 设置',
+    'page.heading': '🤖 Groki 设置',
+    'page.subtitle': '通过 Web Bluetooth 配置 Wi-Fi 和 API 密钥',
+    'page.instructions': 'ℹ️ 先点 <strong>BLE 连接</strong> 用 Web Bluetooth 连上设备，再切换标签页改设置，最后点 <strong>保存并重启</strong> 确认（仅对需要重启的项目）。LED 和面部 DSL 会实时生效。',
+    'page.compat': '在 Chrome / Edge（桌面）<strong>133 及以上</strong> + <code>file://</code> 下可用。Firefox、Safari 不支持 Web Bluetooth。<br>每次连接用 X25519 + AES-256-GCM 加密（不必做系统配对）。',
+    'lang.label': '语言',
+    'common.cancel': '取消',
+    'common.clear': '清除',
+    'common.notStarted': '未开始',
+    'common.failed': '失败：{msg}',
+    'common.on': '开启',
+    'common.off': '关闭',
+    'err.title': '错误',
+    'auth.heading': 'BLE 连接密码',
+    'auth.hint': '此设备已设置认证密码。',
+    'auth.device': '设备',
+    'auth.password': '密码',
+    'auth.show': '显示密码',
+    'auth.connect': '连接',
+    'auth.empty': '密码为空，无法继续认证',
+    'auth.cancelled': '已取消认证密码，连接中止',
+    'auth.statusFail': '读取 Status 失败，设备侧可能已设置认证密码。',
+    'auth.autofilled': '已从密码管理器自动填入',
+    'auth.enter': '请输入密码。',
+    'auth.wrong': '密码不正确，连接中止：{msg}',
+    'auth.ok': 'BLE 认证 OK',
+    'status.connected': 'BLE 已连接',
+    'status.disconnected': '未连接',
+    'status.connecting': '连接中…',
+    'status.wifiUp': 'Wi-Fi: 已连接',
+    'status.wifiDown': 'Wi-Fi: 已断开',
+    'status.readErr': '读取 Status 错误：{msg}',
+    'status.notifyErr': 'Status 通知解密错误：{msg}',
+    'status.notifyOk': '已注册 Status 通知',
+    'flag.ssid': 'SSID 已设置',
+    'flag.pass': 'Password 已设置',
+    'flag.key': 'OpenAI key 已设置',
+    'flag.en': 'OpenAI 已开启',
+    'flag.gkey': 'Gemini key 已设置',
+    'btn.connect': 'BLE 连接',
+    'btn.apply': '保存并重启',
+    'btn.disconnect': '断开',
+    'btn.saving': '保存中…',
+    'btn.restarting': '重启中…',
+    'tab.conn': '连接',
+    'tab.avatar': '形象',
+    'tab.audio': '音频',
+    'tab.chat': '对话',
+    'tab.device': '设备',
+    'tab.maint': '维护',
+    'dis.battery': '电池',
+    'dis.wifiMdns': 'Wi-Fi 设置 (mDNS)',
+    'dis.wifiIp': 'Wi-Fi 设置 (IP)',
+    'dis.wifiAudio': 'Wi-Fi 音频 RTP（L16/AAC/μ-law，对话功能关闭时）',
+    'rtp.cmdL16': '# L16（未压缩） udp/6970',
+    'rtp.cmdAac': '# AAC（压缩）   udp/6972',
+    'mode.title': '工作模式',
+    'mode.hint': '从三种主要行为中选择 Groki 的工作方式。「对话」用 OpenAI / Gemini / XiaoZhi 之一进行对话，「闲聊播报」只在空闲时发音，「口型同步」只根据麦克风输入张嘴。保存后重启才会切换。',
+    'mode.conv': '对话 (Conversation)',
+    'mode.jtts': '闲聊播报 (JttsRandom)',
+    'mode.lip': '口型同步 (MicLipSync)',
+    'opmode.conv': '对话',
+    'opmode.jtts': '闲聊播报',
+    'opmode.lip': '口型同步',
+    'ssid.hint': '留空则不改当前值',
+    'ssid.current': '{ssid}（当前值）',
+    'ssid.log': '当前 SSID：{ssid}',
+    'ssid.readErr': '读取 SSID 错误：{msg}',
+    'wifi.password': 'Wi-Fi 密码',
+    'ph.keep': '（不改请留空）',
+    'ph.keepAscii': '(不改请留空)',
+    'devname.title': '设备名 (BLE / mDNS)',
+    'devname.hint': '用作 BLE 广播名和 mDNS 主机名的基础。留空则自动生成 (Stackchan-XXXXXX)。mDNS 只会保留英文字母、数字和连字符。保存后重启生效。',
+    'devname.label': '设备名',
+    'devname.ph': '（留空则自动）',
+    'devname.auto': '（自动生成）',
+    'authcfg.title': '密码认证',
+    'authcfg.hint': '设置后，本 BLE 设置页和 Wi-Fi 设置页都需要认证。BLE 会把密码哈希混进密钥，密码错误时所有通道都会解密失败。HTTP 使用 Basic Auth。清除后回到无认证（与现状兼容）。保存后重启生效。',
+    'authcfg.label': '密码',
+    'authcfg.clearTitle': '恢复为无认证',
+    'authcfg.stateHint': '（留空不改 / 清除则恢复无认证）',
+    'face.title': '面部调整（滑块与实时预览）',
+    'face.hint': '拖动滑块时，下方预览会跟着变；已连接时<strong>真机面部也会实时</strong>变化（不必重启）。要留下当前设置，请点「保存并重启」（会重启后确认）。',
+    'face.previewLoading': '预览加载中…',
+    'face.previewMissing': '找不到预览模块（avatar_module.js），仅能通过 BLE 调整',
+    'face.previewInitFail': 'avatar_init 失败',
+    'face.previewRunning': '正在绘制预览（用 WASM 运行当前 C++ 代码）',
+    'face.previewError': '预览初始化错误：{msg}',
+    'face.browShow': '显示眉毛',
+    'face.eyeR': '眼睛半径',
+    'face.eyeOx': '眼睛横向偏移',
+    'face.eyeOy': '眼睛纵向偏移',
+    'face.browOx': '眉毛横向偏移',
+    'face.browOy': '眉毛纵向偏移',
+    'face.mouthOx': '嘴巴横向偏移',
+    'face.mouthOy': '嘴巴纵向偏移',
+    'face.mouthMinW': '嘴巴最小宽度',
+    'face.mouthMaxW': '嘴巴最大宽度',
+    'face.mouthMinH': '开口最小（闭）',
+    'face.mouthMaxH': '开口最大（开）',
+    'face.cheekShow': '显示腮红',
+    'face.cheekR': '腮红半径',
+    'face.cheekOx': '腮红横向偏移',
+    'face.cheekOy': '腮红纵向偏移',
+    'face.colFace': '面部颜色',
+    'face.colBg': '背景色',
+    'face.reset': '恢复默认',
+    'face.sendFail': '发送形象调整失败：{msg}',
+    'dsl.title': '面部绘制 DSL（整体替换结构）',
+    'dsl.hint': '用类 Lua 的 DSL 编写形象面部的绘制逻辑，在浏览器里编成字节码，再经 BLE 发到真机立刻生效。会写入 NVS，重启后仍然保留。',
+    'dsl.syntaxGuide': '语法指南',
+    'dsl.defaultSource': '默认面部源码',
+    'dsl.notStarted': 'DSL 编译器未启动',
+    'dsl.send': '编译并发送',
+    'dsl.presetTitle': '选择预设会读取源码并发送到真机',
+    'dsl.reset': '将真机恢复为默认',
+    'dsl.dlAvbc': '下载 .avbc',
+    'dsl.dlAvdsl': '下载 .avdsl',
+    'dsl.loadAvdsl': '读取 .avdsl',
+    'dsl.sendAvbc': '直接发送 .avbc',
+    'dsl.notConnected': 'BLE 未连接',
+    'dsl.compilerMissing': 'DSL 编译器包加载失败（离线 file:// 下尚未注入）',
+    'dsl.chrMissing': 'AvatarBytecode characteristic 未连接',
+    'dsl.sizeRange': '大小超出范围（{n} B，允许 1..32768）',
+    'vol.title': '扬声器音量',
+    'vol.hint': '对内置 / Module Audio / Atomic Echo Base 的全部输出生效。拖动滑块会 <strong>立刻生效</strong> 并自动保存（不必重启）。100% 为各主板出厂默认，200% 为增益（内部 master volume 乘 2，上限 255）。',
+    'vol.label': '音量',
+    'vol.readFail': '获取扬声器音量设置失败：{msg}',
+    'vol.writeFail': '写入扬声器音量设置失败：{msg}',
+    'say.title': 'jtts 试读',
+    'say.hint': '请输入平假名或片假名，再点「朗读」，由 jtts 发音。汉字和英文不会转换，请直接写假名。适合检查音量和音频输出。',
+    'say.ph': '（示例）请输入平假名',
+    'say.btn': '朗读',
+    'say.tooLong': 'jtts 试读：超过 192 字节',
+    'say.ok': 'jtts 试读：「{text}」',
+    'say.fail': 'jtts 试读失败：{msg}',
+    'out.title': '音频输出',
+    'out.hint': '选择音频输出目标。「自动」会优先使用已安装的 M5 Module Audio，未安装则用内置扬声器。「内置」和「Module Audio」是强制指定（未安装 Module Audio 却选了它时，会退回内置）。保存后重启才会切换。',
+    'out.auto': '自动 (Auto)',
+    'out.internal': '内置扬声器 (Internal)',
+    'outlbl.auto': '自动',
+    'outlbl.internal': '内置扬声器',
+    'rtp.title': 'Wi-Fi RTP 音频接收',
+    'rtp.enable': '启用 RTP 音频接收',
+    'rtp.hint': '经 Wi-Fi 接收 RTP 音频（L16/μ-law=udp/6970，AAC=udp/6972）。对话功能开启时会自动关闭',
+    'idle.title': '空闲语音 (jtts)',
+    'idle.enable': '启用空闲播报',
+    'mic.title': '麦克风口型同步调整（工作模式为口型同步时有效）',
+    'mic.hint': '按麦克风音量张嘴闭嘴。CoreS3 麦克风偏钝，提高输入增益会更好看。拖动滑块会 <strong>立刻生效</strong> 并自动保存。',
+    'mic.input': '输入增益',
+    'mic.output': '张嘴增益',
+    'mic.agc': '启用自动增益控制 (AGC)',
+    'mic.agcHint': '自动跟踪环境噪声，让安静房间和嘈杂环境都能对说话做出反应。关闭后用固定阈值判断（不适应环境变化，但结果更好预料）。保存后重启生效。',
+    'mic.readFail': '获取麦克风口型同步设置失败：{msg}',
+    'mic.writeFail': '写入麦克风口型同步设置失败：{msg}',
+    'voice.title': 'jtts 音色',
+    'voice.hint': '留空或不改就点「保存」，会保留当前设置。',
+    'voice.type': '声音类型',
+    'voice.female': 'Female（偏童声）',
+    'voice.male': 'Male（偏低）',
+    'voice.synth': '合成方式',
+    'voice.synthV2': '标准（v2：声门波 + 级联）',
+    'voice.synthClassic': '经典（旧方式：蜂鸣声）',
+    'voice.engine': '引擎',
+    'voice.engAuto': '自动（HMM 音色 > 语音库 > 共振峰）',
+    'voice.engHmm': 'HMM 合成（必须有音色，否则回退）',
+    'voice.engUnit': '单元拼接（必须有语音库，否则用共振峰）',
+    'voice.engFormant': '仅共振峰合成',
+    'voice.halftone': 'HMM 音高移位 [半音]',
+    'voice.uploadHint': 'HMM 音色（.htsvoice）/ 单元拼接语音库（.jvox）可在 Wi-Fi 设置页上传。',
+    'voice.licenseText': '语音引擎（hts_engine, Modified BSD）与配布音色的归属：',
+    'voice.licenseLink': '许可证 / 归属',
+    'voice.f0': '音高 F0 (Hz)',
+    'voice.formant': '共振峰倍率',
+    'voice.mora': '音拍时长 (ms)',
+    'voice.gain': '音量 (gain)',
+    'voice.breath': '气息 (breathiness)',
+    'voice.vibRate': '颤音 rate (Hz)',
+    'voice.vibDepth': '颤音 depth (cents)',
+    'voice.oq': '声门开合比（柔和度）',
+    'voice.tilt': '高频衰减 tilt (dB)',
+    'voice.bw': '带宽倍率（抑制尖声）',
+    'voice.softHint': '偏柔和的参考：开合比 0.65–0.75 / tilt 6–12 dB / 带宽 1.2–1.5（加气息 0.1–0.25）。均在 v2 方式下有效（带宽在经典方式下也有效）。',
+    'phr.label': '空闲播报语句（一行一条）',
+    'phr.hint': '格式为 <code>画面文字 | 读音</code>。<code>|</code> 右侧（读音）只能写平假名或片假名（汉字在发音时会被忽略）。省略 <code>|</code> 则画面文字与读音相同。示例: <code>画面文字 | 平假名读音</code>',
+    'phr.ph': '画面文字 | 平假名读音',
+    'play.title': '音频文件播放（BLE 流式传输）',
+    'play.hint': '选择本地音频文件（.mp3 / .wav / .m4a / .aac 等）再点「播放」，浏览器会重编码为 24 kHz 单声道 AAC-LC，再经 BLE 流式发送。Groki 边解码 AAC 边播放，并按音量张嘴。',
+    'play.play': '播放',
+    'play.stop': '停止',
+    'play.convNote': '⚠ 对话功能已开启，无法使用。无线和 CPU 会互相抢占导致播放中断，两者互斥。请关闭「启用对话功能」并保存重启后再用。',
+    'play.unsupported': '当前固件不支持音频流式传输',
+    'play.convOn': '对话功能开启时互斥，无法播放。请关闭后保存并重启。',
+    'play.noFile': '请选择音频文件',
+    'play.noEncoder': '无法使用 WebCodecs AudioEncoder（需要 Chrome / Edge 94+）',
+    'play.decoding': '解码中…',
+    'play.encodeStart': '开始 AAC 编码：{kib} KiB → {ms} ms @ {rate}Hz 单声道',
+    'play.progress': '发送中 {pct}% / {kib} KiB / {rate} KiB/s / 余量 {credit} KiB',
+    'play.stopped': '已中断',
+    'play.stoppedLog': '已中断音频发送',
+    'play.done': '完成 {kib} KiB',
+    'play.doneLog': '音频发送完成',
+    'play.error': '音频发送错误：{msg}',
+    'met.title': '音频流水线诊断',
+    'met.hint': '最近一轮对话的音频流水线统计（与 BLE chr 0x1f / HTTP <code>GET /api/metrics/audio</code> 相同）。每轮对话结束时固件（<code>conv-task: log_playback_metrics</code>）会更新，点下方「读取」可看到最新一轮的数值。',
+    'met.metric': '指标',
+    'met.none': '未获取',
+    'met.read': '读取',
+    'met.auto': '自动刷新（2 秒）',
+    'met.empty': '最近一轮对话尚未结束（snapshot 为空）',
+    'met.recvLag': 'recv_lag（event 交接）μs',
+    'met.recvQueued': 'recv→queued（投入播放）ms',
+    'met.spkQueue': 'spk_queue 深度 (0..2)',
+    'met.pcmLag': 'pcm_lag 未播放 samples',
+    'met.jsonFail': 'audio metrics：JSON 解析失败（{msg}）',
+    'lt.title': 'LT 计时器',
+    'lt.hint': '在机身「LT」标签页开始或停止。这里设置默认时长和提示词（写入立刻生效，保存后重启仍保留）。读音请写平假名（jtts 读不了汉字）',
+    'lt.total': '发言时长（秒）',
+    'lt.warn': '剩余提醒（提前秒数）',
+    'lt.soon': '临近提醒（提前秒数，0=关闭）',
+    'lt.repeat': '超时重复（秒，0=只一次）',
+    'lt.warnText': '剩余提醒 显示文字',
+    'lt.warnReading': '剩余提醒 读音（平假名）',
+    'lt.soonText': '临近提醒 显示文字',
+    'lt.soonReading': '临近提醒 读音（平假名）',
+    'lt.justText': '刚好到时 显示文字',
+    'lt.justReading': '刚好到时 读音（平假名）',
+    'lt.overText': '超时 显示文字',
+    'lt.overReading': '超时 读音（平假名）',
+    'lt.ph.warnText': '还剩1分钟',
+    'lt.ph.kana': '（请输入平假名）',
+    'lt.ph.soonText': '还剩15秒',
+    'lt.ph.sameAsOver': '（留空则与超时相同）',
+    'lt.ph.overText': '时间到了!',
+    'chat.title': '对话服务商与 API 密钥',
+    'chat.provider': '对话服务商',
+    'chat.xiaozhi': 'XiaoZhi 服务器',
+    'chat.providerHint': '切换使用哪一个对话后端。密钥和设置都可以保存在下面各项里。',
+    'chat.openaiKey': 'OpenAI API 密钥',
+    'chat.geminiKey': 'Gemini API 密钥',
+    'chat.xzUrl': 'XiaoZhi 服务器 URL',
+    'chat.xzToken': 'XiaoZhi 令牌',
+    'chat.ph.openai': 'sk-… （不改请留空）',
+    'chat.ph.gemini': 'AIza… （不改请留空）',
+    'chat.ph.xzUrl': 'ws://192.168.1.10:8000/xiaozhi/v1/ （不改请留空）',
+    'chat.ph.xzToken': '（可选 / 不改请留空）',
+    'chat.enable': '启用对话功能',
+    'touch.title': '触摸操作',
+    'touch.bargeIn': '点头打断对话（插话）',
+    'touch.hint': '应答播放中点按形象屏幕（头部）可打断 AI 应答。触摸传感器较灵敏，容易误触，所以默认关闭。抚摸（前→中→后连续触摸）与本开关无关，始终开启。保存后重启生效。',
+    'dev.title': '设备功能开/关',
+    'dev.batGauge': '显示电池电量条',
+    'dev.batHint': '在形象画面左上角显示电量条（保存后重启生效）',
+    'dev.arp': '启动时播放琶音',
+    'dev.arpHint': '启动后是否播放 C5–E5–G5（扬声器自检音）。关闭则静音启动（保存后重启生效）',
+    'dev.servo': '启用舵机',
+    'dev.servoHint': '关闭后不上舵机电源，也不启动舵机任务（保存后重启生效）。与操作画面的卸力/恢复开关不是一回事，本项会写入 NVS 持久保存。',
+    'sv.title': '舵机原点与活动范围（面向 Takao base 等自制底板）',
+    'sv.hint': '舵机安装方向和活动范围因底板而异。请设置原点（0..1023）和活动范围（度），再点「保存并重启」生效。默认是 M5 base 的数值。',
+    'sv.yawZero': 'Yaw 原点 (raw)',
+    'sv.yawMin': 'Yaw 最小 (°)',
+    'sv.yawMax': 'Yaw 最大 (°)',
+    'sv.pitchZero': 'Pitch 原点 (raw)',
+    'sv.pitchMin': 'Pitch 最小 (°)',
+    'sv.pitchMax': 'Pitch 最大 (°)',
+    'sv.rangeHint': '打开范围设置模式后舵机会卸力，可以手工摆到目标位置再采集。请按顺序：正中点「采集 Yaw 原点」，左端点「采集 Yaw 最小」，右端点「采集 Yaw 最大」。采集值会填进上方输入框。最后点「保存并重启」确认。',
+    'sv.rangeModeOff': '范围设置模式: OFF',
+    'sv.capYawZero': '采集 Yaw 原点',
+    'sv.capYawMin': '采集 Yaw 最小',
+    'sv.capYawMax': '采集 Yaw 最大',
+    'sv.capPitchZero': '采集 Pitch 原点',
+    'sv.capPitchMin': '采集 Pitch 最小',
+    'sv.capPitchMax': '采集 Pitch 最大',
+    'led.title': '猫耳 LED',
+    'led.hint': '设置猫耳 NeoPixel（GPIO9 / 18 颗 LED）的模式、颜色和亮度。更改立刻生效，并自动写入 NVS，重启后仍会恢复。彩虹（gradient）模式会忽略颜色。',
+    'led.mode': '模式',
+    'led.solid': '单色 (solid)',
+    'led.breath': '呼吸 (breath)',
+    'led.gradient': '彩虹 (gradient)',
+    'led.color': '颜色 (solid / breath)',
+    'led.brightness': '亮度',
+    'led.period': '彩虹 (gradient) 周期',
+    'led.seconds': '秒',
+    'led.mouthSync': '按口型控制 LED',
+    'led.mouthHint': '形象张嘴时 LED 会跟着反应（对话播放、jtts 发音、麦克风口型同步都有效）。关闭时固定为所设亮度。保存后重启生效。',
+    'led.lipMode': '口型同步模式',
+    'led.lipHint': '开启时选择控制方式。「亮度」是嘴张得越大 LED 整体越亮的原有行为。「电平表」把猫耳三角形（LED1 为底边，LED5 为顶点）当成 5 级条形图点亮。保存后重启生效。',
+    'led.lipBright': '亮度 (Brightness)',
+    'led.lipLevel': '电平表 (LevelMeter)',
+    'led.readFail': '读取 LED state 失败：{msg}',
+    'led.writeFail': '写入 LED state 失败：{msg}',
+    'lip.bright': '亮度',
+    'lip.level': '电平表',
+    'mcp.title': 'Claude Code Channel (MCP)：令牌管理',
+    'mcp.hint': '设置后会启用 <code>/mcp/*</code> HTTP API（可由 Channel adapter 连接）。清空后 <code>/mcp/*</code> 返回 404。保存后重启生效',
+    'mcp.label': 'MCP API 令牌（留空不改 / 点「清除」会把空字符串写入 NVS）',
+    'mcp.gen': '随机生成',
+    'mcp.show': '显示',
+    'ota.title': '固件更新 (OTA)',
+    'ota.hint': '从 GitHub Release 选择，或选本地 <code>build/stackchan_idf.bin</code>，再点「写入」，会经加密 BLE 把新固件写到另一分区并重启。成功后浏览器侧 BLE 会断开，请手动重新连接。',
+    'ota.version': '版本',
+    'ota.useLocal': '(使用本地文件)',
+    'ota.listFail': '(获取版本列表失败)',
+    'ota.write': '写入',
+    'ota.start': 'OTA 开始：{name}（{size}）',
+    'ota.beginFail': 'begin 失败（{state}: {error}）',
+    'ota.fastPath': '快速路径：writeValueWithoutResponse + 每 16 块同步状态',
+    'ota.compatPath': '兼容路径：writeValueWithResponse（firmware < v0.0.4）',
+    'ota.flushLost': 'flush 过程中会话丢失（{state}: {error}）',
+    'ota.sent': '数据发送完成（{sec} 秒，平均 {rate}/s）',
+    'ota.endFail': 'end 失败（{state}: {error}）',
+    'ota.done': 'OTA 完成，设备即将重启。BLE 断开后请用新固件重新连接。',
+    'ota.error': 'OTA 错误：{msg}',
+    'ota.releaseFail': '获取版本失败：{msg}',
+    'ota.confirm': '即将写入新固件 {name}（{size}）。确定吗？',
+    'ble.unavailable': '无法使用 Web Bluetooth。请用 Chrome / Edge 桌面版打开。',
+    'ble.searching': '正在搜索设备…',
+    'ble.device': '设备：{name}',
+    'ble.unknownName': '（名称未知）',
+    'ble.gattOk': 'GATT 连接完成',
+    'ble.chrsOk': 'Characteristics 获取完成（missing: {list}）',
+    'ble.noKx': '没有 KeyExchange characteristic。固件过旧。',
+    'ble.kxOk': '密钥交换完成（X25519 + AES-256-GCM）',
+    'ble.disFail': '获取设备信息失败：{msg}',
+    'ble.connectFail': '连接失败：{msg}',
+    'ble.connectErrTitle': 'BLE 连接错误',
+    'ble.disconnected': '已断开',
+    'err.x25519': '当前浏览器不支持 X25519（需要 Chrome / Edge 133 及以上）',
+    'read.conv': '对话功能：{state}',
+    'read.convFail': '获取开启状态失败：{msg}',
+    'read.rtp': 'RTP 音频接收：{state}',
+    'read.rtpFail': '获取 RTP 开启状态失败：{msg}',
+    'read.idle': 'jtts 空闲播报：{state}',
+    'read.idleFail': '获取 jtts 空闲播报状态失败：{msg}',
+    'read.ledSync': 'LED 跟随口型：{state}',
+    'read.ledSyncFail': '获取 LED 联动状态失败：{msg}',
+    'read.lipMode': '口型同步模式：{mode}',
+    'read.lipModeFail': '获取口型同步模式状态失败：{msg}',
+    'read.agc': '麦克风 AGC：{state}',
+    'read.agcFail': '获取麦克风 AGC 状态失败：{msg}',
+    'read.mode': '工作模式：{mode}',
+    'read.modeFail': '获取工作模式状态失败：{msg}',
+    'read.out': '音频输出：{mode}',
+    'read.outFail': '获取音频输出状态失败：{msg}',
+    'read.bargeIn': '插话（点头打断对话）：{state}',
+    'read.bargeInFail': '获取插话状态失败：{msg}',
+    'read.devName': '设备名：{name}',
+    'read.devNameFail': '获取设备名失败：{msg}',
+    'read.board': '主板：{board}',
+    'read.boardFail': '获取主板类型失败：{msg}',
+    'read.batGauge': '电池电量条显示：{state}',
+    'read.batGaugeFail': '获取电池电量条设置失败：{msg}',
+    'read.arp': '启动琶音：{state}',
+    'read.arpFail': '获取启动琶音设置失败：{msg}',
+    'read.servo': '舵机：{state}',
+    'read.servoFail': '获取舵机设置失败：{msg}',
+    'read.lt': '已读取 LT 设置：{n}B',
+    'read.ltDefault': 'LT 设置：固件默认值',
+    'read.ltFail': '获取 LT 设置失败：{msg}',
+    'read.sl': '已读取舵机设置：{n}B',
+    'read.slDefault': '舵机设置：固件默认值',
+    'read.provider': '服务商：{name}',
+    'read.providerFail': '获取服务商失败：{msg}',
+    'read.jtts': '已读取 jtts 设置：{n}B',
+    'read.jttsDefault': 'jtts 设置：固件默认值',
+    'read.jttsFail': '获取 jtts 设置失败：{msg}',
+    'read.face': '已读取形象调整：{n}B',
+    'read.faceDefault': '形象调整：固件默认值',
+    'read.faceFail': '获取形象调整失败：{msg}',
+    'w.ssid': 'SSID 写入完成',
+    'w.pass': '密码写入完成',
+    'w.openai': 'OpenAI 密钥写入完成',
+    'w.gemini': 'Gemini 密钥写入完成',
+    'w.xzUrl': 'XiaoZhi URL 写入完成',
+    'w.xzToken': 'XiaoZhi 令牌写入完成',
+    'w.provider': '已切换服务商为 {name}',
+    'w.conv': '已将 OpenAI 对话功能切换为 {state}',
+    'w.rtp': '已将 RTP 音频接收切换为 {state}',
+    'w.idle': '已将 jtts 空闲播报切换为 {state}',
+    'w.ledSync': '已将 LED 口型联动切换为 {state}',
+    'w.lipMode': '已将口型同步模式切换为 {mode}',
+    'w.agc': '已将麦克风 AGC 切换为 {state}',
+    'w.mode': '已将工作模式切换为 {mode}',
+    'w.out': '已将音频输出切换为 {mode}',
+    'w.bargeIn': '已将插话切换为 {state}',
+    'w.devName': '已更新设备名：{name}',
+    'w.authSent': '已发送认证密码（{n}B）',
+    'w.authCleared': '已清除认证密码',
+    'w.batGauge': '已将电池电量条显示切换为 {state}',
+    'w.arp': '已将启动琶音切换为 {state}',
+    'w.servo': '已将舵机切换为 {state}',
+    'w.mcp': 'MCP API 令牌写入完成（{n}B）',
+    'w.lt': 'LT 设置写入完成（{n}B）',
+    'w.sl': '舵机设置写入完成（{n}B）',
+    'w.jtts': '已更新 jtts 设置（{n}B）',
+    'apply.noChr': '没有 Apply characteristic，跳过应用（固件过旧？）',
+    'apply.sending': '正在发送 Apply…',
+    'apply.done': 'Apply 完成，设备即将重启',
+    'apply.restarting': '已应用，正在重启…',
+    'apply.error': 'Apply 错误：{msg}',
+  },
+};
+
+const LANG_STORAGE_KEY = 'groki.settings.lang';
+function detectLang() {
+  try {
+    const saved = localStorage.getItem(LANG_STORAGE_KEY);
+    if (saved === 'en' || saved === 'zh') return saved;
+  } catch (_) { /* storage blocked — fall through to the browser language */ }
+  const prefs = (navigator.languages && navigator.languages.length)
+    ? navigator.languages : [navigator.language || ''];
+  return String(prefs[0] || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+let LANG = detectLang();
+document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+
+// Translate `key`, substituting {name} placeholders from `params`. Missing
+// keys fall back to English, then to the key itself.
+function t(key, params) {
+  let s = (I18N[LANG] && I18N[LANG][key]);
+  if (s == null) s = I18N.en[key];
+  if (s == null) return key;
+  if (params) {
+    s = s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
+  }
+  return s;
+}
+
+// Set an element's text from a key and remember the key so a language switch
+// re-renders it. setRaw() is for non-translatable text (progress, file names).
+function setText(el, key, params) {
+  if (!el) return;
+  el.dataset.i18n = key;
+  if (params) el.dataset.i18nArgs = JSON.stringify(params);
+  else delete el.dataset.i18nArgs;
+  el.textContent = t(key, params);
+}
+function setRaw(el, text) {
+  if (!el) return;
+  delete el.dataset.i18n;
+  delete el.dataset.i18nArgs;
+  el.textContent = text;
+}
+
+function applyI18n(root) {
+  root = root || document;
+  root.querySelectorAll('[data-i18n]').forEach((el) => {
+    let args;
+    if (el.dataset.i18nArgs) { try { args = JSON.parse(el.dataset.i18nArgs); } catch (_) {} }
+    el.textContent = t(el.dataset.i18n, args);
+  });
+  // Dictionary markup is static and trusted (never device- or user-supplied).
+  root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
+  root.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  root.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+  root.querySelectorAll('[data-i18n-aria-label]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel)); });
+  document.querySelectorAll('.lang-switch button[data-lang]').forEach((b) => {
+    const on = b.dataset.lang === LANG;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+function setLang(lang) {
+  if (lang !== 'en' && lang !== 'zh') return;
+  LANG = lang;
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch (_) {}
+  applyI18n();
+  // Page code re-renders dynamic text it owns (servo button, metrics table).
+  document.dispatchEvent(new CustomEvent('i18n:change', { detail: { lang } }));
+}
+
+function initLangSwitch() {
+  document.querySelectorAll('.lang-switch button[data-lang]').forEach((b) => {
+    b.addEventListener('click', () => setLang(b.dataset.lang));
+  });
+}
+</script>
 </head>
 <body>
 <!-- BLE auth password prompt — modal dialog with a real <form> so browser
@@ -377,9 +1289,13 @@
      other catch-block hit-points that the user shouldn't have to scroll
      the log panel to discover). The log entry is still written for
      post-mortem; this just makes the immediate failure unmissable. -->
+<!-- i18n: static text below is the English fallback. Elements carry
+     data-i18n (textContent), data-i18n-html (trusted markup from the
+     dictionary), data-i18n-placeholder / -title / -aria-label keys; the
+     dictionary and applyI18n() live in the <head> script. -->
 <div id="error-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1001;align-items:center;justify-content:center">
   <div style="background:white;padding:1.5rem;border-radius:8px;min-width:300px;max-width:90vw;box-shadow:0 4px 24px rgba(0,0,0,0.3)">
-    <h2 id="error-modal-title" style="margin:0 0 0.5rem 0;font-size:1.1rem;color:#c62828">错误</h2>
+    <h2 id="error-modal-title" data-i18n="err.title" style="margin:0 0 0.5rem 0;font-size:1.1rem;color:#c62828">Error</h2>
     <p id="error-modal-body" style="margin:0 0 1rem 0;white-space:pre-wrap;word-break:break-word"></p>
     <div style="display:flex;justify-content:flex-end">
       <button type="button" id="error-modal-ok"
@@ -398,43 +1314,49 @@
        form, so the field is shown (readonly) instead. -->
   <form id="auth-modal-form" method="dialog" action="#" autocomplete="on"
         style="background:white;padding:1.5rem;border-radius:8px;min-width:300px;max-width:90vw;box-shadow:0 4px 24px rgba(0,0,0,0.3)">
-    <h2 style="margin:0 0 0.5rem 0;font-size:1.1rem">BLE 连接密码</h2>
-    <p class="hint" style="margin:0 0 1rem 0">此设备已设置认证密码。</p>
-    <label for="auth-modal-username" style="display:block;font-size:0.9rem;margin-bottom:0.25rem">设备</label>
+    <h2 data-i18n="auth.heading" style="margin:0 0 0.5rem 0;font-size:1.1rem">BLE connection password</h2>
+    <p class="hint" data-i18n="auth.hint" style="margin:0 0 1rem 0">This device has a connection password set.</p>
+    <label for="auth-modal-username" data-i18n="auth.device" style="display:block;font-size:0.9rem;margin-bottom:0.25rem">Device</label>
     <input type="text" id="auth-modal-username" name="username" autocomplete="username"
            value="stackchan" readonly tabindex="-1"
            style="width:100%;box-sizing:border-box;padding:0.5rem;font-size:1rem;margin-bottom:0.5rem;background:#f4f4f4;color:#555">
-    <label for="auth-modal-password" style="display:block;font-size:0.9rem;margin-bottom:0.25rem">密码</label>
+    <label for="auth-modal-password" data-i18n="auth.password" style="display:block;font-size:0.9rem;margin-bottom:0.25rem">Password</label>
     <input type="password" id="auth-modal-password" name="password"
            autocomplete="current-password" required minlength="1" maxlength="64"
            style="width:100%;box-sizing:border-box;padding:0.5rem;font-size:1rem;margin-bottom:0.5rem">
     <label class="toggle-label" for="auth-modal-show" style="margin:0 0 1rem 0">
       <input type="checkbox" id="auth-modal-show">
-      <span>显示密码</span>
+      <span data-i18n="auth.show">Show password</span>
     </label>
     <div style="display:flex;gap:0.5rem;justify-content:flex-end">
-      <button type="submit" id="auth-modal-ok"
-              style="background:#2563eb;color:white;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-weight:600">连接</button>
-      <button type="button" id="auth-modal-cancel" class="secondary">取消</button>
+      <button type="submit" id="auth-modal-ok" data-i18n="auth.connect"
+              style="background:#2563eb;color:white;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-weight:600">Connect</button>
+      <button type="button" id="auth-modal-cancel" class="secondary" data-i18n="common.cancel">Cancel</button>
     </div>
   </form>
 </div>
 <div class="card">
-  <h1>🤖 Stack-chan 设置</h1>
-  <p class="subtitle">通过 Web Bluetooth 配置 Wi-Fi 和 API 密钥</p>
+  <div class="title-row">
+    <h1 data-i18n="page.heading">🤖 Groki Settings</h1>
+    <div class="lang-switch" role="group" aria-label="Language" data-i18n-aria-label="lang.label">
+      <button type="button" data-lang="en" lang="en">EN</button>
+      <button type="button" data-lang="zh" lang="zh-CN">中文</button>
+    </div>
+  </div>
+  <p class="subtitle" data-i18n="page.subtitle">Configure Wi-Fi and API keys over Web Bluetooth</p>
 
   <div class="page-header">
     <div class="status-bar" style="flex:1 1 auto;margin:0">
       <span class="dot" id="ble-dot"></span>
-      <span id="ble-label">未连接</span>
+      <span id="ble-label" data-i18n="status.disconnected">Not connected</span>
       <span class="dot" id="wifi-dot" style="margin-left:0.75rem"></span>
       <span id="wifi-label">Wi-Fi: —</span>
       <span class="flags">
-        <span class="flag" id="flag-ssid" title="SSID 已设置">S</span>
-        <span class="flag" id="flag-pass" title="Password 已设置">P</span>
-        <span class="flag" id="flag-key"  title="OpenAI key 已设置">K</span>
-        <span class="flag" id="flag-en"   title="OpenAI 已开启">O</span>
-        <span class="flag" id="flag-gkey" title="Gemini key 已设置">G</span>
+        <span class="flag" id="flag-ssid" title="SSID set" data-i18n-title="flag.ssid">S</span>
+        <span class="flag" id="flag-pass" title="Password set" data-i18n-title="flag.pass">P</span>
+        <span class="flag" id="flag-key"  title="OpenAI key set" data-i18n-title="flag.key">K</span>
+        <span class="flag" id="flag-en"   title="OpenAI enabled" data-i18n-title="flag.en">O</span>
+        <span class="flag" id="flag-gkey" title="Gemini key set" data-i18n-title="flag.gkey">G</span>
         <span class="flag" id="flag-prov" title="Provider = Gemini">P</span>
       </span>
     </div>
@@ -443,28 +1365,29 @@
       <span class="key" style="margin-left:0.6rem">Board</span><span class="val" id="hdr-board">—</span>
     </div>
     <div class="actions">
-      <button id="btn-connect">BLE 连接</button>
-      <button id="btn-apply" disabled>保存并重启</button>
-      <button id="btn-disconnect" disabled>断开</button>
+      <button id="btn-connect" data-i18n="btn.connect">Connect over Bluetooth</button>
+      <button id="btn-apply" data-i18n="btn.apply" disabled>Save and restart</button>
+      <button id="btn-disconnect" data-i18n="btn.disconnect" disabled>Disconnect</button>
     </div>
   </div>
 
-  <p class="instructions">
-    ℹ️ 先点 <strong>BLE 连接</strong> 用 Web Bluetooth 连上设备，再切换标签页改设置，
-    最后点 <strong>保存并重启</strong> 确认（仅对需要重启的项目）。
-    LED 和面部 DSL 会实时生效。
+  <p class="instructions" data-i18n-html="page.instructions">
+    ℹ️ Click <strong>Connect over Bluetooth</strong> to connect to the device with Web Bluetooth,
+    change settings in the tabs, then click <strong>Save and restart</strong> to confirm
+    (only needed for settings that require a restart).
+    LED and face DSL changes take effect immediately.
   </p>
 
   <nav class="tabs" role="tablist">
-    <button data-tab="conn"   class="active" role="tab">连接</button>
-    <button data-tab="avatar"             role="tab">形象</button>
-    <button data-tab="audio"              role="tab">音频</button>
-    <button data-tab="chat"               role="tab">对话</button>
-    <button data-tab="device"             role="tab">设备</button>
-    <button data-tab="maint"              role="tab">维护</button>
+    <button data-tab="conn"   class="active" role="tab" data-i18n="tab.conn">Connection</button>
+    <button data-tab="avatar"             role="tab" data-i18n="tab.avatar">Avatar</button>
+    <button data-tab="audio"              role="tab" data-i18n="tab.audio">Audio</button>
+    <button data-tab="chat"               role="tab" data-i18n="tab.chat">Conversation</button>
+    <button data-tab="device"             role="tab" data-i18n="tab.device">Device</button>
+    <button data-tab="maint"              role="tab" data-i18n="tab.maint">Maintenance</button>
   </nav>
 
-  <!-- ===== 接続 ===== -->
+  <!-- ===== Connection ===== -->
   <section class="tab-panel active" data-tab="conn">
     <div class="device-info" id="device-info">
     <div class="row"><span class="key">Firmware</span><span class="val" id="dis-fw">—</span></div>
@@ -472,625 +1395,627 @@
     <div class="row"><span class="key">Model</span><span class="val" id="dis-model">—</span></div>
     <div class="row"><span class="key">Manufacturer</span><span class="val" id="dis-mfr">—</span></div>
     <div class="row"><span class="key">Software</span><span class="val" id="dis-sw">—</span></div>
-    <div class="row" id="dis-battery-row"><span class="key">电池</span><span class="val" id="dis-battery">—</span></div>
+    <div class="row" id="dis-battery-row"><span class="key" data-i18n="dis.battery">Battery</span><span class="val" id="dis-battery">—</span></div>
     <div class="row" id="dis-wifi-mac-row" hidden>
       <span class="key">Wi-Fi MAC (STA)</span>
       <span class="val" id="dis-wifi-mac">—</span>
     </div>
     <div class="row" id="dis-wifi-row" hidden>
-      <span class="key">Wi-Fi 设置 (mDNS)</span>
+      <span class="key" data-i18n="dis.wifiMdns">Wi-Fi settings (mDNS)</span>
       <span class="val"><a id="dis-wifi-url" href="#" target="_blank" rel="noopener">—</a></span>
     </div>
     <div class="row" id="dis-wifi-ip-row" hidden>
-      <span class="key">Wi-Fi 设置 (IP)</span>
+      <span class="key" data-i18n="dis.wifiIp">Wi-Fi settings (IP)</span>
       <span class="val"><a id="dis-wifi-ip-url" href="#" target="_blank" rel="noopener">—</a></span>
     </div>
     <div class="row" id="dis-wifi-audio-row" hidden style="flex-direction:column; align-items:stretch; gap:0.25rem">
-      <span class="key">Wi-Fi 音频 RTP（L16/AAC/μ-law，对话功能关闭时）</span>
+      <span class="key" data-i18n="dis.wifiAudio">Wi-Fi audio over RTP (L16/AAC/μ-law, when conversation is off)</span>
       <code id="dis-wifi-audio-cmd" style="font-size:0.72rem; word-break:break-all; white-space:pre-wrap; user-select:all"></code>
     </div>
   </div>
 
-  <h2 class="section-title" style="margin-top:0.5rem">工作模式</h2>
-  <p class="hint" style="margin-bottom:0.5rem">
-    从三种主要行为中选择 Stack-chan 的工作方式。「对话」用 OpenAI / Gemini /
-    XiaoZhi 之一进行对话，「闲聊播报」只在空闲时发音，
-    「口型同步」只根据麦克风输入张嘴。
-    保存后重启才会切换。
+  <h2 class="section-title" style="margin-top:0.5rem" data-i18n="mode.title">Operating mode</h2>
+  <p class="hint" style="margin-bottom:0.5rem" data-i18n="mode.hint">
+    Choose how Groki behaves from three main modes. "Conversation" talks through OpenAI, Gemini
+    or XiaoZhi, "Idle chatter" only speaks while idle, and "Mic lip sync" only moves the mouth
+    with the microphone input. Takes effect after a restart.
   </p>
   <select id="operation-mode">
-    <option value="2">对话 (Conversation)</option>
-    <option value="1">闲聊播报 (JttsRandom)</option>
-    <option value="0">口型同步 (MicLipSync)</option>
+    <option value="2" data-i18n="mode.conv">Conversation</option>
+    <option value="1" data-i18n="mode.jtts">Idle chatter (JttsRandom)</option>
+    <option value="0" data-i18n="mode.lip">Mic lip sync (MicLipSync)</option>
   </select>
 
   <label for="ssid">Wi-Fi SSID</label>
   <input type="text" id="ssid" maxlength="32" placeholder="MyNetwork">
-  <p class="hint">留空则不改当前值</p>
+  <p class="hint" data-i18n="ssid.hint">Leave blank to keep the current value</p>
 
-  <label for="password">Wi-Fi 密码</label>
-  <input type="password" id="password" maxlength="64" placeholder="（不改请留空）">
+  <label for="password" data-i18n="wifi.password">Wi-Fi password</label>
+  <input type="password" id="password" maxlength="64" placeholder="(leave blank to keep)" data-i18n-placeholder="ph.keep">
 
-  <h2 class="section-title" style="margin-top:0.5rem">设备名 (BLE / mDNS)</h2>
-  <p class="hint" style="margin-bottom:0.5rem">
-    用作 BLE 广播名和 mDNS 主机名的基础。留空则自动生成
-    (Stackchan-XXXXXX)。mDNS 只会保留英文字母、数字和连字符。保存后重启生效。
+  <h2 class="section-title" style="margin-top:0.5rem" data-i18n="devname.title">Device name (BLE / mDNS)</h2>
+  <p class="hint" style="margin-bottom:0.5rem" data-i18n="devname.hint">
+    Used as the base for the BLE advertising name and the mDNS host name. Leave blank to generate one
+    automatically (Stackchan-XXXXXX). mDNS keeps only letters, digits and hyphens. Takes effect after a restart.
   </p>
-  <label for="device-name">设备名</label>
-  <input type="text" id="device-name" maxlength="24" placeholder="（留空则自动）">
+  <label for="device-name" data-i18n="devname.label">Device name</label>
+  <input type="text" id="device-name" maxlength="24" placeholder="(leave blank for automatic)" data-i18n-placeholder="devname.ph">
 
-  <h2 class="section-title" style="margin-top:0.5rem">密码认证</h2>
-  <p class="hint" style="margin-bottom:0.5rem">
-    设置后，本 BLE 设置页和 Wi-Fi 设置页都需要认证。
-    BLE 会把密码哈希混进密钥，密码错误时所有通道都会解密失败。HTTP 使用 Basic Auth。
-    清除后回到无认证（与现状兼容）。保存后重启生效。
+  <h2 class="section-title" style="margin-top:0.5rem" data-i18n="authcfg.title">Password protection</h2>
+  <p class="hint" style="margin-bottom:0.5rem" data-i18n="authcfg.hint">
+    When set, both this BLE settings page and the Wi-Fi settings page require the password.
+    BLE mixes a hash of the password into the encryption key, so with a wrong password every channel fails to decrypt. HTTP uses Basic Auth.
+    Clearing it goes back to no password (compatible with the current behavior). Takes effect after a restart.
   </p>
-  <label for="auth-password">密码 <span id="auth-password-state" class="hint" style="font-weight:normal"></span></label>
+  <label for="auth-password"><span data-i18n="authcfg.label">Password</span> <span id="auth-password-state" class="hint" style="font-weight:normal"></span></label>
   <div style="display:flex;gap:0.4rem;align-items:stretch">
-    <input type="password" id="auth-password" maxlength="64" placeholder="（不改请留空）" style="flex:1 1 auto">
-    <button type="button" id="btn-auth-password-clear" class="danger" title="恢复为无认证">清除</button>
+    <input type="password" id="auth-password" maxlength="64" placeholder="(leave blank to keep)" data-i18n-placeholder="ph.keep" style="flex:1 1 auto">
+    <button type="button" id="btn-auth-password-clear" class="danger" title="Remove the password" data-i18n-title="authcfg.clearTitle" data-i18n="common.clear">Clear</button>
   </div>
   </section><!-- /tab-panel "conn" -->
 
-  <!-- ===== アバター ===== -->
+  <!-- ===== Avatar ===== -->
   <section class="tab-panel" data-tab="avatar">
     <div id="avatar-section">
-      <h2 class="section-title">面部调整（滑块与实时预览）</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        拖动滑块时，下方预览会跟着变；已连接时<strong>真机面部也会实时</strong>
-        变化（不必重启）。要留下当前设置，请点「保存并重启」
-        （会重启后确认）。
+      <h2 class="section-title" data-i18n="face.title">Face tuning (sliders with live preview)</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n-html="face.hint">
+        The preview below follows the sliders. While connected, <strong>the robot's face also changes
+        live</strong> (no restart needed). To keep the current settings, click "Save and restart"
+        (the device restarts to confirm).
       </p>
       <div style="text-align:center;margin-bottom:0.75rem">
         <canvas id="av-preview" width="320" height="240"
                 style="width:320px;height:240px;max-width:100%;background:#000;border-radius:8px;image-rendering:pixelated"></canvas>
-        <p class="hint" id="av-preview-note" style="margin-top:0.25rem">预览加载中…</p>
+        <p class="hint" id="av-preview-note" style="margin-top:0.25rem" data-i18n="face.previewLoading">Loading preview…</p>
       </div>
 
-      <div class="av-row"><label for="av-brow-show">显示眉毛</label>
+      <div class="av-row"><label for="av-brow-show" data-i18n="face.browShow">Show eyebrows</label>
         <input type="checkbox" id="av-brow-show" checked></div>
-      <div class="av-row"><label for="av-eye-r">眼睛半径</label>
+      <div class="av-row"><label for="av-eye-r" data-i18n="face.eyeR">Eye radius</label>
         <input type="range" id="av-eye-r" min="2" max="20" step="0.5" value="8">
         <span class="av-val" id="av-eye-r-v">8.0</span></div>
-      <div class="av-row"><label for="av-eye-ox">眼睛横向偏移</label>
+      <div class="av-row"><label for="av-eye-ox" data-i18n="face.eyeOx">Eye offset X</label>
         <input type="range" id="av-eye-ox" min="-40" max="40" step="1" value="0">
         <span class="av-val" id="av-eye-ox-v">0</span></div>
-      <div class="av-row"><label for="av-eye-oy">眼睛纵向偏移</label>
+      <div class="av-row"><label for="av-eye-oy" data-i18n="face.eyeOy">Eye offset Y</label>
         <input type="range" id="av-eye-oy" min="-40" max="40" step="1" value="0">
         <span class="av-val" id="av-eye-oy-v">0</span></div>
-      <div class="av-row"><label for="av-brow-ox">眉毛横向偏移</label>
+      <div class="av-row"><label for="av-brow-ox" data-i18n="face.browOx">Eyebrow offset X</label>
         <input type="range" id="av-brow-ox" min="-40" max="40" step="1" value="0">
         <span class="av-val" id="av-brow-ox-v">0</span></div>
-      <div class="av-row"><label for="av-brow-oy">眉毛纵向偏移</label>
+      <div class="av-row"><label for="av-brow-oy" data-i18n="face.browOy">Eyebrow offset Y</label>
         <input type="range" id="av-brow-oy" min="-40" max="40" step="1" value="0">
         <span class="av-val" id="av-brow-oy-v">0</span></div>
-      <div class="av-row"><label for="av-mouth-ox">嘴巴横向偏移</label>
+      <div class="av-row"><label for="av-mouth-ox" data-i18n="face.mouthOx">Mouth offset X</label>
         <input type="range" id="av-mouth-ox" min="-60" max="60" step="1" value="0">
         <span class="av-val" id="av-mouth-ox-v">0</span></div>
-      <div class="av-row"><label for="av-mouth-oy">嘴巴纵向偏移</label>
+      <div class="av-row"><label for="av-mouth-oy" data-i18n="face.mouthOy">Mouth offset Y</label>
         <input type="range" id="av-mouth-oy" min="-60" max="60" step="1" value="0">
         <span class="av-val" id="av-mouth-oy-v">0</span></div>
-      <div class="av-row"><label for="av-mouth-minw">嘴巴最小宽度</label>
+      <div class="av-row"><label for="av-mouth-minw" data-i18n="face.mouthMinW">Mouth min width</label>
         <input type="range" id="av-mouth-minw" min="4" max="160" step="1" value="50">
         <span class="av-val" id="av-mouth-minw-v">50</span></div>
-      <div class="av-row"><label for="av-mouth-maxw">嘴巴最大宽度</label>
+      <div class="av-row"><label for="av-mouth-maxw" data-i18n="face.mouthMaxW">Mouth max width</label>
         <input type="range" id="av-mouth-maxw" min="4" max="200" step="1" value="90">
         <span class="av-val" id="av-mouth-maxw-v">90</span></div>
-      <div class="av-row"><label for="av-mouth-minh">开口最小（闭）</label>
+      <div class="av-row"><label for="av-mouth-minh" data-i18n="face.mouthMinH">Mouth min opening (closed)</label>
         <input type="range" id="av-mouth-minh" min="1" max="60" step="1" value="4">
         <span class="av-val" id="av-mouth-minh-v">4</span></div>
-      <div class="av-row"><label for="av-mouth-maxh">开口最大（开）</label>
+      <div class="av-row"><label for="av-mouth-maxh" data-i18n="face.mouthMaxH">Mouth max opening (open)</label>
         <input type="range" id="av-mouth-maxh" min="2" max="120" step="1" value="60">
         <span class="av-val" id="av-mouth-maxh-v">60</span></div>
-      <div class="av-row"><label for="av-cheek-show">显示腮红</label>
+      <div class="av-row"><label for="av-cheek-show" data-i18n="face.cheekShow">Show blush</label>
         <input type="checkbox" id="av-cheek-show"></div>
-      <div class="av-row"><label for="av-cheek-r">腮红半径</label>
+      <div class="av-row"><label for="av-cheek-r" data-i18n="face.cheekR">Blush radius</label>
         <input type="range" id="av-cheek-r" min="2" max="30" step="0.5" value="10">
         <span class="av-val" id="av-cheek-r-v">10.0</span></div>
-      <div class="av-row"><label for="av-cheek-ox">腮红横向偏移</label>
+      <div class="av-row"><label for="av-cheek-ox" data-i18n="face.cheekOx">Blush offset X</label>
         <input type="range" id="av-cheek-ox" min="-40" max="40" step="1" value="0">
         <span class="av-val" id="av-cheek-ox-v">0</span></div>
-      <div class="av-row"><label for="av-cheek-oy">腮红纵向偏移</label>
+      <div class="av-row"><label for="av-cheek-oy" data-i18n="face.cheekOy">Blush offset Y</label>
         <input type="range" id="av-cheek-oy" min="-40" max="40" step="1" value="0">
         <span class="av-val" id="av-cheek-oy-v">0</span></div>
-      <div class="av-row"><label for="av-col-face">面部颜色</label>
+      <div class="av-row"><label for="av-col-face" data-i18n="face.colFace">Face color</label>
         <input type="color" id="av-col-face" value="#ffffff"></div>
-      <div class="av-row"><label for="av-col-bg">背景色</label>
+      <div class="av-row"><label for="av-col-bg" data-i18n="face.colBg">Background color</label>
         <input type="color" id="av-col-bg" value="#000000"></div>
 
-      <button id="av-reset" type="button" style="margin-top:0.5rem">恢复默认</button>
+      <button id="av-reset" type="button" style="margin-top:0.5rem" data-i18n="face.reset">Restore defaults</button>
     </div>
 
     <div id="avatar-dsl-section">
-      <h2 class="section-title">面部绘制 DSL（整体替换结构）</h2>
+      <h2 class="section-title" data-i18n="dsl.title">Face drawing DSL (replaces the whole face structure)</h2>
       <p class="hint" style="margin-bottom:0.5rem">
-        用类 Lua 的 DSL 编写形象面部的绘制逻辑，在浏览器里编成字节码，
-        再经 BLE 发到真机立刻生效。会写入 NVS，重启后仍然保留。
-        <a href="avatar_dsl.html" target="_blank" rel="noopener" style="white-space:nowrap">语法指南</a>
-        ／
+        <span data-i18n="dsl.hint">Write the avatar face's drawing logic in a Lua-like DSL. The browser compiles it to bytecode
+        and sends it over BLE, where it takes effect immediately. It is saved to NVS and survives restarts.</span>
+        <a href="avatar_dsl.html" target="_blank" rel="noopener" style="white-space:nowrap" data-i18n="dsl.syntaxGuide">Syntax guide</a>
+        /
         <a href="https://github.com/sefuzhou770801-hub/groki-bot/blob/main/assets/default_face.avdsl"
-           target="_blank" rel="noopener" style="white-space:nowrap">默认面部源码</a>
+           target="_blank" rel="noopener" style="white-space:nowrap" data-i18n="dsl.defaultSource">Default face source</a>
       </p>
       <textarea id="dsl-src" spellcheck="false" autocomplete="off"
                 autocapitalize="off" autocorrect="off"></textarea>
-      <div id="dsl-msg">DSL 编译器未启动</div>
+      <div id="dsl-msg" data-i18n="dsl.notStarted">DSL compiler not started</div>
       <div class="dsl-btnrow">
-        <button type="button" class="primary" id="btn-dsl-send" disabled>编译并发送</button>
-        <select id="dsl-preset" title="选择预设会读取源码并发送到真机"></select>
-        <button type="button" class="danger" id="btn-dsl-reset" disabled>将真机恢复为默认</button>
+        <button type="button" class="primary" id="btn-dsl-send" data-i18n="dsl.send" disabled>Compile and send</button>
+        <select id="dsl-preset" title="Choosing a preset loads its source and sends it to the robot" data-i18n-title="dsl.presetTitle"></select>
+        <button type="button" class="danger" id="btn-dsl-reset" data-i18n="dsl.reset" disabled>Reset robot to default</button>
       </div>
       <div class="dsl-btnrow">
-        <button type="button" class="secondary" id="btn-dsl-download">下载 .avbc</button>
-        <button type="button" class="secondary" id="btn-dsl-download-src">下载 .avdsl</button>
-        <label class="filebtn" for="dsl-load">读取 .avdsl</label>
+        <button type="button" class="secondary" id="btn-dsl-download" data-i18n="dsl.dlAvbc">Download .avbc</button>
+        <button type="button" class="secondary" id="btn-dsl-download-src" data-i18n="dsl.dlAvdsl">Download .avdsl</button>
+        <label class="filebtn" for="dsl-load" data-i18n="dsl.loadAvdsl">Load .avdsl</label>
         <input type="file" id="dsl-load" accept=".avdsl,text/plain" style="display:none">
-        <label class="filebtn" for="avbc-file">直接发送 .avbc</label>
+        <label class="filebtn" for="avbc-file" data-i18n="dsl.sendAvbc">Send .avbc directly</label>
         <input type="file" id="avbc-file" accept=".avbc,application/octet-stream" style="display:none">
       </div>
     </div>
   </section><!-- /tab-panel "avatar" -->
 
-  <!-- ===== 音声 ===== -->
+  <!-- ===== Audio ===== -->
   <section class="tab-panel" data-tab="audio">
     <div id="speaker-volume-section">
-      <h2 class="section-title">扬声器音量</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        对内置 / Module Audio / Atomic Echo Base 的全部输出生效。
-        拖动滑块会 <strong>立刻生效</strong> 并自动保存（不必重启）。
-        100% 为各主板出厂默认，200% 为增益（内部 master volume
-        乘 2，上限 255）。
+      <h2 class="section-title" data-i18n="vol.title">Speaker volume</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n-html="vol.hint">
+        Applies to all output: built-in speaker, Module Audio and Atomic Echo Base.
+        Moving the slider <strong>takes effect immediately</strong> and is saved automatically (no restart needed).
+        100% is each board's factory default; 200% is a boost (the internal master volume
+        is doubled, capped at 255).
       </p>
-      <label for="speaker-volume">音量 <span id="speaker-volume-value">100</span> %</label>
+      <label for="speaker-volume"><span data-i18n="vol.label">Volume</span> <span id="speaker-volume-value">100</span> %</label>
       <input type="range" id="speaker-volume" min="0" max="200" step="5" value="100" style="width:100%">
     </div>
 
     <div id="jtts-say-section">
-      <h2 class="section-title">jtts 试读</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        请输入平假名或片假名，再点「朗读」，由 jtts 发音。
-        汉字和英文不会转换，请直接写假名。
-        适合检查音量和音频输出。
+      <h2 class="section-title" data-i18n="say.title">jtts test speech</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n="say.hint">
+        Type hiragana or katakana and click "Speak" to hear it through jtts.
+        Kanji and English are not converted, so write the text in kana.
+        Useful for checking the volume and the audio output.
       </p>
-      <input type="text" id="jtts-say-text" maxlength="64" placeholder="（示例）请输入平假名">
-      <button type="button" id="btn-jtts-say" class="primary" disabled style="margin-top:0.5rem">朗读</button>
+      <input type="text" id="jtts-say-text" maxlength="64" placeholder="(example) type hiragana" data-i18n-placeholder="say.ph">
+      <button type="button" id="btn-jtts-say" class="primary" disabled style="margin-top:0.5rem" data-i18n="say.btn">Speak</button>
     </div>
 
     <div id="audio-output-section">
-      <h2 class="section-title">音频输出</h2>
-      <p class="hint">
-        选择音频输出目标。「自动」会优先使用已安装的 M5 Module Audio，
-        未安装则用内置扬声器。「内置」和「Module Audio」是强制指定
-        （未安装 Module Audio 却选了它时，会退回内置）。保存后重启才会切换。
+      <h2 class="section-title" data-i18n="out.title">Audio output</h2>
+      <p class="hint" data-i18n="out.hint">
+        Choose where audio plays. "Auto" uses an installed M5 Module Audio first and falls back to the
+        built-in speaker. "Built-in speaker" and "Module Audio" force the choice (choosing Module Audio
+        without one installed falls back to the built-in speaker). Takes effect after a restart.
       </p>
       <select id="audio-output">
-        <option value="0">自动 (Auto)</option>
-        <option value="1">内置扬声器 (Internal)</option>
+        <option value="0" data-i18n="out.auto">Auto</option>
+        <option value="1" data-i18n="out.internal">Built-in speaker (Internal)</option>
         <option value="2">M5 Module Audio (ModuleAudio)</option>
       </select>
     </div>
 
     <div id="rtp-section">
-      <h2 class="section-title">Wi-Fi RTP 音频接收</h2>
+      <h2 class="section-title" data-i18n="rtp.title">Wi-Fi RTP audio receiver</h2>
       <label class="toggle-label" for="rtp-enabled">
         <input type="checkbox" id="rtp-enabled" checked>
-        <span>启用 RTP 音频接收</span>
+        <span data-i18n="rtp.enable">Enable the RTP audio receiver</span>
       </label>
-      <p class="hint">经 Wi-Fi 接收 RTP 音频（L16/μ-law=udp/6970，AAC=udp/6972）。对话功能开启时会自动关闭</p>
+      <p class="hint" data-i18n="rtp.hint">Receives RTP audio over Wi-Fi (L16/μ-law = udp/6970, AAC = udp/6972). Turned off automatically while conversation is on</p>
     </div>
 
     <div id="jtts-section">
-      <h2 class="section-title">空闲语音 (jtts)</h2>
+      <h2 class="section-title" data-i18n="idle.title">Idle speech (jtts)</h2>
       <!-- Hidden legacy toggle — operation_mode == JttsRandom is the real
            switch now. Kept in the DOM so probe/Apply JS keeps working. -->
       <label class="toggle-label" for="jtts-idle-enabled" style="display:none">
         <input type="checkbox" id="jtts-idle-enabled" checked>
-        <span>启用空闲播报</span>
+        <span data-i18n="idle.enable">Enable idle chatter</span>
       </label>
 
-      <h2 class="section-title">麦克风口型同步调整（工作模式为口型同步时有效）</h2>
-      <p class="hint" style="margin-bottom:0.5rem">按麦克风音量张嘴闭嘴。CoreS3 麦克风偏钝，提高输入增益会更好看。拖动滑块会 <strong>立刻生效</strong> 并自动保存。</p>
+      <h2 class="section-title" data-i18n="mic.title">Mic lip sync tuning (used in Mic lip sync mode)</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n-html="mic.hint">Opens and closes the mouth with the microphone level. The CoreS3 microphone is not very sensitive, so a higher input gain looks better. Moving a slider <strong>takes effect immediately</strong> and is saved automatically.</p>
       <div class="grid2">
         <div style="grid-column:span 2">
-          <label for="mic-lip-input">输入增益 <span id="mic-lip-input-value">200</span> %</label>
+          <label for="mic-lip-input"><span data-i18n="mic.input">Input gain</span> <span id="mic-lip-input-value">200</span> %</label>
           <input type="range" id="mic-lip-input" min="10" max="1000" step="10" value="200" style="width:100%">
         </div>
         <div style="grid-column:span 2">
-          <label for="mic-lip-output">张嘴增益 <span id="mic-lip-output-value">100</span> %</label>
+          <label for="mic-lip-output"><span data-i18n="mic.output">Mouth gain</span> <span id="mic-lip-output-value">100</span> %</label>
           <input type="range" id="mic-lip-output" min="10" max="500" step="10" value="100" style="width:100%">
         </div>
       </div>
       <label class="toggle-label" for="mic-lip-agc" style="margin-top:0.5rem">
         <input type="checkbox" id="mic-lip-agc">
-        <span>启用自动增益控制 (AGC)</span>
+        <span data-i18n="mic.agc">Enable automatic gain control (AGC)</span>
       </label>
-      <p class="hint">自动跟踪环境噪声，让安静房间和嘈杂环境都能对说话做出反应。关闭后用固定阈值判断（不适应环境变化，但结果更好预料）。保存后重启生效。</p>
+      <p class="hint" data-i18n="mic.agcHint">Tracks the background noise so the mouth reacts to speech in both quiet rooms and noisy places. When off, a fixed threshold is used (it does not adapt, but it is more predictable). Takes effect after a restart.</p>
 
-      <h2 class="section-title" style="margin-top:1rem">jtts 音色</h2>
-      <p class="hint" style="margin-bottom:0.5rem">留空或不改就点「保存」，会保留当前设置。</p>
+      <h2 class="section-title" style="margin-top:1rem" data-i18n="voice.title">jtts voice</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n="voice.hint">Fields left blank or unchanged keep their current values when you click "Save".</p>
 
-      <label for="jtts-voice">声音类型</label>
+      <label for="jtts-voice" data-i18n="voice.type">Voice type</label>
       <select id="jtts-voice">
-        <option value="female">Female（偏童声）</option>
-        <option value="male">Male（偏低）</option>
+        <option value="female" data-i18n="voice.female">Female (childlike)</option>
+        <option value="male" data-i18n="voice.male">Male (lower)</option>
       </select>
 
-      <label for="jtts-synth">合成方式</label>
+      <label for="jtts-synth" data-i18n="voice.synth">Synthesis method</label>
       <select id="jtts-synth">
-        <option value="v2">标准（v2：声门波 + 级联）</option>
-        <option value="classic">经典（旧方式：蜂鸣声）</option>
+        <option value="v2" data-i18n="voice.synthV2">Standard (v2: glottal wave + cascade)</option>
+        <option value="classic" data-i18n="voice.synthClassic">Classic (old method: buzzer tone)</option>
       </select>
 
-      <label for="jtts-engine">引擎</label>
+      <label for="jtts-engine" data-i18n="voice.engine">Engine</label>
       <select id="jtts-engine">
-        <option value="auto">自动（HMM 音色 &gt; 语音库 &gt; 共振峰）</option>
-        <option value="hmm">HMM 合成（必须有音色，否则回退）</option>
-        <option value="unit">单元拼接（必须有语音库，否则用共振峰）</option>
-        <option value="formant">仅共振峰合成</option>
+        <option value="auto" data-i18n="voice.engAuto">Auto (HMM voice &gt; voice library &gt; formant)</option>
+        <option value="hmm" data-i18n="voice.engHmm">HMM synthesis (needs a voice, otherwise falls back)</option>
+        <option value="unit" data-i18n="voice.engUnit">Unit concatenation (needs a voice library, otherwise formant)</option>
+        <option value="formant" data-i18n="voice.engFormant">Formant synthesis only</option>
       </select>
-      <label for="jtts-halftone">HMM 音高移位 [半音]</label>
+      <label for="jtts-halftone" data-i18n="voice.halftone">HMM pitch shift [semitones]</label>
       <input type="number" id="jtts-halftone" min="-12" max="12" step="0.5" placeholder="0">
-      <p class="hint">HMM 音色（.htsvoice）/ 单元拼接语音库（.jvox）可在 Wi-Fi 设置页上传。</p>
-      <p class="hint">语音引擎（hts_engine, Modified BSD）与配布音色的归属： <a href="./licenses.html" target="_blank" rel="noopener">许可证 / 归属</a></p>
+      <p class="hint" data-i18n="voice.uploadHint">HMM voices (.htsvoice) and unit-concatenation voice libraries (.jvox) can be uploaded on the Wi-Fi settings page.</p>
+      <p class="hint"><span data-i18n="voice.licenseText">Attribution for the speech engine (hts_engine, Modified BSD) and the bundled voices:</span> <a href="./licenses.html" target="_blank" rel="noopener" data-i18n="voice.licenseLink">Licenses / attribution</a></p>
 
       <div class="grid2">
         <div>
-          <label for="jtts-f0">音高 F0 (Hz)</label>
+          <label for="jtts-f0" data-i18n="voice.f0">Pitch F0 (Hz)</label>
           <input type="number" id="jtts-f0" min="60" max="500" step="1" placeholder="280">
         </div>
         <div>
-          <label for="jtts-formant">共振峰倍率</label>
+          <label for="jtts-formant" data-i18n="voice.formant">Formant scale</label>
           <input type="number" id="jtts-formant" min="0.5" max="2.0" step="0.05" placeholder="1.30">
         </div>
         <div>
-          <label for="jtts-mora">音拍时长 (ms)</label>
+          <label for="jtts-mora" data-i18n="voice.mora">Mora length (ms)</label>
           <input type="number" id="jtts-mora" min="40" max="300" step="5" placeholder="120">
         </div>
         <div>
-          <label for="jtts-gain">音量 (gain)</label>
+          <label for="jtts-gain" data-i18n="voice.gain">Volume (gain)</label>
           <input type="number" id="jtts-gain" min="0" max="2" step="0.05" placeholder="0.60">
         </div>
         <div>
-          <label for="jtts-breath">气息 (breathiness)</label>
+          <label for="jtts-breath" data-i18n="voice.breath">Breathiness</label>
           <input type="number" id="jtts-breath" min="0" max="1" step="0.05" placeholder="0.00">
         </div>
         <div>
-          <label for="jtts-vibrate">颤音 rate (Hz)</label>
+          <label for="jtts-vibrate" data-i18n="voice.vibRate">Vibrato rate (Hz)</label>
           <input type="number" id="jtts-vibrate" min="0" max="10" step="0.1" placeholder="0">
         </div>
         <div>
-          <label for="jtts-vibratoc">颤音 depth (cents)</label>
+          <label for="jtts-vibratoc" data-i18n="voice.vibDepth">Vibrato depth (cents)</label>
           <input type="number" id="jtts-vibratoc" min="0" max="200" step="1" placeholder="0">
         </div>
         <div>
-          <label for="jtts-oq">声门开合比（柔和度）</label>
+          <label for="jtts-oq" data-i18n="voice.oq">Glottal open quotient (softness)</label>
           <input type="number" id="jtts-oq" min="0.35" max="0.85" step="0.01" placeholder="0.56">
         </div>
         <div>
-          <label for="jtts-tilt">高频衰减 tilt (dB)</label>
+          <label for="jtts-tilt" data-i18n="voice.tilt">High-frequency tilt (dB)</label>
           <input type="number" id="jtts-tilt" min="0" max="24" step="1" placeholder="0">
         </div>
         <div>
-          <label for="jtts-bwscale">带宽倍率（抑制尖声）</label>
+          <label for="jtts-bwscale" data-i18n="voice.bw">Bandwidth scale (reduces shrillness)</label>
           <input type="number" id="jtts-bwscale" min="0.7" max="2.0" step="0.05" placeholder="1.00">
         </div>
       </div>
-      <p class="hint" style="margin-top:0.25rem">
-        偏柔和的参考：开合比 0.65–0.75 / tilt 6–12 dB / 带宽 1.2–1.5
-        （加气息 0.1–0.25）。均在 v2 方式下有效（带宽在经典方式下也有效）。</p>
+      <p class="hint" style="margin-top:0.25rem" data-i18n="voice.softHint">
+        For a softer voice try: open quotient 0.65–0.75 / tilt 6–12 dB / bandwidth 1.2–1.5
+        (plus breathiness 0.1–0.25). All of these apply to the v2 method (bandwidth also applies to the classic method).</p>
 
-      <label for="jtts-phrases" style="margin-top:0.75rem">空闲播报语句（一行一条）</label>
-      <p style="font-size:0.8rem;color:#888;margin:0.2rem 0">
-        格式为 <code>画面文字 | 读音</code>。<code>|</code> 右侧（读音）只能写平假名或片假名
-        （汉字在发音时会被忽略）。省略 <code>|</code> 则画面文字与读音相同。
-        示例: <code>画面文字 | 平假名读音</code></p>
-      <textarea id="jtts-phrases" rows="6" placeholder="画面文字 | 平假名读音"></textarea>
+      <label for="jtts-phrases" style="margin-top:0.75rem" data-i18n="phr.label">Idle phrases (one per line)</label>
+      <p style="font-size:0.8rem;color:#888;margin:0.2rem 0" data-i18n-html="phr.hint">
+        Format: <code>display text | reading</code>. The part right of <code>|</code> (the reading) must be hiragana or katakana
+        (kanji are skipped when speaking). Without <code>|</code> the display text is also used as the reading.
+        Example: <code>display text | hiragana reading</code></p>
+      <textarea id="jtts-phrases" rows="6" placeholder="display text | hiragana reading" data-i18n-placeholder="phr.ph"></textarea>
     </div>
 
     <div id="audio-section">
-      <h2 class="section-title">音频文件播放（BLE 流式传输）</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        选择本地音频文件（.mp3 / .wav / .m4a / .aac 等）再点「播放」，
-        浏览器会重编码为 24 kHz 单声道 AAC-LC，再经 BLE 流式发送。
-        Stack-chan 边解码 AAC 边播放，并按音量张嘴。
+      <h2 class="section-title" data-i18n="play.title">Play an audio file (BLE streaming)</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n="play.hint">
+        Choose a local audio file (.mp3 / .wav / .m4a / .aac, etc.) and click "Play".
+        The browser re-encodes it to 24 kHz mono AAC-LC and streams it over BLE.
+        Groki decodes and plays the AAC as it arrives and moves its mouth with the volume.
       </p>
       <div class="ota-row">
         <input type="file" id="audio-file" accept="audio/*">
-        <button id="btn-audio-play" type="button" disabled>播放</button>
-        <button id="btn-audio-stop" type="button" disabled>停止</button>
+        <button id="btn-audio-play" type="button" disabled data-i18n="play.play">Play</button>
+        <button id="btn-audio-stop" type="button" disabled data-i18n="play.stop">Stop</button>
       </div>
-      <p class="hint" id="audio-conv-note" style="display:none;color:#c0392b">
-        ⚠ 对话功能已开启，无法使用。无线和 CPU 会互相抢占导致播放中断，两者互斥。
-        请关闭「启用对话功能」并保存重启后再用。
+      <p class="hint" id="audio-conv-note" style="display:none;color:#c0392b" data-i18n="play.convNote">
+        ⚠ Not available while conversation is on. Radio and CPU contention would interrupt playback, so the two are mutually exclusive.
+        Turn off "Enable conversation", save and restart, then try again.
       </p>
       <div class="ota-status" id="audio-status">
         <div class="ota-bar"><div class="ota-bar-fill" id="audio-bar-fill"></div></div>
-        <div class="ota-stats" id="audio-stats">未开始</div>
+        <div class="ota-stats" id="audio-stats" data-i18n="common.notStarted">Not started</div>
       </div>
     </div>
 
     <div id="audio-metrics-section">
-      <h2 class="section-title">音频流水线诊断</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        最近一轮对话的音频流水线统计（与 BLE chr 0x1f / HTTP
-        <code>GET /api/metrics/audio</code> 相同）。每轮对话结束时
-        固件（<code>conv-task: log_playback_metrics</code>）会更新，
-        点下方「读取」可看到最新一轮的数值。
+      <h2 class="section-title" data-i18n="met.title">Audio pipeline diagnostics</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n-html="met.hint">
+        Audio pipeline statistics for the most recent conversation turn (same as BLE chr 0x1f / HTTP
+        <code>GET /api/metrics/audio</code>). The firmware
+        (<code>conv-task: log_playback_metrics</code>) updates them at the end of each turn;
+        click "Read" below to see the latest values.
       </p>
       <table id="audio-metrics-table" style="width:100%;border-collapse:collapse;font-size:0.92em">
         <thead>
           <tr style="text-align:left;border-bottom:1px solid #444">
-            <th style="padding:0.3rem 0.5rem">指标</th>
+            <th style="padding:0.3rem 0.5rem" data-i18n="met.metric">Metric</th>
             <th style="padding:0.3rem 0.5rem">avg</th>
             <th style="padding:0.3rem 0.5rem">min</th>
             <th style="padding:0.3rem 0.5rem">max</th>
           </tr>
         </thead>
         <tbody id="audio-metrics-body">
-          <tr><td colspan="4" class="hint" style="padding:0.5rem">未获取</td></tr>
+          <tr><td colspan="4" class="hint" style="padding:0.5rem" data-i18n="met.none">Not read yet</td></tr>
         </tbody>
       </table>
       <p class="hint" id="audio-metrics-summary" style="margin-top:0.5rem">—</p>
       <div class="actions" style="margin-top:0.5rem">
-        <button id="btn-audio-metrics-reload" disabled>读取</button>
+        <button id="btn-audio-metrics-reload" disabled data-i18n="met.read">Read</button>
         <label style="margin-left:0.8rem;font-size:0.92em">
-          <input type="checkbox" id="audio-metrics-autorefresh"> 自动刷新（2 秒）
+          <input type="checkbox" id="audio-metrics-autorefresh"> <span data-i18n="met.auto">Auto-refresh (2 s)</span>
         </label>
       </div>
     </div>
 
     <div id="lt-section">
-      <h2 class="section-title">LT 计时器</h2>
-      <p class="hint">在机身「LT」标签页开始或停止。这里设置默认时长和提示词（写入立刻生效，保存后重启仍保留）。读音请写平假名（jtts 读不了汉字）</p>
+      <h2 class="section-title" data-i18n="lt.title">LT timer</h2>
+      <p class="hint" data-i18n="lt.hint">Start or stop it from the "LT" tab on the robot. Set the default length and the announcements here (changes apply immediately and are kept after Save and restart). Write readings in hiragana (jtts cannot read kanji)</p>
       <div class="grid2">
         <div>
-          <label for="lt-total">发言时长（秒）</label>
+          <label for="lt-total" data-i18n="lt.total">Talk length (seconds)</label>
           <input type="number" id="lt-total" min="30" max="3600" step="30" placeholder="300">
         </div>
         <div>
-          <label for="lt-warn">剩余提醒（提前秒数）</label>
+          <label for="lt-warn" data-i18n="lt.warn">Time-left warning (seconds before end)</label>
           <input type="number" id="lt-warn" min="10" max="600" step="10" placeholder="60">
         </div>
       </div>
       <div class="grid2">
         <div>
-          <label for="lt-soon">临近提醒（提前秒数，0=关闭）</label>
+          <label for="lt-soon" data-i18n="lt.soon">Almost-up warning (seconds before end, 0 = off)</label>
           <input type="number" id="lt-soon" min="0" max="120" step="5" placeholder="15">
         </div>
         <div>
-          <label for="lt-repeat">超时重复（秒，0=只一次）</label>
+          <label for="lt-repeat" data-i18n="lt.repeat">Overtime repeat (seconds, 0 = once)</label>
           <input type="number" id="lt-repeat" min="0" max="300" step="5" placeholder="30">
         </div>
       </div>
-      <label for="lt-warn-text">剩余提醒 显示文字</label>
-      <input id="lt-warn-text" placeholder="还剩1分钟">
-      <label for="lt-warn-reading">剩余提醒 读音（平假名）</label>
-      <input id="lt-warn-reading" placeholder="（请输入平假名）">
-      <label for="lt-soon-text">临近提醒 显示文字</label>
-      <input id="lt-soon-text" placeholder="还剩15秒">
-      <label for="lt-soon-reading">临近提醒 读音（平假名）</label>
-      <input id="lt-soon-reading" placeholder="（请输入平假名）">
-      <label for="lt-just-text">刚好到时 显示文字</label>
-      <input id="lt-just-text" placeholder="（留空则与超时相同）">
-      <label for="lt-just-reading">刚好到时 读音（平假名）</label>
-      <input id="lt-just-reading" placeholder="（留空则与超时相同）">
-      <label for="lt-over-text">超时 显示文字</label>
-      <input id="lt-over-text" placeholder="时间到了!">
-      <label for="lt-over-reading">超时 读音（平假名）</label>
-      <input id="lt-over-reading" placeholder="（请输入平假名）">
+      <label for="lt-warn-text" data-i18n="lt.warnText">Time-left warning: display text</label>
+      <input id="lt-warn-text" placeholder="1 minute left" data-i18n-placeholder="lt.ph.warnText">
+      <label for="lt-warn-reading" data-i18n="lt.warnReading">Time-left warning: reading (hiragana)</label>
+      <input id="lt-warn-reading" placeholder="(type hiragana)" data-i18n-placeholder="lt.ph.kana">
+      <label for="lt-soon-text" data-i18n="lt.soonText">Almost-up warning: display text</label>
+      <input id="lt-soon-text" placeholder="15 seconds left" data-i18n-placeholder="lt.ph.soonText">
+      <label for="lt-soon-reading" data-i18n="lt.soonReading">Almost-up warning: reading (hiragana)</label>
+      <input id="lt-soon-reading" placeholder="(type hiragana)" data-i18n-placeholder="lt.ph.kana">
+      <label for="lt-just-text" data-i18n="lt.justText">Time up: display text</label>
+      <input id="lt-just-text" placeholder="(blank = same as overtime)" data-i18n-placeholder="lt.ph.sameAsOver">
+      <label for="lt-just-reading" data-i18n="lt.justReading">Time up: reading (hiragana)</label>
+      <input id="lt-just-reading" placeholder="(blank = same as overtime)" data-i18n-placeholder="lt.ph.sameAsOver">
+      <label for="lt-over-text" data-i18n="lt.overText">Overtime: display text</label>
+      <input id="lt-over-text" placeholder="Time's up!" data-i18n-placeholder="lt.ph.overText">
+      <label for="lt-over-reading" data-i18n="lt.overReading">Overtime: reading (hiragana)</label>
+      <input id="lt-over-reading" placeholder="(type hiragana)" data-i18n-placeholder="lt.ph.kana">
     </div>
   </section><!-- /tab-panel "audio" -->
 
-  <!-- ===== 会話 ===== -->
+  <!-- ===== Conversation ===== -->
   <section class="tab-panel" data-tab="chat">
     <div id="chat-section">
-      <h2 class="section-title">对话服务商与 API 密钥</h2>
-      <label for="provider">对话服务商</label>
+      <h2 class="section-title" data-i18n="chat.title">Conversation provider and API keys</h2>
+      <label for="provider" data-i18n="chat.provider">Conversation provider</label>
       <select id="provider">
         <option value="0">OpenAI Realtime</option>
         <option value="1">Google Gemini Live</option>
-        <option value="2">XiaoZhi 服务器</option>
+        <option value="2" data-i18n="chat.xiaozhi">XiaoZhi server</option>
       </select>
-      <p class="hint">切换使用哪一个对话后端。密钥和设置都可以保存在下面各项里。</p>
+      <p class="hint" data-i18n="chat.providerHint">Chooses which conversation backend to use. Keys and settings for each one can be saved in the fields below.</p>
 
-      <label for="apikey">OpenAI API 密钥</label>
-      <input type="password" id="apikey" maxlength="256" placeholder="sk-… （不改请留空）">
+      <label for="apikey" data-i18n="chat.openaiKey">OpenAI API key</label>
+      <input type="password" id="apikey" maxlength="256" placeholder="sk-… (leave blank to keep)" data-i18n-placeholder="chat.ph.openai">
 
-      <label for="gemini-apikey">Gemini API 密钥</label>
-      <input type="password" id="gemini-apikey" maxlength="256" placeholder="AIza… （不改请留空）">
+      <label for="gemini-apikey" data-i18n="chat.geminiKey">Gemini API key</label>
+      <input type="password" id="gemini-apikey" maxlength="256" placeholder="AIza… (leave blank to keep)" data-i18n-placeholder="chat.ph.gemini">
 
-      <label for="xiaozhi-url">XiaoZhi 服务器 URL</label>
-      <input type="text" id="xiaozhi-url" maxlength="256" placeholder="ws://192.168.1.10:8000/xiaozhi/v1/ （不改请留空）">
+      <label for="xiaozhi-url" data-i18n="chat.xzUrl">XiaoZhi server URL</label>
+      <input type="text" id="xiaozhi-url" maxlength="256" placeholder="ws://192.168.1.10:8000/xiaozhi/v1/ (leave blank to keep)" data-i18n-placeholder="chat.ph.xzUrl">
 
-      <label for="xiaozhi-token">XiaoZhi 令牌</label>
-      <input type="password" id="xiaozhi-token" maxlength="256" placeholder="（可选 / 不改请留空）">
+      <label for="xiaozhi-token" data-i18n="chat.xzToken">XiaoZhi token</label>
+      <input type="password" id="xiaozhi-token" maxlength="256" placeholder="(optional / leave blank to keep)" data-i18n-placeholder="chat.ph.xzToken">
 
       <!-- Legacy toggle, kept in the DOM so existing JS keeps working but
-           hidden — operation_mode (selectable on the 接続 tab) now decides
+           hidden — operation_mode (selectable on the Connection tab) now decides
            whether the conversation task spawns. The device derives this
            gate from operation_mode at boot, so the toggle value is ignored
            on the next reboot regardless of what's in dataset.initial. -->
       <label class="toggle-label" for="openai-enabled" style="display:none">
         <input type="checkbox" id="openai-enabled" checked>
-        <span>启用对话功能</span>
+        <span data-i18n="chat.enable">Enable conversation</span>
       </label>
 
-      <h2 class="section-title">触摸操作</h2>
+      <h2 class="section-title" data-i18n="touch.title">Touch controls</h2>
       <label class="toggle-label" for="barge-in-enabled">
         <input type="checkbox" id="barge-in-enabled">
-        <span>点头打断对话（插话）</span>
+        <span data-i18n="touch.bargeIn">Tap the head to interrupt (barge-in)</span>
       </label>
-      <p class="hint">应答播放中点按形象屏幕（头部）可打断 AI 应答。触摸传感器较灵敏，容易误触，所以默认关闭。抚摸（前→中→后连续触摸）与本开关无关，始终开启。保存后重启生效。</p>
+      <p class="hint" data-i18n="touch.hint">While a reply is playing, tapping the avatar screen (the head) interrupts the AI reply. The touch sensor is sensitive and easily triggered by accident, so this is off by default. Petting (touching front → middle → back in sequence) is not affected by this switch and is always on. Takes effect after a restart.</p>
     </div>
   </section><!-- /tab-panel "chat" -->
 
-  <!-- ===== デバイス ===== -->
+  <!-- ===== Device ===== -->
   <section class="tab-panel" data-tab="device">
     <div id="device-toggles-section">
-      <h2 class="section-title">设备功能开/关</h2>
+      <h2 class="section-title" data-i18n="dev.title">Device features on/off</h2>
       <label class="toggle-label" for="bat-gauge-enabled">
         <input type="checkbox" id="bat-gauge-enabled" checked>
-        <span>显示电池电量条</span>
+        <span data-i18n="dev.batGauge">Show battery gauge</span>
       </label>
-      <p class="hint">在形象画面左上角显示电量条（保存后重启生效）</p>
+      <p class="hint" data-i18n="dev.batHint">Shows a battery gauge in the top-left corner of the avatar screen (takes effect after a restart)</p>
 
       <label class="toggle-label" for="startup-arpeggio-enabled" style="margin-top:1rem">
         <input type="checkbox" id="startup-arpeggio-enabled" checked>
-        <span>启动时播放琶音</span>
+        <span data-i18n="dev.arp">Play an arpeggio at startup</span>
       </label>
-      <p class="hint">启动后是否播放 C5–E5–G5（扬声器自检音）。关闭则静音启动（保存后重启生效）</p>
+      <p class="hint" data-i18n="dev.arpHint">Whether to play C5–E5–G5 (a speaker self-test tone) after startup. When off, the device starts silently (takes effect after a restart)</p>
 
       <label class="toggle-label" for="servo-enabled" style="margin-top:1rem">
         <input type="checkbox" id="servo-enabled" checked>
-        <span>启用舵机</span>
+        <span data-i18n="dev.servo">Enable servos</span>
       </label>
-      <p class="hint">关闭后不上舵机电源，也不启动舵机任务（保存后重启生效）。与操作画面的卸力/恢复开关不是一回事，本项会写入 NVS 持久保存。</p>
+      <p class="hint" data-i18n="dev.servoHint">When off, the servos get no power and the servo task does not start (takes effect after a restart). This is not the same as the torque off/on switch on the control screen: this setting is saved to NVS.</p>
     </div>
 
     <div id="servo-section">
-      <h2 class="section-title">舵机原点与活动范围（面向 Takao base 等自制底板）</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        舵机安装方向和活动范围因底板而异。请设置原点（0..1023）和活动范围（度），
-        再点「保存并重启」生效。默认是 M5 base 的数值。
+      <h2 class="section-title" data-i18n="sv.title">Servo origin and range of motion (for custom bases such as the Takao base)</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n="sv.hint">
+        Servo mounting direction and range of motion differ between bases. Set the origin (0..1023) and the range (degrees),
+        then click "Save and restart" to apply. The defaults are the M5 base values.
       </p>
       <div class="grid2">
         <div>
-          <label for="sv-yaw-zero">Yaw 原点 (raw)</label>
+          <label for="sv-yaw-zero" data-i18n="sv.yawZero">Yaw origin (raw)</label>
           <input type="number" id="sv-yaw-zero" min="0" max="1023" step="1" placeholder="460">
         </div>
         <div></div>
         <div>
-          <label for="sv-yaw-min">Yaw 最小 (°)</label>
+          <label for="sv-yaw-min" data-i18n="sv.yawMin">Yaw min (°)</label>
           <input type="number" id="sv-yaw-min" min="-90" max="90" step="1" placeholder="-40">
         </div>
         <div>
-          <label for="sv-yaw-max">Yaw 最大 (°)</label>
+          <label for="sv-yaw-max" data-i18n="sv.yawMax">Yaw max (°)</label>
           <input type="number" id="sv-yaw-max" min="-90" max="90" step="1" placeholder="40">
         </div>
         <div>
-          <label for="sv-pitch-zero">Pitch 原点 (raw)</label>
+          <label for="sv-pitch-zero" data-i18n="sv.pitchZero">Pitch origin (raw)</label>
           <input type="number" id="sv-pitch-zero" min="0" max="1023" step="1" placeholder="620">
         </div>
         <div></div>
         <div>
-          <label for="sv-pitch-min">Pitch 最小 (°)</label>
+          <label for="sv-pitch-min" data-i18n="sv.pitchMin">Pitch min (°)</label>
           <input type="number" id="sv-pitch-min" min="-90" max="90" step="1" placeholder="-10">
         </div>
         <div>
-          <label for="sv-pitch-max">Pitch 最大 (°)</label>
+          <label for="sv-pitch-max" data-i18n="sv.pitchMax">Pitch max (°)</label>
           <input type="number" id="sv-pitch-max" min="-90" max="90" step="1" placeholder="25">
         </div>
       </div>
       <div id="sv-range-area" style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px dashed #555">
-        <p class="hint" style="margin-bottom:0.5rem">
-          打开范围设置模式后舵机会卸力，可以手工摆到目标位置再采集。
-          请按顺序：正中点「采集 Yaw 原点」，左端点「采集 Yaw 最小」，右端点「采集 Yaw 最大」。
-          采集值会填进上方输入框。最后点「保存并重启」确认。
+        <p class="hint" style="margin-bottom:0.5rem" data-i18n="sv.rangeHint">
+          Range setting mode turns the servo torque off so you can move the head by hand and capture positions.
+          In order: at the center click "Capture Yaw origin", at the left end "Capture Yaw min", at the right end "Capture Yaw max".
+          Captured values fill the fields above. Finally click "Save and restart" to confirm.
         </p>
         <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
-          <button type="button" id="sv-range-mode">范围设置模式: OFF</button>
+          <button type="button" id="sv-range-mode" data-i18n="sv.rangeModeOff">Range setting mode: OFF</button>
           <span class="hint" id="sv-live-pos">Yaw: -- (--°)   Pitch: -- (--°)</span>
         </div>
         <div style="margin-top:0.4rem;display:flex;flex-wrap:wrap;gap:0.3rem">
-          <button type="button" id="sv-cap-yaw-zero" disabled>采集 Yaw 原点</button>
-          <button type="button" id="sv-cap-yaw-min"  disabled>采集 Yaw 最小</button>
-          <button type="button" id="sv-cap-yaw-max"  disabled>采集 Yaw 最大</button>
-          <button type="button" id="sv-cap-pitch-zero" disabled>采集 Pitch 原点</button>
-          <button type="button" id="sv-cap-pitch-min"  disabled>采集 Pitch 最小</button>
-          <button type="button" id="sv-cap-pitch-max"  disabled>采集 Pitch 最大</button>
+          <button type="button" id="sv-cap-yaw-zero" data-i18n="sv.capYawZero" disabled>Capture Yaw origin</button>
+          <button type="button" id="sv-cap-yaw-min"  data-i18n="sv.capYawMin" disabled>Capture Yaw min</button>
+          <button type="button" id="sv-cap-yaw-max"  data-i18n="sv.capYawMax" disabled>Capture Yaw max</button>
+          <button type="button" id="sv-cap-pitch-zero" data-i18n="sv.capPitchZero" disabled>Capture Pitch origin</button>
+          <button type="button" id="sv-cap-pitch-min"  data-i18n="sv.capPitchMin" disabled>Capture Pitch min</button>
+          <button type="button" id="sv-cap-pitch-max"  data-i18n="sv.capPitchMax" disabled>Capture Pitch max</button>
         </div>
       </div>
     </div>
 
     <div id="led-section">
-      <h2 class="section-title">猫耳 LED</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        设置猫耳 NeoPixel（GPIO9 / 18 颗 LED）的模式、颜色和亮度。
-        更改立刻生效，并自动写入 NVS，重启后仍会恢复。
-        彩虹（gradient）模式会忽略颜色。
+      <h2 class="section-title" data-i18n="led.title">Cat-ear LEDs</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n="led.hint">
+        Sets the mode, color and brightness of the cat-ear NeoPixels (GPIO9 / 18 LEDs).
+        Changes apply immediately, are saved to NVS automatically and come back after a restart.
+        Rainbow (gradient) mode ignores the color.
       </p>
       <div class="grid2">
         <div>
-          <label for="led-mode">模式</label>
+          <label for="led-mode" data-i18n="led.mode">Mode</label>
           <select id="led-mode">
             <option value="0">OFF</option>
-            <option value="1">单色 (solid)</option>
-            <option value="2">呼吸 (breath)</option>
-            <option value="3">彩虹 (gradient)</option>
+            <option value="1" data-i18n="led.solid">Solid (solid)</option>
+            <option value="2" data-i18n="led.breath">Breathing (breath)</option>
+            <option value="3" data-i18n="led.gradient">Rainbow (gradient)</option>
           </select>
         </div>
         <div>
-          <label for="led-color">颜色 (solid / breath)</label>
+          <label for="led-color" data-i18n="led.color">Color (solid / breath)</label>
           <input type="color" id="led-color" value="#404040" style="width:100%;height:2.2rem;padding:0;border:0">
         </div>
         <div style="grid-column:span 2">
-          <label for="led-brightness">亮度 <span id="led-brightness-value">26</span> / 255</label>
+          <label for="led-brightness"><span data-i18n="led.brightness">Brightness</span> <span id="led-brightness-value">26</span> / 255</label>
           <input type="range" id="led-brightness" min="0" max="255" step="1" value="26" style="width:100%">
         </div>
         <div style="grid-column:span 2">
-          <label for="led-period">彩彩虹 (gradient) 周期 <span id="led-period-value">6.0</span> 秒</label>
+          <label for="led-period"><span data-i18n="led.period">Rainbow (gradient) period</span> <span id="led-period-value">6.0</span> <span data-i18n="led.seconds">s</span></label>
           <input type="range" id="led-period" min="1" max="255" step="1" value="60" style="width:100%">
         </div>
       </div>
       <label class="toggle-label" for="led-mouth-sync" style="margin-top:1rem">
         <input type="checkbox" id="led-mouth-sync">
-        <span>按口型控制 LED</span>
+        <span data-i18n="led.mouthSync">Drive the LEDs with lip sync</span>
       </label>
-      <p class="hint">形象张嘴时 LED 会跟着反应（对话播放、jtts 发音、麦克风口型同步都有效）。关闭时固定为所设亮度。保存后重启生效。</p>
-      <label for="lip-sync-mode" style="margin-top:0.5rem">口型同步模式</label>
-      <p class="hint">
-        开启时选择控制方式。「亮度」是嘴张得越大 LED 整体越亮的原有行为。
-        「电平表」把猫耳三角形（LED1 为底边，LED5 为顶点）
-        当成 5 级条形图点亮。保存后重启生效。
+      <p class="hint" data-i18n="led.mouthHint">The LEDs react when the avatar opens its mouth (works for conversation playback, jtts speech and mic lip sync). When off, they stay at the set brightness. Takes effect after a restart.</p>
+      <label for="lip-sync-mode" style="margin-top:0.5rem" data-i18n="led.lipMode">Lip sync mode</label>
+      <p class="hint" data-i18n="led.lipHint">
+        Chooses how the LEDs follow the mouth when this is on. "Brightness" is the original behavior: the wider the mouth, the brighter all LEDs.
+        "Level meter" lights the cat-ear triangle (LED1 along the base, LED5 at the tip)
+        as a 5-step bar graph. Takes effect after a restart.
       </p>
       <select id="lip-sync-mode">
-        <option value="0">亮度 (Brightness)</option>
-        <option value="1">电平表 (LevelMeter)</option>
+        <option value="0" data-i18n="led.lipBright">Brightness</option>
+        <option value="1" data-i18n="led.lipLevel">Level meter (LevelMeter)</option>
       </select>
     </div>
   </section><!-- /tab-panel "device" -->
 
-  <!-- ===== メンテ ===== -->
+  <!-- ===== Maintenance ===== -->
   <section class="tab-panel" data-tab="maint">
     <div id="mcp-section">
-      <h2 class="section-title">Claude Code Channel (MCP)：令牌管理</h2>
-      <p class="hint">设置后会启用 <code>/mcp/*</code> HTTP API（可由 Channel adapter 连接）。清空后 <code>/mcp/*</code> 返回 404。保存后重启生效</p>
-      <label for="mcp-token">MCP API 令牌（留空不改 / 点「清除」会把空字符串写入 NVS）</label>
-      <input type="password" id="mcp-token" autocomplete="off" placeholder="(不改请留空)">
+      <h2 class="section-title" data-i18n="mcp.title">Claude Code Channel (MCP): token</h2>
+      <p class="hint" data-i18n-html="mcp.hint">When set, the <code>/mcp/*</code> HTTP API is enabled (a Channel adapter can connect to it). When cleared, <code>/mcp/*</code> returns 404. Takes effect after a restart</p>
+      <label for="mcp-token" data-i18n="mcp.label">MCP API token (blank = keep / "Clear" writes an empty string to NVS)</label>
+      <input type="password" id="mcp-token" autocomplete="off" placeholder="(leave blank to keep)" data-i18n-placeholder="ph.keepAscii">
       <div style="display:flex;gap:0.4rem;margin-top:0.3rem">
-        <button type="button" id="btn-mcp-token-gen">随机生成</button>
-        <button type="button" id="btn-mcp-token-show">显示</button>
-        <button type="button" id="btn-mcp-token-clear">清除</button>
+        <button type="button" id="btn-mcp-token-gen" data-i18n="mcp.gen">Generate</button>
+        <button type="button" id="btn-mcp-token-show" data-i18n="mcp.show">Show</button>
+        <button type="button" id="btn-mcp-token-clear" data-i18n="common.clear">Clear</button>
       </div>
     </div>
 
     <div id="ota-section">
-      <h2 class="section-title">固件更新 (OTA)</h2>
-      <p class="hint" style="margin-bottom:0.5rem">
-        从 GitHub Release 选择，或选本地 <code>build/stackchan_idf.bin</code>，
-        再点「写入」，会经加密 BLE 把新固件写到另一分区并重启。
-        成功后浏览器侧 BLE 会断开，请手动重新连接。
+      <h2 class="section-title" data-i18n="ota.title">Firmware update (OTA)</h2>
+      <p class="hint" style="margin-bottom:0.5rem" data-i18n-html="ota.hint">
+        Pick a GitHub release or a local <code>build/stackchan_idf.bin</code>
+        and click "Write". The new firmware is written to the other partition over encrypted BLE and the device restarts.
+        The browser's BLE connection drops afterwards; reconnect manually.
       </p>
-      <label for="ota-release">版本</label>
-      <select id="ota-release" style="margin-bottom:0.5rem"><option value="">(使用本地文件)</option></select>
+      <label for="ota-release" data-i18n="ota.version">Version</label>
+      <select id="ota-release" style="margin-bottom:0.5rem"><option value="" data-i18n="ota.useLocal">(use a local file)</option></select>
       <div class="ota-row">
         <input type="file" id="ota-file" accept=".bin">
-        <button id="btn-ota" type="button" disabled>写入</button>
+        <button id="btn-ota" type="button" disabled data-i18n="ota.write">Write</button>
       </div>
       <div class="ota-status" id="ota-status">
         <div class="ota-bar"><div class="ota-bar-fill" id="ota-bar-fill"></div></div>
-        <div class="ota-stats" id="ota-stats">未开始</div>
+        <div class="ota-stats" id="ota-stats" data-i18n="common.notStarted">Not started</div>
       </div>
     </div>
   </section><!-- /tab-panel "maint" -->
 
   <div class="log" id="log"></div>
 
-  <p class="compat-note">
-    在 Chrome / Edge（桌面）<strong>133 及以上</strong> + <code>file://</code> 下可用。
-    Firefox、Safari 不支持 Web Bluetooth。<br>
-    每次连接用 X25519 + AES-256-GCM 加密（不必做系统配对）。
+  <p class="compat-note" data-i18n-html="page.compat">
+    Works in Chrome / Edge (desktop) <strong>133 or later</strong>, including over <code>file://</code>.
+    Firefox and Safari do not support Web Bluetooth.<br>
+    Each connection is encrypted with X25519 + AES-256-GCM (no system pairing needed).
   </p>
 </div>
+<!-- Translate the static markup before the (large) avatar module loads so
+     Chinese-locale visitors don't see a flash of the English fallback. -->
+<script>applyI18n(); initLangSwitch();</script>
 
 <!-- Embeddable avatar render module (built by wasm/build.sh, deployed next to
      this page by pages.yml). MODULARIZE → defines window.AvatarModule. Optional:
@@ -1108,7 +2033,7 @@
      inject.mjs (see .github/workflows/pages.yml). When this page is loaded
      locally without inject (file:// during development), the placeholder is
      left as a comment so the surrounding JS still parses cleanly — the DSL
-     editor will report "DSL コンパイラ未起動" but everything else works. -->
+     editor will report "DSL compiler not started" but everything else works. -->
 <script>/*{{AVATAR_DSL_BUNDLE}}*/</script>
 <!-- DSL preset list inlined the same way (`[{name,source}, ...]`). The first
      entry is the textarea's initial value. When the placeholder is not
@@ -1288,12 +2213,12 @@ const log = StackchanSettings.log;
 function setBleUi(connected) {
   const dot = document.getElementById('ble-dot');
   dot.className = 'dot ' + (connected ? 'ble-connected' : '');
-  document.getElementById('ble-label').textContent = connected ? 'BLE 已连接' : '未连接';
+  setText(document.getElementById('ble-label'), connected ? 'status.connected' : 'status.disconnected');
   const applyBtn = document.getElementById('btn-apply');
   applyBtn.disabled = !connected;
-  // Reset label — a prior Apply may have left it on "再起動中…", which
+  // Reset label — a prior Apply may have left it on "Restarting…", which
   // sticks across reconnects without this.
-  applyBtn.textContent = '保存并重启';
+  setText(applyBtn, 'btn.apply');
   document.getElementById('btn-disconnect').disabled = !connected;
   document.getElementById('btn-connect').disabled = connected;
   // Enable the jtts-say test button only while connected AND the chr
@@ -1331,7 +2256,7 @@ function updateStatus(data) {
   document.getElementById('flag-prov').classList.toggle('set', !!(flags & 0x20));
   const wifiDot = document.getElementById('wifi-dot');
   wifiDot.className = 'dot ' + (wifi ? 'wifi-connected' : '');
-  document.getElementById('wifi-label').textContent = wifi ? 'Wi-Fi: 已连接' : 'Wi-Fi: 已断开';
+  setText(document.getElementById('wifi-label'), wifi ? 'status.wifiUp' : 'status.wifiDown');
 }
 
 // --- Encode helpers ---
@@ -1348,7 +2273,7 @@ async function ensureX25519Supported() {
   try {
     await crypto.subtle.generateKey({ name: 'X25519' }, false, ['deriveBits']);
   } catch (e) {
-    throw new Error('当前浏览器不支持 X25519（需要 Chrome / Edge 133 及以上）');
+    throw new Error(t('err.x25519'));
   }
 }
 
@@ -1406,7 +2331,7 @@ function showErrorPopup(message, title) {
     const titleEl  = document.getElementById('error-modal-title');
     const bodyEl   = document.getElementById('error-modal-body');
     const okEl     = document.getElementById('error-modal-ok');
-    titleEl.textContent = title || '错误';
+    if (title) setRaw(titleEl, title); else setText(titleEl, 'err.title');
     bodyEl.textContent  = message;
     backdrop.style.display = 'flex';
     setTimeout(() => okEl.focus(), 0);
@@ -1488,7 +2413,7 @@ function promptForAuthPassword(deviceName) {
       const pwd = pwdEl.value;
       if (!pwd) {
         cleanup();
-        reject(new Error('密码为空，无法继续认证'));
+        reject(new Error(t('auth.empty')));
         return;
       }
       // Offer to save the credential to the browser's password manager
@@ -1500,7 +2425,7 @@ function promptForAuthPassword(deviceName) {
     };
     const onCancel = () => {
       cleanup();
-      reject(new Error('已取消认证密码，连接中止'));
+      reject(new Error(t('auth.cancelled')));
     };
     form.addEventListener('submit', onSubmit);
     cancelEl.addEventListener('click', onCancel);
@@ -1523,19 +2448,19 @@ async function ensureAuthenticated() {
   } catch (_) {
     // Fall through to the password prompt.
   }
-  log('读取 Status 失败，设备侧可能已设置认证密码。', 'info');
+  log(t('auth.statusFail'), 'info');
   const deviceName = (bleDevice && bleDevice.name) || '';
   // Try browser's password manager first (silent autofill if a saved
   // credential matches). On success skips the modal entirely.
   let pwd = await tryAutofillCredential(deviceName);
   if (pwd) {
-    log('已从密码管理器自动填入', 'info');
+    log(t('auth.autofilled'), 'info');
   } else {
-    log('请输入密码。', 'info');
+    log(t('auth.enter'), 'info');
     pwd = await promptForAuthPassword(deviceName);
   }
   if (pwd === '') {
-    throw new Error('密码为空，无法继续认证');
+    throw new Error(t('auth.empty'));
   }
   const salt = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(pwd)));
   await setupSession(salt);
@@ -1544,9 +2469,9 @@ async function ensureAuthenticated() {
   try {
     await readEncrypted(chrStatus);
   } catch (e) {
-    throw new Error('密码不正确，连接中止：' + e.message);
+    throw new Error(t('auth.wrong', { msg: e.message }));
   }
-  log('BLE 认证 OK', 'ok');
+  log(t('auth.ok'), 'ok');
 }
 
 // Decrypt a characteristic READ. Wire format: [12B nonce][ct][16B tag].
@@ -1664,9 +2589,9 @@ async function fetchDeviceInfo() {
   }
   if (audioHost) {
     audioCmd.textContent =
-      `# L16（未压缩） udp/6970\n` +
+      `${t('rtp.cmdL16')}\n` +
       `ffmpeg -re -i IN -ac 1 -ar 48000 -c:a pcm_s16be -f rtp rtp://${audioHost}:6970\n` +
-      `# AAC（压缩）   udp/6972\n` +
+      `${t('rtp.cmdAac')}\n` +
       `ffmpeg -re -i IN -ac 1 -ar 48000 -c:a aac -f rtp rtp://${audioHost}:6972\n` +
       `# mu-law (OBS)  udp/6970\n` +
       `ffmpeg -re -i IN -ac 1 -ar 8000 -c:a pcm_mulaw -f rtp rtp://${audioHost}:6970`;
@@ -1737,7 +2662,7 @@ function readJttsForm() {
       if (Number.isFinite(n)) obj[key] = n;
     }
   }
-  // `表示 | 読み` pair support shared with the Wi-Fi page (settings_common.js).
+  // `display | reading` pair support shared with the Wi-Fi page (settings_common.js).
   const phrases = StackchanSettings.jttsPhrasesFromText(
       document.getElementById('jtts-phrases').value);
   if (phrases.length > 0) obj.phrases = phrases;
@@ -1889,7 +2814,7 @@ function applyCapabilityGating() {
   }
   // Also mirror the firmware revision into the compact page header so the
   // user can see "what version is on this device" without expanding the full
-  // device info card (which lives inside the 接続 tab).
+  // device info card (which lives inside the Connection tab).
   const fwEl = document.getElementById('dis-fw');
   const hdrFw = document.getElementById('hdr-fw');
   const headerInfo = document.getElementById('header-info');
@@ -1958,7 +2883,7 @@ async function loadOtaReleases() {
     const r = await fetch('./versions.json', { cache: 'no-cache' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     otaReleases = await r.json();
-    sel.innerHTML = '<option value="">(使用本地文件)</option>';
+    sel.innerHTML = `<option value="" data-i18n="ota.useLocal">${t('ota.useLocal')}</option>`;
     for (const rel of otaReleases) {
       const o = document.createElement('option');
       o.value = rel.tag;
@@ -1966,7 +2891,7 @@ async function loadOtaReleases() {
       sel.appendChild(o);
     }
   } catch (e) {
-    sel.innerHTML = '<option value="">(获取版本列表失败)</option>';
+    sel.innerHTML = `<option value="" data-i18n="ota.listFail">${t('ota.listFail')}</option>`;
   }
 }
 
@@ -2010,8 +2935,8 @@ function setOtaProgress(received, total, rateBps) {
   const pct = total > 0 ? Math.min(100, (received / total) * 100) : 0;
   document.getElementById('ota-bar-fill').style.width = pct.toFixed(1) + '%';
   const rateStr = rateBps != null ? `, ${fmtBytes(rateBps)}/s` : '';
-  document.getElementById('ota-stats').textContent =
-    `${fmtBytes(received)} / ${fmtBytes(total)} (${pct.toFixed(1)}%)${rateStr}`;
+  setRaw(document.getElementById('ota-stats'),
+    `${fmtBytes(received)} / ${fmtBytes(total)} (${pct.toFixed(1)}%)${rateStr}`);
 }
 
 async function readOtaStatus() {
@@ -2027,13 +2952,13 @@ async function performOta(file) {
   document.getElementById('btn-disconnect').disabled = true;
   try {
     const total = file.size;
-    log(`OTA 开始：${file.name}（${fmtBytes(total)}）`);
+    log(t('ota.start', { name: file.name, size: fmtBytes(total) }));
 
     // begin
     await writeEncrypted(chrOtaCtrl, strToBytes(JSON.stringify({op: 'begin', size: total})));
     const st = await readOtaStatus();
     if (st.state !== 'receiving') {
-      throw new Error(`begin 失败（${st.state}: ${st.error || ''}）`);
+      throw new Error(t('ota.beginFail', { state: st.state, error: st.error || '' }));
     }
     setOtaProgress(0, total, null);
 
@@ -2058,8 +2983,8 @@ async function performOta(file) {
       ? (bytes) => writeEncryptedNoResp(chrOtaData, bytes)
       : (bytes) => writeEncrypted(chrOtaData, bytes);
     log(fastPath
-        ? '快速路径：writeValueWithoutResponse + 每 16 块同步状态'
-        : '兼容路径：writeValueWithResponse（firmware < v0.0.4）');
+        ? t('ota.fastPath')
+        : t('ota.compatPath'));
 
     // Flow control: in the fast path the browser fires chunks without
     // waiting for ATT_WRITE_RSP, so neither end has back-pressure visible
@@ -2071,7 +2996,7 @@ async function performOta(file) {
     async function maybeFlush(forceLog) {
       const st = await readOtaStatus();
       if (st.state !== 'receiving') {
-        throw new Error(`flush 过程中会话丢失（${st.state}: ${st.error || ''}）`);
+        throw new Error(t('ota.flushLost', { state: st.state, error: st.error || '' }));
       }
       // Reuse st.received as the canonical progress source — bytes the
       // device actually wrote to flash, not what we shipped over the wire.
@@ -2121,22 +3046,22 @@ async function performOta(file) {
     await maybeFlush(true);
     const elapsed = (performance.now() - t0) / 1000;
     setOtaProgress(received, total, received / elapsed);
-    log(`数据发送完成（${elapsed.toFixed(1)} 秒，平均 ${fmtBytes(received / elapsed)}/s）`);
+    log(t('ota.sent', { sec: elapsed.toFixed(1), rate: fmtBytes(received / elapsed) }));
 
     // end → server sets boot partition and schedules reboot
     await writeEncrypted(chrOtaCtrl, strToBytes(JSON.stringify({op: 'end'})));
     const final = await readOtaStatus();
     if (final.state !== 'done') {
-      throw new Error(`end 失败（${final.state}: ${final.error || ''}）`);
+      throw new Error(t('ota.endFail', { state: final.state, error: final.error || '' }));
     }
-    log('OTA 完成，设备即将重启。BLE 断开后请用新固件重新连接。', 'ok');
-    document.getElementById('ota-stats').textContent = '重启中…';
+    log(t('ota.done'), 'ok');
+    setText(document.getElementById('ota-stats'), 'btn.restarting');
   } catch (e) {
-    log(`OTA 错误：${e.message}`, 'err');
+    log(t('ota.error', { msg: e.message }), 'err');
     try {
       await writeEncrypted(chrOtaCtrl, strToBytes(JSON.stringify({op: 'abort'})));
     } catch (_) { /* ignore — link may be down */ }
-    document.getElementById('ota-stats').textContent = `失败：${e.message}`;
+    setText(document.getElementById('ota-stats'), 'common.failed', { msg: e.message });
     document.getElementById('btn-ota').disabled = false;
     document.getElementById('btn-apply').disabled = false;
     document.getElementById('btn-disconnect').disabled = false;
@@ -2213,18 +3138,18 @@ function adtsHeader(payloadLen, sampleRate, channels) {
 async function audioPlay() {
   if (audioInFlight) return;
   if (!chrAudioCtrl || !chrAudioData) {
-    log('当前固件不支持音频流式传输', 'err');
+    log(t('play.unsupported'), 'err');
     return;
   }
   if (document.getElementById('openai-enabled').checked) {
-    log('对话功能开启时互斥，无法播放。请关闭后保存并重启。', 'err');
+    log(t('play.convOn'), 'err');
     return;
   }
   const fileInput = document.getElementById('audio-file');
   const file = fileInput.files && fileInput.files[0];
-  if (!file) { log('请选择音频文件', 'err'); return; }
+  if (!file) { log(t('play.noFile'), 'err'); return; }
   if (typeof AudioEncoder === 'undefined') {
-    log('无法使用 WebCodecs AudioEncoder（需要 Chrome / Edge 94+）', 'err');
+    log(t('play.noEncoder'), 'err');
     return;
   }
 
@@ -2237,7 +3162,7 @@ async function audioPlay() {
   playBtn.disabled = true;
   stopBtn.disabled = false;
   barFill.style.width = '0%';
-  stats.textContent = '解码中…';
+  setText(stats, 'play.decoding');
 
   try {
     // 1. Decode the source file to PCM (any format AudioContext understands).
@@ -2276,7 +3201,7 @@ async function audioPlay() {
 
     const totalSamples = resampled.length;
     const durationMs = Math.round(totalSamples * 1000 / AAC_SAMPLE_RATE);
-    log(`开始 AAC 编码：${(file.size/1024).toFixed(1)} KiB → ${durationMs} ms @ ${AAC_SAMPLE_RATE}Hz 单声道`);
+    log(t('play.encodeStart', { kib: (file.size/1024).toFixed(1), ms: durationMs, rate: AAC_SAMPLE_RATE }));
 
     // 4. Tell the device to spin up the decoder.
     const beginPayload = strToBytes(JSON.stringify({
@@ -2401,7 +3326,7 @@ async function audioPlay() {
         const pct = Math.min(100, Math.floor(submittedSamples * 100 / totalSamples));
         barFill.style.width = pct + '%';
         const rate = elapsedS > 0.1 ? (bytesSent / elapsedS / 1024).toFixed(1) : '—';
-        stats.textContent = `发送中 ${pct}% / ${(bytesSent/1024).toFixed(1)} KiB / ${rate} KiB/s / 余量 ${(credit/1024).toFixed(1)} KiB`;
+        setText(stats, 'play.progress', { pct, kib: (bytesSent/1024).toFixed(1), rate, credit: (credit/1024).toFixed(1) });
       }
     })();
 
@@ -2414,18 +3339,18 @@ async function audioPlay() {
     if (audioAbortRequested) {
       try { await chrAudioCtrl.writeValueWithResponse(strToBytes(JSON.stringify({op: 'abort'}))); }
       catch (_) { /* ignore */ }
-      stats.textContent = '已中断';
-      log('已中断音频发送', 'info');
+      setText(stats, 'play.stopped');
+      log(t('play.stoppedLog'), 'info');
     } else {
       await chrAudioCtrl.writeValueWithResponse(strToBytes(JSON.stringify({op: 'end'})));
-      stats.textContent = `完成 ${(bytesSent/1024).toFixed(1)} KiB`;
-      log('音频发送完成', 'ok');
+      setText(stats, 'play.done', { kib: (bytesSent/1024).toFixed(1) });
+      log(t('play.doneLog'), 'ok');
     }
   } catch (e) {
-    log('音频发送错误：' + e.message, 'err');
+    log(t('play.error', { msg: e.message }), 'err');
     try { await chrAudioCtrl.writeValueWithResponse(strToBytes(JSON.stringify({op: 'abort'}))); }
     catch (_) { /* ignore */ }
-    document.getElementById('audio-stats').textContent = '失败：' + e.message;
+    setText(document.getElementById('audio-stats'), 'common.failed', { msg: e.message });
   } finally {
     audioInFlight = false;
     audioAbortRequested = false;
@@ -2441,7 +3366,7 @@ function audioStop() {
 // --- Connect ---
 document.getElementById('btn-connect').addEventListener('click', async () => {
   if (!navigator.bluetooth) {
-    log('无法使用 Web Bluetooth。请用 Chrome / Edge 桌面版打开。', 'err');
+    log(t('ble.unavailable'), 'err');
     return;
   }
   try {
@@ -2451,20 +3376,20 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
     return;
   }
   document.getElementById('ble-dot').className = 'dot ble-connecting';
-  document.getElementById('ble-label').textContent = '连接中…';
+  setText(document.getElementById('ble-label'), 'status.connecting');
   document.getElementById('btn-connect').disabled = true;
 
   try {
-    log('正在搜索设备…');
+    log(t('ble.searching'));
     bleDevice = await navigator.bluetooth.requestDevice({
       filters: [{ services: [SVC_UUID] }],
       optionalServices: [SVC_UUID, DIS_SVC],
     });
     bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
-    log(`设备：${bleDevice.name || '（名称未知）'}`);
+    log(t('ble.device', { name: bleDevice.name || t('ble.unknownName') }));
     bleServer = await bleDevice.gatt.connect();
-    log('GATT 连接完成', 'ok');
+    log(t('ble.gattOk'), 'ok');
 
     svc = await bleServer.getPrimaryService(SVC_UUID);
 
@@ -2576,19 +3501,19 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
     chrDeviceName = found.deviceName ?? null;
     chrAuthPassword = found.authPassword ?? null;
     chrAvatarBc = found.avatarBc ?? null;
-    log(`Characteristics 获取完成（missing: ${missing.length ? missing.join(', ') : 'none'}）`,
+    log(t('ble.chrsOk', { list: missing.length ? missing.join(', ') : 'none' }),
         missing.length ? 'info' : 'ok');
 
     if (!chrKx) {
       // No KeyExchange chr → no encrypted session → nothing else works.
       // Bail with a clear message rather than leaving the UI half-alive.
-      log('没有 KeyExchange characteristic。固件过旧。', 'err');
+      log(t('ble.noKx'), 'err');
       throw new Error('KeyExchange unsupported by this firmware');
     }
 
     // X25519 handshake. After this, every other read/write is encrypted.
     await setupSession();
-    log('密钥交换完成（X25519 + AES-256-GCM）', 'ok');
+    log(t('ble.kxOk'), 'ok');
     // Auth gate: if the device has an auth password set, the empty-salt
     // session we just built doesn't match — prompt() and re-handshake.
     await ensureAuthenticated();
@@ -2597,7 +3522,7 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
     try {
       await fetchDeviceInfo();
     } catch (e) {
-      log(`获取设备信息失败：${e.message}`, 'err');
+      log(t('ble.disFail', { msg: e.message }), 'err');
     }
 
     if (chrSsid) {
@@ -2605,11 +3530,11 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const ssidBytes = await readEncrypted(chrSsid);
         const ssidStr = dec.decode(ssidBytes);
         if (ssidStr) {
-          document.getElementById('ssid').placeholder = ssidStr + '（当前值）';
-          log(`当前 SSID：${ssidStr}`);
+          document.getElementById('ssid').placeholder = t('ssid.current', { ssid: ssidStr });
+          log(t('ssid.log', { ssid: ssidStr }));
         }
       } catch (e) {
-        log(`读取 SSID 错误：${e.message}`, 'err');
+        log(t('ssid.readErr', { msg: e.message }), 'err');
       }
     }
 
@@ -2618,7 +3543,7 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const stBytes = await readEncrypted(chrStatus);
         updateStatus(new DataView(stBytes.buffer, stBytes.byteOffset, stBytes.byteLength));
       } catch (e) {
-        log(`读取 Status 错误：${e.message}`, 'err');
+        log(t('status.readErr', { msg: e.message }), 'err');
       }
     }
 
@@ -2629,9 +3554,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         document.getElementById('openai-enabled').checked = enabled;
         document.getElementById('openai-enabled').dataset.initial = enabled ? '1' : '0';
         refreshAudioButton(); // gate streaming on the just-loaded conv state
-        log(`对话功能：${enabled ? '开启' : '关闭'}`);
+        log(t('read.conv', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取开启状态失败：${e.message}`, 'err');
+        log(t('read.convFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2641,9 +3566,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = rtpBytes.length > 0 && rtpBytes[0] !== 0;
         document.getElementById('rtp-enabled').checked = enabled;
         document.getElementById('rtp-enabled').dataset.initial = enabled ? '1' : '0';
-        log(`RTP 音频接收：${enabled ? '开启' : '关闭'}`);
+        log(t('read.rtp', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取 RTP 开启状态失败：${e.message}`, 'err');
+        log(t('read.rtpFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2653,9 +3578,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = jiBytes.length > 0 && jiBytes[0] !== 0;
         document.getElementById('jtts-idle-enabled').checked = enabled;
         document.getElementById('jtts-idle-enabled').dataset.initial = enabled ? '1' : '0';
-        log(`jtts 空闲播报：${enabled ? '开启' : '关闭'}`);
+        log(t('read.idle', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取 jtts 空闲播报状态失败：${e.message}`, 'err');
+        log(t('read.idleFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2665,9 +3590,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = lmsBytes.length > 0 && lmsBytes[0] !== 0;
         document.getElementById('led-mouth-sync').checked = enabled;
         document.getElementById('led-mouth-sync').dataset.initial = enabled ? '1' : '0';
-        log(`LED 跟随口型：${enabled ? '开启' : '关闭'}`);
+        log(t('read.ledSync', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取 LED 联动状态失败：${e.message}`, 'err');
+        log(t('read.ledSyncFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2678,11 +3603,11 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
           const m = String(lsmBytes[0]);
           document.getElementById('lip-sync-mode').value = m;
           document.getElementById('lip-sync-mode').dataset.initial = m;
-          const labels = {'0':'亮度','1':'电平表'};
-          log(`口型同步模式：${labels[m] || `mode ${m}`}`);
+          const labels = {'0':t('lip.bright'),'1':t('lip.level')};
+          log(t('read.lipMode', { mode: labels[m] || `mode ${m}` }));
         }
       } catch (e) {
-        log(`获取口型同步模式状态失败：${e.message}`, 'err');
+        log(t('read.lipModeFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2692,9 +3617,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = agcBytes.length > 0 && agcBytes[0] !== 0;
         document.getElementById('mic-lip-agc').checked = enabled;
         document.getElementById('mic-lip-agc').dataset.initial = enabled ? '1' : '0';
-        log(`麦克风 AGC：${enabled ? '开启' : '关闭'}`);
+        log(t('read.agc', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取麦克风 AGC 状态失败：${e.message}`, 'err');
+        log(t('read.agcFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2705,11 +3630,11 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
           const mode = String(omBytes[0]);
           document.getElementById('operation-mode').value = mode;
           document.getElementById('operation-mode').dataset.initial = mode;
-          const labels = {'0':'口型同步','1':'闲聊播报','2':'对话'};
-          log(`工作模式：${labels[mode] || `mode ${mode}`}`);
+          const labels = {'0':t('opmode.lip'),'1':t('opmode.jtts'),'2':t('opmode.conv')};
+          log(t('read.mode', { mode: labels[mode] || `mode ${mode}` }));
         }
       } catch (e) {
-        log(`获取工作模式状态失败：${e.message}`, 'err');
+        log(t('read.modeFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2720,11 +3645,11 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
           const v = String(aoBytes[0]);
           document.getElementById('audio-output').value = v;
           document.getElementById('audio-output').dataset.initial = v;
-          const labels = {'0':'自动','1':'内置扬声器','2':'M5 Module Audio'};
-          log(`音频输出：${labels[v] || `mode ${v}`}`);
+          const labels = {'0':t('outlbl.auto'),'1':t('outlbl.internal'),'2':'M5 Module Audio'};
+          log(t('read.out', { mode: labels[v] || `mode ${v}` }));
         }
       } catch (e) {
-        log(`获取音频输出状态失败：${e.message}`, 'err');
+        log(t('read.outFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2734,9 +3659,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = biBytes.length > 0 && biBytes[0] !== 0;
         document.getElementById('barge-in-enabled').checked = enabled;
         document.getElementById('barge-in-enabled').dataset.initial = enabled ? '1' : '0';
-        log(`插话（点头打断对话）：${enabled ? '开启' : '关闭'}`);
+        log(t('read.bargeIn', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取插话状态失败：${e.message}`, 'err');
+        log(t('read.bargeInFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2750,9 +3675,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
           el.value = dn;
           el.dataset.initial = dn;
         }
-        log(`设备名：${dn || '（自动生成）'}`);
+        log(t('read.devName', { name: dn || t('devname.auto') }));
       } catch (e) {
-        log(`获取设备名失败：${e.message}`, 'err');
+        log(t('read.devNameFail', { msg: e.message }), 'err');
       }
     }
     // Auth password — read-only state surfacing. The chr itself is
@@ -2768,7 +3693,7 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
       if (hintEl && chrAuthPassword) {
         // We can't read the password, but we can offer the UI even when
         // the firmware exposes the chr.
-        hintEl.textContent = '（留空不改 / 清除则恢复无认证）';
+        setText(hintEl, 'authcfg.stateHint');
       }
     }
 
@@ -2779,10 +3704,10 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const bk = await readEncrypted(chrBoardKind);
         if (bk.length > 0) {
           boardKind = bk[0];
-          log(`主板：${StackchanSettings.boardLabel(boardKind)}`);
+          log(t('read.board', { board: StackchanSettings.boardLabel(boardKind) }));
         }
       } catch (e) {
-        log(`获取主板类型失败：${e.message}`, 'err');
+        log(t('read.boardFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2792,9 +3717,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = bgBytes.length > 0 && bgBytes[0] !== 0;
         document.getElementById('bat-gauge-enabled').checked = enabled;
         document.getElementById('bat-gauge-enabled').dataset.initial = enabled ? '1' : '0';
-        log(`电池电量条显示：${enabled ? '开启' : '关闭'}`);
+        log(t('read.batGauge', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取电池电量条设置失败：${e.message}`, 'err');
+        log(t('read.batGaugeFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2804,9 +3729,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = baBytes.length > 0 && baBytes[0] !== 0;
         document.getElementById('startup-arpeggio-enabled').checked = enabled;
         document.getElementById('startup-arpeggio-enabled').dataset.initial = enabled ? '1' : '0';
-        log(`启动琶音：${enabled ? '开启' : '关闭'}`);
+        log(t('read.arp', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取启动琶音设置失败：${e.message}`, 'err');
+        log(t('read.arpFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2816,9 +3741,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const enabled = seBytes.length > 0 && seBytes[0] !== 0;
         document.getElementById('servo-enabled').checked = enabled;
         document.getElementById('servo-enabled').dataset.initial = enabled ? '1' : '0';
-        log(`舵机：${enabled ? '开启' : '关闭'}`);
+        log(t('read.servo', { state: t(enabled ? 'common.on' : 'common.off') }));
       } catch (e) {
-        log(`获取舵机设置失败：${e.message}`, 'err');
+        log(t('read.servoFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2828,9 +3753,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const ltJson = dec.decode(ltBytes);
         // Malformed stored JSON leaves the placeholders (seed no-ops).
         StackchanSettings.seedLtConfigForm(ltJson);
-        log(ltJson ? `已读取 LT 设置：${ltBytes.length}B` : 'LT 设置：固件默认值');
+        log(ltJson ? t('read.lt', { n: ltBytes.length }) : t('read.ltDefault'));
       } catch (e) {
-        log(`获取 LT 设置失败：${e.message}`, 'err');
+        log(t('read.ltFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2839,9 +3764,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const slBytes = await readEncrypted(chrServoLimits);
         const slJson = dec.decode(slBytes);
         seedServoLimits(slJson); // populate inputs + remember initial
-        log(slJson ? `已读取舵机设置：${slBytes.length}B` : '舵机设置：固件默认值');
+        log(slJson ? t('read.sl', { n: slBytes.length }) : t('read.slDefault'));
       } catch (e) {
-        log(`获取舵机设置失败：${e.message}`, 'err');
+        log(t('read.servoFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2852,9 +3777,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const sel = document.getElementById('provider');
         sel.value = String(provider);
         sel.dataset.initial = String(provider);
-        log(`服务商：${provider === 1 ? 'Gemini Live' : 'OpenAI Realtime'}`);
+        log(t('read.provider', { name: provider === 1 ? 'Gemini Live' : 'OpenAI Realtime' }));
       } catch (e) {
-        log(`获取服务商失败：${e.message}`, 'err');
+        log(t('read.providerFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2865,12 +3790,12 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         writeJttsForm(jttsJson);
         jttsInitialJson = canonicaliseJttsForm();
         if (jttsJson) {
-          log(`已读取 jtts 设置：${jttsBytes.length}B`);
+          log(t('read.jtts', { n: jttsBytes.length }));
         } else {
-          log('jtts 设置：固件默认值');
+          log(t('read.jttsDefault'));
         }
       } catch (e) {
-        log(`获取 jtts 设置失败：${e.message}`, 'err');
+        log(t('read.jttsFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2879,9 +3804,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
         const faceBytes = await readEncrypted(chrFaceConfig);
         const faceJson = dec.decode(faceBytes);
         seedAvatarControls(faceJson); // sets controls + updates preview, no write-back
-        log(faceJson ? `已读取形象调整：${faceBytes.length}B` : '形象调整：固件默认值');
+        log(faceJson ? t('read.face', { n: faceBytes.length }) : t('read.faceDefault'));
       } catch (e) {
-        log(`获取形象调整失败：${e.message}`, 'err');
+        log(t('read.faceFail', { msg: e.message }), 'err');
       }
     }
 
@@ -2913,10 +3838,10 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
             await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ctTag));
           updateStatus(new DataView(pt.buffer, pt.byteOffset, pt.byteLength));
         } catch (err) {
-          log(`Status 通知解密错误：${err.message}`, 'err');
+          log(t('status.notifyErr', { msg: err.message }), 'err');
         }
       });
-      log('已注册 Status 通知', 'ok');
+      log(t('status.notifyOk'), 'ok');
     }
 
     // Battery: read once now, then poll (it changes slowly — no NOTIFY).
@@ -2932,17 +3857,17 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
   } catch (e) {
     setBleUi(false);
     document.getElementById('ble-dot').className = 'dot';
-    document.getElementById('ble-label').textContent = '未连接';
+    setText(document.getElementById('ble-label'), 'status.disconnected');
     document.getElementById('btn-connect').disabled = false;
     // Surface as a modal so the user doesn't have to scroll the log
     // panel — fires await so the prompt blocks until dismissed.
-    await showErrorPopup(`连接失败：${e.message}`, 'BLE 连接错误');
+    await showErrorPopup(t('ble.connectFail', { msg: e.message }), t('ble.connectErrTitle'));
   }
 });
 
 // --- Disconnect handler ---
 function onDisconnected() {
-  log('已断开', 'err');
+  log(t('ble.disconnected'), 'err');
   setBleUi(false);
   clearInterval(batteryPollTimer); batteryPollTimer = null;
   clearInterval(audioMetricsTimer); audioMetricsTimer = null;
@@ -2977,14 +3902,14 @@ function onDisconnected() {
   document.getElementById('btn-ota').disabled = true;
   if (!otaInFlight) {
     document.getElementById('ota-bar-fill').style.width = '0';
-    document.getElementById('ota-stats').textContent = '未开始';
+    setText(document.getElementById('ota-stats'), 'common.notStarted');
     document.getElementById('ota-file').value = '';
   }
   document.getElementById('btn-audio-play').disabled = true;
   document.getElementById('btn-audio-stop').disabled = true;
   if (!audioInFlight) {
     document.getElementById('audio-bar-fill').style.width = '0';
-    document.getElementById('audio-stats').textContent = '未开始';
+    setText(document.getElementById('audio-stats'), 'common.notStarted');
   }
 }
 
@@ -3006,41 +3931,41 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
 
   const btn = document.getElementById('btn-apply');
   btn.disabled = true;
-  btn.textContent = '保存中…';
+  setText(btn, 'btn.saving');
 
   try {
     // Write only fields that have input (empty = unchanged). All payloads
     // travel through the AES-GCM session established at connect.
     if (ssid && chrSsid) {
       await writeEncrypted(chrSsid, strToBytes(ssid));
-      log('SSID 写入完成', 'ok');
+      log(t('w.ssid'), 'ok');
     }
     if (pass && chrPass) {
       await writeEncrypted(chrPass, strToBytes(pass));
-      log('密码写入完成', 'ok');
+      log(t('w.pass'), 'ok');
     }
     if (key && chrKey) {
       await writeEncrypted(chrKey, strToBytes(key));
-      log('OpenAI 密钥写入完成', 'ok');
+      log(t('w.openai'), 'ok');
     }
     if (gkey && chrGeminiKey) {
       await writeEncrypted(chrGeminiKey, strToBytes(gkey));
-      log('Gemini 密钥写入完成', 'ok');
+      log(t('w.gemini'), 'ok');
     }
     if (xzUrl && chrXiaozhiUrl) {
       await writeEncrypted(chrXiaozhiUrl, strToBytes(xzUrl));
-      log('XiaoZhi URL 写入完成', 'ok');
+      log(t('w.xzUrl'), 'ok');
     }
     if (xzToken && chrXiaozhiToken) {
       await writeEncrypted(chrXiaozhiToken, strToBytes(xzToken));
-      log('XiaoZhi 令牌写入完成', 'ok');
+      log(t('w.xzToken'), 'ok');
     }
 
     // Provider: only write if changed from initial AND chr is present.
     const provSel = document.getElementById('provider');
     if (chrProvider && provSel.dataset.initial !== undefined && provSel.value !== provSel.dataset.initial) {
       await writeEncrypted(chrProvider, new Uint8Array([Number(provSel.value)]));
-      log(`已切换服务商为 ${provSel.options[provSel.selectedIndex].text}`, 'ok');
+      log(t('w.provider', { name: provSel.options[provSel.selectedIndex].text }), 'ok');
     }
 
     // Only push the enable flag if it changed AND chr is present.
@@ -3049,7 +3974,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const enWanted = enCheckbox.checked ? '1' : '0';
     if (chrEn && enInitial !== undefined && enInitial !== enWanted) {
       await writeEncrypted(chrEn, new Uint8Array([enCheckbox.checked ? 1 : 0]));
-      log(`已将 OpenAI 对话功能切换为 ${enCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.conv', { state: t(enCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // RTP audio enable: only push if it changed AND chr is present.
@@ -3058,7 +3983,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const rtpWanted = rtpCheckbox.checked ? '1' : '0';
     if (chrRtpEn && rtpInitial !== undefined && rtpInitial !== rtpWanted) {
       await writeEncrypted(chrRtpEn, new Uint8Array([rtpCheckbox.checked ? 1 : 0]));
-      log(`已将 RTP 音频接收切换为 ${rtpCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.rtp', { state: t(rtpCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // jtts idle babble enable: only push if it changed AND chr is present.
@@ -3067,7 +3992,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const jiWanted = jiCheckbox.checked ? '1' : '0';
     if (chrJttsIdleEn && jiInitial !== undefined && jiInitial !== jiWanted) {
       await writeEncrypted(chrJttsIdleEn, new Uint8Array([jiCheckbox.checked ? 1 : 0]));
-      log(`已将 jtts 空闲播报切换为 ${jiCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.idle', { state: t(jiCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // LED mouth-sync: only push if it changed AND chr is present.
@@ -3076,7 +4001,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const lmsWanted = lmsCheckbox.checked ? '1' : '0';
     if (chrLedMouthSync && lmsInitial !== undefined && lmsInitial !== lmsWanted) {
       await writeEncrypted(chrLedMouthSync, new Uint8Array([lmsCheckbox.checked ? 1 : 0]));
-      log(`已将 LED 口型联动切换为 ${lmsCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.ledSync', { state: t(lmsCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // Lip-sync mode: only push if it changed AND chr is present.
@@ -3085,8 +4010,8 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     if (chrLipSyncMode && lsmInitial !== undefined && lsmInitial !== lsmSel.value) {
       const v = Number(lsmSel.value);
       await writeEncrypted(chrLipSyncMode, new Uint8Array([v]));
-      const labels = {0:'亮度',1:'电平表'};
-      log(`已将口型同步模式切换为 ${labels[v] || `mode ${v}`}`, 'ok');
+      const labels = {0:t('lip.bright'),1:t('lip.level')};
+      log(t('w.lipMode', { mode: labels[v] || `mode ${v}` }), 'ok');
     }
 
     // Mic lip-sync AGC: only push if it changed AND chr is present.
@@ -3095,7 +4020,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const agcWanted = agcCheckbox.checked ? '1' : '0';
     if (chrMicLipAgc && agcInitial !== undefined && agcInitial !== agcWanted) {
       await writeEncrypted(chrMicLipAgc, new Uint8Array([agcCheckbox.checked ? 1 : 0]));
-      log(`已将麦克风 AGC 切换为 ${agcCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.agc', { state: t(agcCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // Operation mode: only push if it changed AND chr is present.
@@ -3104,8 +4029,8 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     if (chrOperationMode && omInitial !== undefined && omInitial !== omSel.value) {
       const v = Number(omSel.value);
       await writeEncrypted(chrOperationMode, new Uint8Array([v]));
-      const labels = {0:'口型同步',1:'闲聊播报',2:'对话'};
-      log(`已将工作模式切换为 ${labels[v] || `mode ${v}`}`, 'ok');
+      const labels = {0:t('opmode.lip'),1:t('opmode.jtts'),2:t('opmode.conv')};
+      log(t('w.mode', { mode: labels[v] || `mode ${v}` }), 'ok');
     }
 
     // Audio output: only push if it changed AND chr is present.
@@ -3114,8 +4039,8 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     if (chrAudioOutput && aoInitial !== undefined && aoInitial !== aoSel.value) {
       const v = Number(aoSel.value);
       await writeEncrypted(chrAudioOutput, new Uint8Array([v]));
-      const labels = {0:'自动',1:'内置扬声器',2:'M5 Module Audio'};
-      log(`已将音频输出切换为 ${labels[v] || `mode ${v}`}`, 'ok');
+      const labels = {0:t('outlbl.auto'),1:t('outlbl.internal'),2:'M5 Module Audio'};
+      log(t('w.out', { mode: labels[v] || `mode ${v}` }), 'ok');
     }
 
     // Barge-in: only push if it changed AND chr is present.
@@ -3124,7 +4049,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const biWanted = biCheckbox.checked ? '1' : '0';
     if (chrBargeIn && biInitial !== undefined && biInitial !== biWanted) {
       await writeEncrypted(chrBargeIn, new Uint8Array([biCheckbox.checked ? 1 : 0]));
-      log(`已将插话切换为 ${biCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.bargeIn', { state: t(biCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // Device name: only push when the input actually differs from the
@@ -3134,7 +4059,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     if (chrDeviceName && dnEl && dnEl.dataset.initial !== undefined &&
         dnEl.value !== dnEl.dataset.initial) {
       await writeEncrypted(chrDeviceName, strToBytes(dnEl.value));
-      log(`已更新设备名：${dnEl.value || '（自动生成）'}`, 'ok');
+      log(t('w.devName', { name: dnEl.value || t('devname.auto') }), 'ok');
     }
 
     // Auth password (write-only): push when the user typed something OR
@@ -3142,7 +4067,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const authEl = document.getElementById('auth-password');
     if (chrAuthPassword && authEl && (authEl.value || authEl.dataset.cleared === '1')) {
       await writeEncrypted(chrAuthPassword, strToBytes(authEl.value));
-      log(authEl.value ? `已发送认证密码（${authEl.value.length}B）` : '已清除认证密码', 'ok');
+      log(authEl.value ? t('w.authSent', { n: authEl.value.length }) : t('w.authCleared'), 'ok');
       authEl.value = '';
       delete authEl.dataset.cleared;
     }
@@ -3153,7 +4078,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const bgWanted = bgCheckbox.checked ? '1' : '0';
     if (chrBatGauge && bgInitial !== undefined && bgInitial !== bgWanted) {
       await writeEncrypted(chrBatGauge, new Uint8Array([bgCheckbox.checked ? 1 : 0]));
-      log(`已将电池电量条显示切换为 ${bgCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.batGauge', { state: t(bgCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // Startup arpeggio: only push if it changed AND chr is present.
@@ -3162,7 +4087,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const baWanted = baCheckbox.checked ? '1' : '0';
     if (chrStartupArp && baInitial !== undefined && baInitial !== baWanted) {
       await writeEncrypted(chrStartupArp, new Uint8Array([baCheckbox.checked ? 1 : 0]));
-      log(`已将启动琶音切换为 ${baCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.arp', { state: t(baCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // Servo master enable (NVS-persisted): only push if it changed AND chr is present.
@@ -3171,7 +4096,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const seWanted = seCheckbox.checked ? '1' : '0';
     if (chrServoEnabled && seInitial !== undefined && seInitial !== seWanted) {
       await writeEncrypted(chrServoEnabled, new Uint8Array([seCheckbox.checked ? 1 : 0]));
-      log(`已将舵机切换为 ${seCheckbox.checked ? '开启' : '关闭'}`, 'ok');
+      log(t('w.servo', { state: t(seCheckbox.checked ? 'common.on' : 'common.off') }), 'ok');
     }
 
     // MCP API token (write-only). Push only when the user typed a value OR
@@ -3179,7 +4104,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
     const mcpTokenEl = document.getElementById('mcp-token');
     if (chrMcpToken && (mcpTokenEl.value || mcpTokenEl.dataset.cleared === '1')) {
       await writeEncrypted(chrMcpToken, strToBytes(mcpTokenEl.value));
-      log(`MCP API 令牌写入完成（${mcpTokenEl.value.length}B）`, 'ok');
+      log(t('w.mcp', { n: mcpTokenEl.value.length }), 'ok');
       mcpTokenEl.value = '';
       delete mcpTokenEl.dataset.cleared;
     }
@@ -3190,7 +4115,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
       const ltJson = StackchanSettings.buildLtConfigJson();
       if (ltJson) {
         await writeEncrypted(chrLtConfig, strToBytes(ltJson));
-        log(`LT 设置写入完成（${ltJson.length}B）`, 'ok');
+        log(t('w.lt', { n: ltJson.length }), 'ok');
       }
     }
 
@@ -3199,7 +4124,7 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
       const slCanonical = canonicaliseServoLimits();
       if (slCanonical !== servoLimitsInitial) {
         await writeEncrypted(chrServoLimits, strToBytes(slCanonical));
-        log(`舵机设置写入完成（${slCanonical.length}B）`, 'ok');
+        log(t('w.sl', { n: slCanonical.length }), 'ok');
       }
     }
 
@@ -3211,31 +4136,31 @@ document.getElementById('btn-apply').addEventListener('click', async () => {
         // Object.keys==0 means "fall back to firmware defaults" — send empty.
         const payload = Object.keys(jttsObj).length === 0 ? '' : JSON.stringify(jttsObj);
         await writeEncrypted(chrJtts, strToBytes(payload));
-        log(`已更新 jtts 设置（${payload.length}B）`, 'ok');
+        log(t('w.jtts', { n: payload.length }), 'ok');
       }
     }
 
     if (!chrApply) {
-      log('没有 Apply characteristic，跳过应用（固件过旧？）', 'err');
+      log(t('apply.noChr'), 'err');
       btn.disabled = false;
-      btn.textContent = '保存并重启';
+      setText(btn, 'btn.apply');
       return;
     }
-    log('正在发送 Apply…');
+    log(t('apply.sending'));
     // Sentinel: single byte 0x01, encrypted like everything else.
     await writeEncrypted(chrApply, new Uint8Array([0x01]));
-    log('Apply 完成，设备即将重启', 'ok');
-    btn.textContent = '重启中…';
+    log(t('apply.done'), 'ok');
+    setText(btn, 'btn.restarting');
     // Device reboots ~200 ms after Apply; disconnection event will fire shortly.
   } catch (e) {
     // A disconnection during/after Apply is expected (device restarted).
     if (e.message && e.message.toLowerCase().includes('disconnect')) {
-      log('已应用，正在重启…', 'ok');
-      btn.textContent = '重启中…';
+      log(t('apply.restarting'), 'ok');
+      setText(btn, 'btn.restarting');
     } else {
-      log(`Apply 错误：${e.message}`, 'err');
+      log(t('apply.error', { msg: e.message }), 'err');
       btn.disabled = false;
-      btn.textContent = '保存并重启';
+      setText(btn, 'btn.apply');
     }
   }
 });
@@ -3246,7 +4171,7 @@ document.getElementById('btn-audio-stop').addEventListener('click', audioStop);
 document.getElementById('audio-file').addEventListener('change', e => {
   const file = e.target.files && e.target.files[0];
   if (file) {
-    document.getElementById('audio-stats').textContent = `${file.name} (${fmtBytes(file.size)})`;
+    setRaw(document.getElementById('audio-stats'), `${file.name} (${fmtBytes(file.size)})`);
   }
   refreshAudioButton();
 });
@@ -3266,7 +4191,7 @@ document.getElementById('ota-file').addEventListener('change', e => {
   if (file) {
     // Selecting a file overrides any release pick (mutually exclusive).
     document.getElementById('ota-release').value = '';
-    document.getElementById('ota-stats').textContent = `${file.name} (${fmtBytes(file.size)})`;
+    setRaw(document.getElementById('ota-stats'), `${file.name} (${fmtBytes(file.size)})`);
   }
   refreshOtaButton();
 });
@@ -3274,7 +4199,7 @@ document.getElementById('ota-release').addEventListener('change', e => {
   if (e.target.value) {
     // Selecting a release overrides any file pick.
     document.getElementById('ota-file').value = '';
-    document.getElementById('ota-stats').textContent = `Release: ${e.target.value}`;
+    setRaw(document.getElementById('ota-stats'), `Release: ${e.target.value}`);
   }
   refreshOtaButton();
 });
@@ -3289,7 +4214,7 @@ document.getElementById('btn-ota').addEventListener('click', async () => {
       blob = await fetchReleaseFirmware(releaseTag);
       name = `${releaseTag}/stackchan_idf.bin`;
     } catch (e) {
-      log(`获取版本失败：${e.message}`, 'err');
+      log(t('ota.releaseFail', { msg: e.message }), 'err');
       return;
     }
   } else if (fileInput.files[0]) {
@@ -3299,7 +4224,7 @@ document.getElementById('btn-ota').addEventListener('click', async () => {
     return;
   }
 
-  if (!confirm(`即将写入新固件 ${name}（${fmtBytes(blob.size)}）。确定吗？`)) return;
+  if (!confirm(t('ota.confirm', { name, size: fmtBytes(blob.size) }))) return;
   // performOta expects .name / .size / .stream() — File satisfies all three,
   // so wrap a raw Blob in a File constructor.
   const carrier = (blob instanceof File) ? blob :
@@ -3313,7 +4238,7 @@ loadOtaReleases();
 // ===== Avatar face tuning (in-page live preview + BLE mirror) ================
 // Slider/colour changes update the embedded WASM preview and, while connected,
 // are mirrored to the device over the FaceConfig characteristic (debounced, no
-// reboot). "保存 & 再起動" persists the last value to NVS device-side.
+// reboot). "Save and restart" persists the last value to NVS device-side.
 const AV_READOUT = { 'av-eye-r': 1, 'av-eye-ox': 0, 'av-eye-oy': 0,
   'av-brow-ox': 0, 'av-brow-oy': 0, 'av-mouth-ox': 0, 'av-mouth-oy': 0,
   'av-mouth-minw': 0, 'av-mouth-maxw': 0, 'av-mouth-minh': 0, 'av-mouth-maxh': 0,
@@ -3375,7 +4300,7 @@ function avScheduleWrite() {
   clearTimeout(avWriteTimer);
   avWriteTimer = setTimeout(async () => {
     try { await writeEncrypted(chrFaceConfig, strToBytes(avFaceConfigJson())); }
-    catch (e) { log(`发送形象调整失败：${e.message}`, 'err'); }
+    catch (e) { log(t('face.sendFail', { msg: e.message }), 'err'); }
   }, 120);
 }
 
@@ -3426,11 +4351,11 @@ avUpdateReadouts();
 function setupAvatarPreview() {
   const note = avEl('av-preview-note');
   if (typeof AvatarModule === 'undefined' || window.__avatarModuleMissing) {
-    note.textContent = '找不到预览模块（avatar_module.js），仅能通过 BLE 调整';
+    setText(note, 'face.previewMissing');
     return;
   }
   AvatarModule().then((m) => {
-    if (!m._avatar_init()) { note.textContent = 'avatar_init 失败'; return; }
+    if (!m._avatar_init()) { setText(note, 'face.previewInitFail'); return; }
     avModule = m;
     const cnv = avEl('av-preview');
     const W = m._avatar_width(), H = m._avatar_height();
@@ -3438,7 +4363,7 @@ function setupAvatarPreview() {
     const ctx2d = cnv.getContext('2d');
     const img = ctx2d.createImageData(W, H);
     avPushPreview();
-    note.textContent = '正在绘制预览（用 WASM 运行当前 C++ 代码）';
+    setText(note, 'face.previewRunning');
     (function frame() {
       m._avatar_tick(performance.now());
       const fb = new Uint16Array(m.HEAPU16.buffer, m._avatar_framebuffer(), W * H);
@@ -3453,7 +4378,7 @@ function setupAvatarPreview() {
       ctx2d.putImageData(img, 0, 0);
       requestAnimationFrame(frame);
     })();
-  }).catch((e) => { note.textContent = '预览初始化错误：' + e.message; });
+  }).catch((e) => { setText(note, 'face.previewError', { msg: e.message }); });
 }
 setupAvatarPreview();
 
@@ -3472,7 +4397,7 @@ const servoCal = StackchanSettings.setupServoCalibration({
     await writeEncrypted(chrServoRangeMode, new Uint8Array([on ? 1 : 0]));
   },
   async readPositions() {
-    if (!chrServoPositions || !aesKey) throw new Error('未连接');
+    if (!chrServoPositions || !aesKey) throw new Error(t('status.disconnected'));
     const b = await readEncrypted(chrServoPositions);
     if (b.length < 4) throw new Error('short read');
     const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
@@ -3524,7 +4449,7 @@ async function loadLedState() {
     document.getElementById('led-period-value').textContent = (period / 10).toFixed(1);
     ledStateLoaded = true;
   } catch (e) {
-    log(`读取 LED state 失败：${e?.message ?? e}`, 'err');
+    log(t('led.readFail', { msg: e?.message ?? e }), 'err');
   }
 }
 
@@ -3540,7 +4465,7 @@ async function writeLedState() {
   try {
     await writeEncrypted(chrLedState, payload);
   } catch (e) {
-    log(`写入 LED state 失败：${e?.message ?? e}`, 'err');
+    log(t('led.writeFail', { msg: e?.message ?? e }), 'err');
   }
 }
 
@@ -3570,7 +4495,7 @@ async function loadMicLipGain() {
     document.getElementById('mic-lip-output-value').textContent = String(outPct);
     micLipLoaded = true;
   } catch (e) {
-    log(`获取麦克风口型同步设置失败：${e?.message ?? e}`, 'err');
+    log(t('mic.readFail', { msg: e?.message ?? e }), 'err');
   }
 }
 
@@ -3585,7 +4510,7 @@ async function writeMicLipGain() {
   try {
     await writeEncrypted(chrMicLipGain, payload);
   } catch (e) {
-    log(`写入麦克风口型同步设置失败：${e?.message ?? e}`, 'err');
+    log(t('mic.writeFail', { msg: e?.message ?? e }), 'err');
   }
 }
 
@@ -3610,7 +4535,7 @@ async function loadSpeakerVolume() {
     document.getElementById('speaker-volume-value').textContent = String(pct);
     speakerVolumeLoaded = true;
   } catch (e) {
-    log(`获取扬声器音量设置失败：${e?.message ?? e}`, 'err');
+    log(t('vol.readFail', { msg: e?.message ?? e }), 'err');
   }
 }
 
@@ -3623,7 +4548,7 @@ async function writeSpeakerVolume() {
   try {
     await writeEncrypted(chrSpeakerVolume, payload);
   } catch (e) {
-    log(`写入扬声器音量设置失败：${e?.message ?? e}`, 'err');
+    log(t('vol.writeFail', { msg: e?.message ?? e }), 'err');
   }
 }
 
@@ -3648,11 +4573,13 @@ function fmtMs(v) { return Number.isFinite(v) ? v.toFixed(1) : '--'; }
 function fmtN(v, p=2) { return Number.isFinite(v) ? v.toFixed(p) : '--'; }
 function fmtInt(v) { return Number.isFinite(v) ? Math.round(v).toLocaleString() : '--'; }
 
+let lastAudioMetrics; // last rendered snapshot, re-rendered on language change
 function renderAudioMetrics(j) {
+  lastAudioMetrics = j;
   const tbody = document.getElementById('audio-metrics-body');
   const summary = document.getElementById('audio-metrics-summary');
   if (!j || Object.keys(j).length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="hint" style="padding:0.5rem">最近一轮对话尚未结束（snapshot 为空）</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="4" class="hint" style="padding:0.5rem" data-i18n="met.empty">${t('met.empty')}</td></tr>`;
     summary.textContent = '—';
     return;
   }
@@ -3660,16 +4587,16 @@ function renderAudioMetrics(j) {
   const q = j.recv_to_queued_ms || {};
   const s = j.spk_queue || {};
   const p = j.pcm_lag_samples || {};
-  // played_sps と nominal の比 — 0.99 切ったら明示的にハイライト
+  // played_sps / nominal ratio — highlight it when it drops below 0.99
   const sps = j.played_sps;
   const nom = j.speaker_sample_rate;
   const ratio = (Number.isFinite(sps) && nom) ? (sps / nom) : null;
   const ratioCol = (ratio != null && ratio < 0.99) ? 'color:#f88' : '';
   const rows = [
-    ['recv_lag（event 交接）μs', fmtUs(r.avg), fmtUs(r.min), fmtUs(r.max)],
-    ['recv→queued（投入播放）ms', fmtMs(q.avg), fmtMs(q.min), fmtMs(q.max)],
-    ['spk_queue 深度 (0..2)',    fmtN(s.avg, 2), fmtN(s.min, 0), fmtN(s.max, 0)],
-    ['pcm_lag 未播放 samples',   fmtInt(p.avg), '—',           fmtInt(p.max)],
+    [t('met.recvLag'), fmtUs(r.avg), fmtUs(r.min), fmtUs(r.max)],
+    [t('met.recvQueued'), fmtMs(q.avg), fmtMs(q.min), fmtMs(q.max)],
+    [t('met.spkQueue'),    fmtN(s.avg, 2), fmtN(s.min, 0), fmtN(s.max, 0)],
+    [t('met.pcmLag'),   fmtInt(p.avg), '—',           fmtInt(p.max)],
   ];
   tbody.innerHTML = rows.map(([n,a,mn,mx]) => `
     <tr style="border-bottom:1px solid #333">
@@ -3692,7 +4619,7 @@ async function readAudioMetrics() {
     let j = {};
     if (txt.length > 0) {
       try { j = JSON.parse(txt); }
-      catch (e) { log(`audio metrics：JSON 解析失败（${e.message}）`, 'err'); return; }
+      catch (e) { log(t('met.jsonFail', { msg: e.message }), 'err'); return; }
     }
     renderAudioMetrics(j);
   } catch (e) {
@@ -3752,14 +4679,14 @@ async function sayJtts(text) {
   // plenty of margin under the 484 B encrypted-write max).
   const utf8 = enc.encode(text);
   if (utf8.length > 192) {
-    log('jtts 试读：超过 192 字节', 'err');
+    log(t('say.tooLong'), 'err');
     return;
   }
   try {
     await writeEncrypted(chrJttsSay, utf8);
-    log(`jtts 试读：「${text}」`, 'ok');
+    log(t('say.ok', { text }), 'ok');
   } catch (e) {
-    log(`jtts 试读失败：${e?.message ?? e}`, 'err');
+    log(t('say.fail', { msg: e?.message ?? e }), 'err');
   }
 }
 
@@ -3793,10 +4720,10 @@ const AVBC_CHUNK_PAYLOAD = OTA_CHUNK_SIZE - 1;
 // when the chr isn't available, when the size is out of range, or when any
 // underlying writeEncrypted / readEncrypted fails.
 async function avbcSendBytecode(buf, onProgress) {
-  if (!chrAvatarBc) throw new Error('AvatarBytecode characteristic 未连接');
+  if (!chrAvatarBc) throw new Error(t('dsl.chrMissing'));
   if (!(buf instanceof Uint8Array)) buf = new Uint8Array(buf);
   if (buf.length === 0 || buf.length > 32 * 1024) {
-    throw new Error(`大小超出范围（${buf.length} B，允许 1..32768）`);
+    throw new Error(t('dsl.sizeRange', { n: buf.length }));
   }
   // op=begin [total:u16 LE]
   const begin = new Uint8Array(3);
@@ -3827,7 +4754,7 @@ async function avbcSendBytecode(buf, onProgress) {
 
 // Reset (op=0xff) — clear NVS override + revert to firmware-embedded default.
 async function avbcSendReset() {
-  if (!chrAvatarBc) throw new Error('AvatarBytecode characteristic 未连接');
+  if (!chrAvatarBc) throw new Error(t('dsl.chrMissing'));
   await writeEncrypted(chrAvatarBc, new Uint8Array([0xff]));
   const respBytes = await readEncrypted(chrAvatarBc);
   const resp = dec.decode(respBytes);
@@ -3842,8 +4769,9 @@ async function avbcSendReset() {
 // {ok, saved, note, raw} shape here.
 const dslEditor = StackchanSettings.setupDslEditor({
   isConnected: () => !!chrAvatarBc,
-  notConnectedMsg: 'BLE 未连接',
-  compilerMissingMsg: 'DSL 编译器包加载失败（离线 file:// 下尚未注入）',
+  // Getters so the shared editor picks up the current UI language.
+  get notConnectedMsg() { return t('dsl.notConnected'); },
+  get compilerMissingMsg() { return t('dsl.compilerMissing'); },
   async send(u8, onProgress) {
     const r = await avbcSendBytecode(u8, onProgress);
     if (r.json && r.json.state === 'done') {
@@ -3899,6 +4827,14 @@ async function refreshBattery() {
 // (#avatar-section, #led-section, etc.) live inside their respective panels so
 // no event listener or chr-probing code needed to change.
 StackchanSettings.setupTabs('stackchan.settings.ble.activeTab');
+
+// ===== Language switch =====================================================
+// applyI18n() has already re-rendered every data-i18n element; redraw the
+// dynamic text owned by the shared helpers and the metrics table.
+document.addEventListener('i18n:change', () => {
+  if (servoCal) servoCal.refreshUi();
+  if (lastAudioMetrics !== undefined) renderAudioMetrics(lastAudioMetrics);
+});
 </script>
 </body>
 </html>

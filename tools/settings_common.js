@@ -14,6 +14,93 @@
 (function () {
   'use strict';
 
+  // --- UI strings ---------------------------------------------------------
+  // English when the host page's <html lang> starts with "en" (the BLE page
+  // sets it from the browser language / its EN-中文 switch); Chinese
+  // otherwise, which keeps the Wi-Fi page (lang="ja") showing the same
+  // messages as before. Read at call time so a language switch applies to
+  // the next message.
+  const STRINGS = {
+    en: {
+      ready: 'Ready: press Ctrl/Cmd+Enter or click "Compile and send" to apply',
+      noCompiler: 'The DSL compiler failed to load, so nothing can be compiled',
+      compileErr: 'Compile error: {msg}',
+      compiled: 'Done: {bytes} bytes, compiled in {ms} ms',
+      sentSaved: 'Sent {label}and saved {n} bytes to NVS{note}',
+      logSentBytes: 'Avatar DSL sent ({n} B)',
+      sentRaw: 'Sent {label}(response: {raw})',
+      logSent: 'Avatar DSL sent',
+      sendFailed: 'Sending {label}failed: {err}',
+      logSendFailed: 'Avatar DSL send failed: {err}',
+      sendError: 'Send error: {msg}',
+      sending: 'Sending…',
+      sendingProgress: 'Sending… {sent}/{total} B',
+      textOnly: '{msg}: only the text was updated',
+      resetConfirm: 'This deletes the face override in NVS and returns to the Grok face built into the firmware. Continue?',
+      resetDone: 'Face override deleted; the robot is back to the built-in Grok face{raw}',
+      logReset: 'Avatar DSL reset',
+      resetFail: 'Reset failed: {msg}',
+      logResetFail: 'Avatar DSL reset failed: {msg}',
+      loaded: 'Loaded: click "Compile and send" to sync it to the robot',
+      fileSending: 'Sending {name} ({n} B)…',
+      fileProgress: 'Sending {name}… {sent}/{total} B',
+      rangeMode: 'Range setting mode: {state}',
+      logRangeOn: 'Range setting mode: ON (servo torque off)',
+      logRangeOff: 'Range setting mode: OFF',
+      rangeFail: 'Failed to switch range setting mode: {msg}',
+      noPosition: 'Servo position not read yet',
+      authClearConfirm: 'This removes the password (no authentication). It takes effect after Save and restart. Continue?',
+      authClearHint: '(clear scheduled: an empty value is sent on save)',
+    },
+    zh: {
+      ready: '已就绪：Ctrl/Cmd+Enter 或点「编译并发送」即可生效',
+      noCompiler: '未能加载 DSL 编译器，无法编译',
+      compileErr: '编译错误：{msg}',
+      compiled: '完成，{bytes} 字节，编译 {ms} ms',
+      sentSaved: '{label}发送完成，已向 NVS 保存 {n} 字节{note}',
+      logSentBytes: 'Avatar DSL 发送成功（{n} B）',
+      sentRaw: '{label}发送完成，响应：{raw}',
+      logSent: 'Avatar DSL 发送成功',
+      sendFailed: '{label}发送失败：{err}',
+      logSendFailed: 'Avatar DSL 发送失败：{err}',
+      sendError: '发送错误：{msg}',
+      sending: '发送中…',
+      sendingProgress: '发送中… {sent}/{total} B',
+      textOnly: '{msg}：仅更新了文本',
+      resetConfirm: '将删除 NVS 中的面部覆盖并回到固件内置的 Grok 脸。确定吗？',
+      resetDone: '已删除面部覆盖，真机回到内置 Grok 脸{raw}',
+      logReset: 'Avatar DSL 重置',
+      resetFail: '重置失败：{msg}',
+      logResetFail: 'Avatar DSL 重置失败：{msg}',
+      loaded: '已读取：请点「编译并发送」同步到真机',
+      fileSending: '{name}（{n} B）发送中…',
+      fileProgress: '{name} 发送中… {sent}/{total} B',
+      rangeMode: '范围设置模式: {state}',
+      logRangeOn: '范围设置模式: ON（舵机卸力）',
+      logRangeOff: '范围设置模式: OFF',
+      rangeFail: '切换范围设置模式失败：{msg}',
+      noPosition: '尚未获取舵机位置',
+      authClearConfirm: '将恢复为无认证（空）。保存并重启后生效。确定吗？',
+      authClearHint: '（已预约清除：保存时发送空值）',
+    },
+  };
+  function tr(key, params) {
+    const l = String(document.documentElement.lang || '').toLowerCase();
+    const dict = l.startsWith('en') ? STRINGS.en : STRINGS.zh;
+    let s = dict[key] != null ? dict[key] : STRINGS.en[key];
+    if (s == null) return key;
+    if (params) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
+    return s;
+  }
+  // Helpers write their own text into these elements; drop any page-level
+  // i18n key so a later language switch doesn't overwrite it.
+  function setOwnText(el, text) {
+    if (!el) return;
+    el.removeAttribute('data-i18n');
+    el.removeAttribute('data-i18n-args');
+    el.textContent = text;
+  }
+
   // --- Board facts -----------------------------------------------------
   // Keyed by the BoardKind byte the firmware reports (BLE BoardKind chr /
   // /api/status "board"). Mirrors board::profile_for() — update BOTH when a
@@ -118,7 +205,7 @@
     const presetEl = $id('dsl-preset');
     if (!srcEl || !msg) return null;
 
-    const setMsg = (txt, kind = '') => { msg.textContent = txt; msg.className = kind; };
+    const setMsg = (txt, kind = '') => { setOwnText(msg, txt); msg.className = kind; };
 
     const compilerOk = !!(window.AvatarDsl && typeof window.AvatarDsl.compile === 'function');
     if (!compilerOk) setMsg(transport.compilerMissingMsg, 'err');
@@ -140,25 +227,25 @@
                    !window.AVATAR_DSL_DEFAULT_SOURCE.includes('{{AVATAR_DSL_DEFAULT_SOURCE}}')
                      ? window.AVATAR_DSL_DEFAULT_SOURCE : '');
     if (compilerOk) {
-      setMsg('已就绪：Ctrl/Cmd+Enter 或点「编译并发送」即可生效');
+      setMsg(tr('ready'));
     }
 
     let lastBuf = null; // last successfully-compiled bytecode (for download)
 
     function compileNow() {
       if (!compilerOk) {
-        setMsg('未能加载 DSL 编译器，无法编译', 'err');
+        setMsg(tr('noCompiler'), 'err');
         return null;
       }
       const t0 = performance.now();
       let buf;
       try { buf = window.AvatarDsl.compile(srcEl.value); }
       catch (e) {
-        setMsg('编译错误：' + e.message, 'err');
+        setMsg(tr('compileErr', { msg: e.message }), 'err');
         return null;
       }
       const compileMs = performance.now() - t0;
-      setMsg(`完成，${buf.byteLength} 字节，编译 ${compileMs.toFixed(1)} ms`, 'ok');
+      setMsg(tr('compiled', { bytes: buf.byteLength, ms: compileMs.toFixed(1) }), 'ok');
       lastBuf = buf;
       return buf;
     }
@@ -170,20 +257,20 @@
       try {
         const r = await transport.send(u8, onProgress);
         if (r.ok && r.saved != null) {
-          setMsg(`${label}发送完成，已向 NVS 保存 ${r.saved} 字节${r.note || ''}`, 'ok');
-          log(`Avatar DSL 发送成功（${r.saved} B）`, 'ok');
+          setMsg(tr('sentSaved', { label, n: r.saved, note: r.note || '' }), 'ok');
+          log(tr('logSentBytes', { n: r.saved }), 'ok');
           return true;
         }
         if (r.ok) {
-          setMsg(`${label}发送完成，响应：` + r.raw, 'ok');
-          log('Avatar DSL 发送成功', 'ok');
+          setMsg(tr('sentRaw', { label, raw: r.raw }), 'ok');
+          log(tr('logSent'), 'ok');
           return true;
         }
-        setMsg(`${label}发送失败：${r.error || 'unknown'}`, 'err');
-        log(`Avatar DSL 发送失败：${r.error}`, 'err');
+        setMsg(tr('sendFailed', { label, err: r.error || 'unknown' }), 'err');
+        log(tr('logSendFailed', { err: r.error }), 'err');
       } catch (e) {
-        setMsg('发送错误：' + e.message, 'err');
-        log('Avatar DSL 发送失败：' + e.message, 'err');
+        setMsg(tr('sendError', { msg: e.message }), 'err');
+        log(tr('logSendFailed', { err: e.message }), 'err');
       }
       return false;
     }
@@ -194,10 +281,10 @@
       if (!buf) return;
       sendBtn.disabled = true;
       const oldText = sendBtn.textContent;
-      sendBtn.textContent = '发送中…';
+      sendBtn.textContent = tr('sending');
       try {
         await sendBytes(new Uint8Array(buf), '', (sent, total) => {
-          sendBtn.textContent = `发送中… ${sent}/${total} B`;
+          sendBtn.textContent = tr('sendingProgress', { sent, total });
         });
       } finally {
         sendBtn.textContent = oldText;
@@ -224,7 +311,7 @@
       srcEl.value = src;
       lastBuf = null;
       if (!transport.isConnected()) {
-        setMsg(transport.notConnectedMsg + '：仅更新了文本', 'err');
+        setMsg(tr('textOnly', { msg: transport.notConnectedMsg }), 'err');
         return;
       }
       await compileAndSend();
@@ -232,17 +319,17 @@
 
     resetBtn.addEventListener('click', async () => {
       if (!transport.isConnected()) { setMsg(transport.notConnectedMsg, 'err'); return; }
-      if (!confirm('将删除 NVS 中的面部覆盖并回到固件内置的 Grok 脸。确定吗？')) return;
+      if (!confirm(tr('resetConfirm'))) return;
       const oldText = resetBtn.textContent;
       resetBtn.disabled = true;
-      resetBtn.textContent = '发送中…';
+      resetBtn.textContent = tr('sending');
       try {
         const r = await transport.reset();
-        setMsg(`已删除面部覆盖，真机回到内置 Grok 脸${r.raw ? ` (${r.raw})` : ''}`, 'ok');
-        log('Avatar DSL 重置', 'ok');
+        setMsg(tr('resetDone', { raw: r.raw ? ` (${r.raw})` : '' }), 'ok');
+        log(tr('logReset'), 'ok');
       } catch (e) {
-        setMsg('重置失败：' + e.message, 'err');
-        log('Avatar DSL 重置失败：' + e.message, 'err');
+        setMsg(tr('resetFail', { msg: e.message }), 'err');
+        log(tr('logResetFail', { msg: e.message }), 'err');
       } finally {
         resetBtn.textContent = oldText;
         resetBtn.disabled = !transport.isConnected();
@@ -276,13 +363,13 @@
       const r = new FileReader();
       r.onload = () => {
         srcEl.value = r.result;
-        setMsg('已读取：请点「编译并发送」同步到真机');
+        setMsg(tr('loaded'));
       };
       r.readAsText(f);
       e.target.value = '';
     });
 
-    // .avbc 直接送信 — for users who already have a compiled bytecode. Skips
+    // Direct .avbc upload — for users who already have a compiled bytecode. Skips
     // the in-browser compiler entirely. Only present on pages whose HTML has
     // the file input (currently the BLE page).
     const avbcInput = $id('avbc-file');
@@ -293,9 +380,9 @@
         if (!f) return;
         if (!transport.isConnected()) { setMsg(transport.notConnectedMsg, 'err'); return; }
         const buf = new Uint8Array(await f.arrayBuffer());
-        setMsg(`${f.name}（${buf.length} B）发送中…`);
+        setMsg(tr('fileSending', { name: f.name, n: buf.length }));
         const ok = await sendBytes(buf, `${f.name} `, (sent, total) => {
-          setMsg(`${f.name} 发送中… ${sent}/${total} B`);
+          setMsg(tr('fileProgress', { name: f.name, sent, total }));
         });
         if (ok) {
           lastBuf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
@@ -378,7 +465,7 @@
         if (el) el.disabled = !ok;
       }
       const btn = $id('sv-range-mode');
-      btn.textContent = '范围设置模式: ' + (rangeOn ? 'ON' : 'OFF');
+      setOwnText(btn, tr('rangeMode', { state: rangeOn ? 'ON' : 'OFF' }));
       btn.disabled = !transport.canToggle();
     }
 
@@ -418,14 +505,14 @@
         refreshUi();
         restartPoll();
         if (on) {
-          log('范围设置模式: ON（舵机卸力）', 'ok');
+          log(tr('logRangeOn'), 'ok');
         } else {
-          log('范围设置模式: OFF');
+          log(tr('logRangeOff'));
           liveYaw = livePitch = -1;
           clearLiveDisplay();
         }
       } catch (e) {
-        log('切换范围设置模式失败：' + e.message, 'err');
+        log(tr('rangeFail', { msg: e.message }), 'err');
       }
     }
 
@@ -450,7 +537,7 @@
 
     function capture(axis, which) {
       const live = axis === 'yaw' ? liveYaw : livePitch;
-      if (live < 0) { log('尚未获取舵机位置', 'err'); return; }
+      if (live < 0) { log(tr('noPosition'), 'err'); return; }
       const zeroId = `sv-${axis}-zero`;
       if (which === 'zero') {
         $id(zeroId).value = live;
@@ -512,13 +599,13 @@
     const authClear = $id('btn-auth-password-clear');
     if (authEl && authClear) {
       authClear.addEventListener('click', () => {
-        if (!confirm('将恢复为无认证（空）。保存并重启后生效。确定吗？')) {
+        if (!confirm(tr('authClearConfirm'))) {
           return;
         }
         authEl.value = '';
         authEl.dataset.cleared = '1';
         const hintEl = $id('auth-password-state');
-        if (hintEl) hintEl.textContent = '（已预约清除：保存时发送空值）';
+        setOwnText(hintEl, tr('authClearHint'));
       });
     }
   }
@@ -565,7 +652,7 @@
   }
 
   // --- jtts phrase list mapping ---------------------------------------------
-  // Textarea line format: `表示 | 読み` (reading optional). JSON entry: a
+  // Textarea line format: `display | reading` (reading optional). JSON entry: a
   // plain string when display == reading (compact — the JttsConfig budget is
   // ~768 bytes), otherwise {text, reading}. The device parser accepts both.
   // MUST be used by both pages: a page that renders entries with a bare
