@@ -18,7 +18,11 @@ import tempfile
 import wave
 from pathlib import Path
 
-from stackchan_mcp.wake_gate import SherpaOnnxKeywordSpotter, WAKE_PHRASE
+from stackchan_mcp.wake_gate import (
+    SherpaOnnxKeywordSpotter,
+    _keyword_from_env,
+    _phrase_from_env,
+)
 
 
 def _kws_float_from_env(name: str) -> float | None:
@@ -73,7 +77,11 @@ def detect_wake(
     kws_score: float | None = None,
     kws_threshold: float | None = None,
 ) -> int | None:
-    spotter_kwargs: dict[str, float] = {}
+    # Same wake word the gateway uses (STACKCHAN_WAKE_PHRASE / _KEYWORD).
+    spotter_kwargs: dict[str, float | str] = {
+        "keyword": _keyword_from_env(),
+        "phrase": _phrase_from_env(),
+    }
     if kws_score is not None:
         spotter_kwargs["keywords_score"] = kws_score
     if kws_threshold is not None:
@@ -90,7 +98,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--wav", type=Path)
     parser.add_argument("--generate-say", action="store_true")
-    parser.add_argument("--text", default=WAKE_PHRASE)
+    parser.add_argument("--text", default=_phrase_from_env())
     parser.add_argument("--voice", default="Moira")
     parser.add_argument("--chunk-ms", type=int, default=100)
     parser.add_argument(

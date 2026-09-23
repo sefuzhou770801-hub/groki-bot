@@ -496,3 +496,72 @@ def test_create_wake_gate_from_env_passes_kws_env_vars(monkeypatch) -> None:
     call = mock_ctor.call_args
     assert call.kwargs["keywords_score"] == 4.2
     assert call.kwargs["keywords_threshold"] == 0.09
+
+
+def _fake_kws_model(monkeypatch, tmp_path):
+    mock_sherpa = MagicMock()
+    monkeypatch.setitem(sys.modules, "numpy", MagicMock())
+    monkeypatch.setitem(sys.modules, "sherpa_onnx", mock_sherpa)
+    model_dir = tmp_path / "kws-model"
+    model_dir.mkdir()
+    for name in (
+        "tokens.txt",
+        "encoder-epoch-13-avg-2-chunk-16-left-64.onnx",
+        "decoder-epoch-13-avg-2-chunk-16-left-64.onnx",
+        "joiner-epoch-13-avg-2-chunk-16-left-64.onnx",
+    ):
+        (model_dir / name).write_text("", encoding="utf-8")
+    return model_dir
+
+
+def _clear_wake_env(monkeypatch) -> None:
+    for name in ("WAKE_PHRASE", "STACKCHAN_WAKE_PHRASE", "WAKE_KEYWORD", "STACKCHAN_WAKE_KEYWORD"):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_default_wake_word_is_hey_groki(monkeypatch, tmp_path) -> None:
+    from stackchan_mcp import wake_gate
+
+    _clear_wake_env(monkeypatch)
+    assert wake_gate._phrase_from_env() == "hey groki"
+    assert wake_gate._keyword_from_env() == "HH EY1 G R OW1 K IY0 @hey_groki"
+
+    model_dir = _fake_kws_model(monkeypatch, tmp_path)
+    spotter = SherpaOnnxKeywordSpotter(
+        model_dir=model_dir,
+        keyword=wake_gate._keyword_from_env(),
+        phrase=wake_gate._phrase_from_env(),
+    )
+    lines = (model_dir / "stackchan_keywords.txt").read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "HH EY1 G R OW1 K IY0 @hey_groki"
+    assert all(line.endswith(("@hey_groki_aa", "@hey_groki_ao", "@hey_groki_ah")) for line in lines[1:])
+    assert len(lines) == 4
+    # Every variant tag counts as the wake word.
+    for tag in ("hey_groki", "hey_groki_aa", "hey_groki_ao", "hey_groki_ah"):
+        assert spotter._result_matches(tag)
+    assert not spotter._result_matches("hi_grok")
+
+
+def test_hi_grok_phrase_switches_back_to_the_old_keyword(monkeypatch, tmp_path) -> None:
+    from stackchan_mcp import wake_gate
+
+    _clear_wake_env(monkeypatch)
+    monkeypatch.setenv("STACKCHAN_WAKE_PHRASE", "Hi Grok")
+    assert wake_gate._keyword_from_env() == "HH AY1 G R AA1 K @hi_grok"
+
+    model_dir = _fake_kws_model(monkeypatch, tmp_path)
+    spotter = SherpaOnnxKeywordSpotter(
+        model_dir=model_dir,
+        keyword=wake_gate._keyword_from_env(),
+        phrase=wake_gate._phrase_from_env(),
+    )
+    lines = (model_dir / "stackchan_keywords.txt").read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "HH AY1 G R AA1 K @hi_grok"
+    assert len(lines) == 4
+    assert spotter._result_matches("hi_grok_ow")
+
+
+def test_custom_wake_keyword_is_written_alone(monkeypatch) -> None:
+    from stackchan_mcp.wake_gate import keywords_file_body
+
+    assert keywords_file_body("HH EH1 L OW0 @hello") == "HH EH1 L OW0 @hello\n"

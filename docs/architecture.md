@@ -5,7 +5,7 @@ English · [中文](architecture.zh-CN.md)
 Groki Bot has three layers. Each one is optional on top of the one before it:
 
 1. **Firmware** on the robot (M5Stack CoreS3 with a Stack-chan base). On its own it talks to OpenAI Realtime or Gemini Live with your API key.
-2. **Gateway** on your computer ([gateway/](../gateway/README.md)). The robot sends its microphone audio to the gateway instead; the gateway runs Gemini Live with a "Hi Grok" wake word and exposes an MCP server for Claude and other MCP clients.
+2. **Gateway** on your computer ([gateway/](../gateway/README.md)). The robot sends its microphone audio to the gateway instead; the gateway runs Gemini Live with a "Hey Groki" wake word and exposes an MCP server for Claude and other MCP clients.
 3. **Grok Bot hand-off**. The gateway can pass tasks to an agent in the Grok Bot app through a small local forwarding service, and read the agent's replies aloud through the robot.
 
 ```mermaid
@@ -61,7 +61,7 @@ The same picture as text:
 
 | | Path 1: firmware only | Path 2: + gateway | Path 3: + Grok Bot |
 |---|---|---|---|
-| What you get | Voice conversation, face, head motion, touch | "Hi Grok" wake word, Gemini Live voice through your computer, Claude can make the robot speak and read its status | Say "look this up" or "research X"; the robot answers "sent to the agent" right away and reads the agent's replies aloud as they arrive |
+| What you get | Voice conversation, face, head motion, touch | "Hey Groki" wake word, Gemini Live voice through your computer, Claude can make the robot speak and read its status | Say "look this up" or "research X"; the robot answers "sent to the agent" right away and reads the agent's replies aloud as they arrive |
 | Hardware | CoreS3 + Stack-chan base (or another supported board), USB-C cable | Plus a computer on the same Wi-Fi (macOS tested; Linux for voice) | Same computer |
 | Software | Desktop Chrome or Edge for the web flasher and BLE settings page | [uv](https://docs.astral.sh/uv/), Git, libopus; optional wake word model (about 33 MB) | Grok Bot app, signed in; `gbot` CLI from [grok-bot-cli](https://github.com/ScriptedAlchemy/grok-bot-cli) (`npm install --global grok-bot-cli`; needs a recent Node.js) |
 | Keys | OpenAI or Gemini API key, stored in the robot's NVS | Gemini API key in `gateway/.env`; optional shared `STACKCHAN_TOKEN` | None extra: `gbot` uses the app session; nothing Grok-related is stored by the gateway |
@@ -89,7 +89,7 @@ A wrong token is rejected with HTTP 401 (`ESP32 auth rejected` in the gateway lo
 
 **Hello.** The robot sends `{"type": "hello", "features": {"mcp": false}, "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}`. The gateway answers with its own hello and a 24 kHz downlink format. `features.mcp=false` tells the gateway that this firmware does not accept MCP tool calls from the server, so face, LED, head and camera tools from the gateway do not reach the Groki Bot firmware. Voice works fully.
 
-**Audio.** Uplink: Opus, 16 kHz mono, 60 ms frames, as binary WebSocket messages. On the gateway the wake word detector (sherpa-onnx, runs locally) listens first; only after "Hi Grok" is audio forwarded to Gemini, and the listening window closes after `STACKCHAN_WAKE_IDLE_S` seconds of silence. Downlink: Gemini's reply audio is encoded to Opus (24 kHz, 60 ms) and sent back with `tts` state messages so the robot knows when speech starts and stops.
+**Audio.** Uplink: Opus, 16 kHz mono, 60 ms frames, as binary WebSocket messages. On the gateway the wake word detector (sherpa-onnx, runs locally) listens first; only after "Hey Groki" is audio forwarded to Gemini, and the listening window closes after `STACKCHAN_WAKE_IDLE_S` seconds of silence. Downlink: Gemini's reply audio is encoded to Opus (24 kHz, 60 ms) and sent back with `tts` state messages so the robot knows when speech starts and stops.
 
 **Gemini Live.** The gateway keeps one Gemini Live session (`GEMINI_API_KEY`, model `gemini-3.8-live`, voice `Kore` by default) and gives Gemini a small set of function-calling tools: `end_conversation`, `get_current_datetime`, `ask_claude` when the `claude` CLI is installed (`STACKCHAN_ASK_CLAUDE=0` turns it off), and, when you turn them on, Mac control tools and `ask_grokbot`.
 
@@ -122,7 +122,7 @@ sequenceDiagram
     participant P as Forwarding service :18770
     participant B as gbot CLI + Grok Bot app
 
-    U->>R: "Hi Grok, research X for me"
+    U->>R: "Hey Groki, research X for me"
     R->>G: Opus audio (ws :8765)
     G->>G: Gemini calls ask_grokbot(task)
     G-->>R: Gemini says "Sent to assistant."
