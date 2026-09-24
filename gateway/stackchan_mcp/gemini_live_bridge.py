@@ -330,13 +330,18 @@ def _close_code(exc: BaseException | None) -> int | None:
 
 
 def _is_dead_resumption_handle(exc: BaseException) -> bool:
-    """服务端明确拒绝恢复句柄的错误（句柄过期或非法，重试同一句柄必死）。
+    """True when the server has rejected the resumption handle.
 
-    只匹配这两类拒绝文案；普通网络断连不算——那种情况下句柄仍可能有效，
-    保留它才能续上对话上下文。
+    Matches known rejection wording. A plain network drop is not a match —
+    the handle may still work, and keeping it is what preserves conversation
+    context across a blip.
     """
     text = str(exc).lower()
-    return "session expired" in text or "invalid argument" in text
+    return (
+        "session expired" in text
+        or "invalid argument" in text
+        or "requested entity was not found" in text
+    )
 
 
 PersonalityLoader = Callable[[], str]
@@ -928,6 +933,7 @@ class GeminiLiveBridge:
         on_session_dead: TurnCompleteCallback | None = None,
         reconnect_audio_ttl_s: float | None = None,
         reconnect_audio_max_bytes: int = DEFAULT_RECONNECT_AUDIO_MAX_BYTES,
+        resumption_max_failures: int = 3,
     ) -> None:
         self._status = debug_status or get_debug_status()
         self._esp32 = esp32
@@ -968,6 +974,8 @@ class GeminiLiveBridge:
         self._emotion_tasks: set[asyncio.Task[None]] = set()
         self._claude_bin = resolve_claude_bin()
         self._resumption_handle: str | None = None
+        self._resumption_max_failures = resumption_max_failures
+        self._resumption_failure_count = 0
         self._go_away_received = False
         self._receive_stall_s = float(
             os.getenv("STACKCHAN_GEMINI_RECEIVE_STALL_S", str(DEFAULT_RECEIVE_STALL_S))
@@ -1070,15 +1078,16 @@ class GeminiLiveBridge:
         backoff = self._reconnect_initial_backoff_s
         while not self._stop_event.is_set():
             used_handle = False
+            handle_used = self._resumption_handle
             try:
                 config = build_live_config(
                     system_instruction=self._system_instruction,
                     voice=self._voice,
                     response_modality=self._response_modality,
-                    session_resumption_handle=self._resumption_handle,
+                    session_resumption_handle=handle_used,
                     model=self._model,
                 )
-                used_handle = self._resumption_handle is not None
+                used_handle = handle_used is not None
                 async with self._client.aio.live.connect(
                     model=self._model,
                     config=config,
@@ -1088,6 +1097,7 @@ class GeminiLiveBridge:
                     self._receive_stall_triggered = False
                     self._reset_manual_vad_activity()
                     self._session_count += 1
+                    self._resumption_failure_count = 0
                     self._connected_event.set()
                     self._status.on_gemini_connected(
                         self._session_count,
@@ -1127,16 +1137,43 @@ class GeminiLiveBridge:
                     self._session_count, exc, backoff,
                 )
                 self._note_session_end(exc)
-                # 恢复句柄服务端已判死（expired/invalid）时必须丢弃，否则
-                # 每次重连都带着同一个死句柄被 1008 拒绝，死循环到进程重启
-                # （2026-07-07 09:38–11:37 两小时装死的直接根因）。
-                if used_handle and _is_dead_resumption_handle(exc):
-                    self._resumption_handle = None
-                    self._status.on_resumption_handle_cleared()
-                    logger.warning(
-                        "Gemini Live resumption handle rejected by server; "
-                        "dropped it, next connect starts a fresh session"
+                # Drop a handle the server has rejected (expired / invalid /
+                # not found). Otherwise every reconnect retries the same dead
+                # handle and the robot stays silent until the process restarts.
+                # Fallback: drop the same handle after too many consecutive
+                # failures, so a new rejection phrase cannot stall us again.
+                # A failure that belongs to an older connection does not count
+                # against a handle issued mid-session.
+                if (
+                    handle_used is not None
+                    and self._resumption_handle == handle_used
+                ):
+                    self._resumption_failure_count += 1
+                    dead = _is_dead_resumption_handle(exc)
+                    over_limit = (
+                        self._resumption_failure_count
+                        >= self._resumption_max_failures
                     )
+                    if dead or over_limit:
+                        failures = self._resumption_failure_count
+                        self._resumption_handle = None
+                        self._resumption_failure_count = 0
+                        self._status.on_resumption_handle_cleared()
+                        if dead:
+                            logger.warning(
+                                "Gemini Live resumption handle rejected by "
+                                "server (%s); dropped it, next connect starts "
+                                "a fresh session",
+                                exc,
+                            )
+                        else:
+                            logger.warning(
+                                "Gemini Live resumption handle failed %d "
+                                "times in a row (%s); dropped it, next "
+                                "connect starts a fresh session",
+                                failures,
+                                exc,
+                            )
             finally:
                 self._session = None
                 self._connected_event.clear()
@@ -1236,6 +1273,7 @@ class GeminiLiveBridge:
             new_handle = getattr(update, "new_handle", None)
             if getattr(update, "resumable", False) and new_handle:
                 self._resumption_handle = str(new_handle)
+                self._resumption_failure_count = 0
                 self._status.on_resumption_handle_updated()
 
         go_away = getattr(response, "go_away", None)
