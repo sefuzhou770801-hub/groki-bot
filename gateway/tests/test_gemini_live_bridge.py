@@ -2282,6 +2282,169 @@ async def test_bridge_keeps_resumption_handle_on_transient_network_error():
     assert bridge._client.live.configs[1].session_resumption.handle == "still-valid-handle"
 
 
+@pytest.mark.asyncio
+async def test_bridge_drops_resumption_handle_when_server_says_not_found():
+    """A 1008 'Requested entity was not found' rejection must drop the handle."""
+    sessions = [
+        _ExpiredHandleConnect("1008 None. Requested entity was not found."),
+        _RecordingFakeSession([]),
+    ]
+    bridge = GeminiLiveBridge(
+        FakeESP32(),
+        api_key="test-key",
+        reconnect_on_close=True,
+        reconnect_initial_backoff_s=0.01,
+        reconnect_max_backoff_s=0.01,
+    )
+    bridge._client = _FakeClient(sessions)
+    bridge._resumption_handle = "stale-handle"
+
+    task = asyncio.create_task(bridge._run())
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if bridge._session_count >= 1:
+            break
+    bridge._stop_event.set()
+    await asyncio.wait_for(task, timeout=2.0)
+
+    assert bridge._resumption_handle is None
+    assert bridge._session_count == 1
+    assert bridge._client.live.configs[1].session_resumption.handle is None
+
+
+@pytest.mark.asyncio
+async def test_bridge_drops_resumption_handle_after_consecutive_failures():
+    """The same handle is dropped after three failures, whatever the wording."""
+    stale = "stale-handle"
+    sessions = [
+        _ExpiredHandleConnect("1011 None. Internal error encountered."),
+        _ExpiredHandleConnect("1011 None. Internal error encountered."),
+        _ExpiredHandleConnect("1011 None. Internal error encountered."),
+        _RecordingFakeSession([]),
+    ]
+    bridge = GeminiLiveBridge(
+        FakeESP32(),
+        api_key="test-key",
+        reconnect_on_close=True,
+        reconnect_initial_backoff_s=0.01,
+        reconnect_max_backoff_s=0.01,
+    )
+    bridge._client = _FakeClient(sessions)
+    bridge._resumption_handle = stale
+
+    task = asyncio.create_task(bridge._run())
+    for _ in range(200):
+        await asyncio.sleep(0.01)
+        if bridge._session_count >= 1:
+            break
+    bridge._stop_event.set()
+    await asyncio.wait_for(task, timeout=2.0)
+
+    configs = bridge._client.live.configs
+    assert configs[0].session_resumption.handle == stale
+    assert configs[1].session_resumption.handle == stale
+    assert configs[2].session_resumption.handle == stale
+    assert configs[3].session_resumption.handle is None
+    assert bridge._session_count == 1
+
+
+@pytest.mark.asyncio
+async def test_bridge_resets_resumption_failure_count_after_successful_connect():
+    """A successful connect resets the counter, so two later failures keep the handle."""
+    handle = "still-valid-handle"
+    sessions = [
+        _ExpiredHandleConnect("1011 None. Internal error encountered."),
+        _ExpiredHandleConnect("1011 None. Internal error encountered."),
+        _RecordingFakeSession([]),
+        _ExpiredHandleConnect("1011 None. Internal error encountered."),
+        _ExpiredHandleConnect("1011 None. Internal error encountered."),
+    ]
+    bridge = GeminiLiveBridge(
+        FakeESP32(),
+        api_key="test-key",
+        reconnect_on_close=True,
+        reconnect_initial_backoff_s=0.01,
+        reconnect_max_backoff_s=0.01,
+    )
+    bridge._client = _FakeClient(sessions)
+    bridge._resumption_handle = handle
+
+    task = asyncio.create_task(bridge._run())
+    for _ in range(300):
+        await asyncio.sleep(0.01)
+        if bridge._client.live.connect_count >= 5:
+            break
+    bridge._stop_event.set()
+    await asyncio.wait_for(task, timeout=2.0)
+
+    assert bridge._resumption_handle == handle
+    assert bridge._session_count == 1
+    configs = bridge._client.live.configs
+    assert len(configs) == 5
+    assert all(cfg.session_resumption.handle == handle for cfg in configs)
+
+
+class _UpdateThenFailSession:
+    """Issue a new handle, then fail receive() to simulate a mid-session drop."""
+
+    def __init__(self, new_handle: str, exc_text: str) -> None:
+        self._new_handle = new_handle
+        self._exc_text = exc_text
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
+    async def receive(self):
+        class Update:
+            resumable = True
+            new_handle = self._new_handle
+
+        yield SimpleNamespace(
+            session_resumption_update=Update(),
+            go_away=None,
+            tool_call=None,
+            server_content=None,
+        )
+        raise RuntimeError(self._exc_text)
+
+
+@pytest.mark.asyncio
+async def test_bridge_does_not_count_failure_against_handle_issued_mid_session():
+    """A drop after a mid-session handle refresh must not count against the new handle."""
+    sessions = [
+        _UpdateThenFailSession("fresh", "1011 None. Internal error encountered."),
+        _ExpiredHandleConnect("[Errno 61] Could not connect to proxy 127.0.0.1:1080"),
+        _ExpiredHandleConnect("[Errno 61] Could not connect to proxy 127.0.0.1:1080"),
+        _RecordingFakeSession([]),
+    ]
+    bridge = GeminiLiveBridge(
+        FakeESP32(),
+        api_key="test-key",
+        reconnect_on_close=True,
+        reconnect_initial_backoff_s=0.01,
+        reconnect_max_backoff_s=0.01,
+    )
+    bridge._client = _FakeClient(sessions)
+    bridge._resumption_handle = "old"
+
+    task = asyncio.create_task(bridge._run())
+    for _ in range(300):
+        await asyncio.sleep(0.01)
+        if bridge._session_count >= 2:
+            break
+    bridge._stop_event.set()
+    await asyncio.wait_for(task, timeout=2.0)
+
+    configs = bridge._client.live.configs
+    assert configs[1].session_resumption.handle == "fresh"
+    assert configs[2].session_resumption.handle == "fresh"
+    assert configs[3].session_resumption.handle == "fresh"
+    assert bridge._resumption_handle == "fresh"
+
+
 # --- Grok Bot hand-off (ask_grokbot) ------------------------------------------
 
 
