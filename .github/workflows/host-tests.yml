@@ -3,8 +3,9 @@ name: Host Unit Tests
 # ESP-IDF independent unit tests that build with a plain gcc + cmake toolchain
 # on ubuntu-latest — no ESP-IDF container, no cross toolchain. These cover the
 # pure-logic parts of the firmware (avatar bytecode VM decode/execute, SCS0009
-# servo protocol framing/checksum/parse, jtts vowel synthesis) and run on every
-# push / PR so regressions surface long before a tagged firmware build.
+# servo protocol framing/checksum/parse, XiaoZhi control dispatch, jtts vowel
+# synthesis) and run on every push / PR so regressions surface long before a
+# tagged firmware build.
 #
 # The firmware build itself lives in release.yml (tag-driven, in the espressif
 # IDF container); this job is deliberately separate and fast.
@@ -106,6 +107,17 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
           cmake --build build
           ctest --test-dir build --output-on-failure
+
+      # --- conversation: XiaoZhi control dispatch (gateway head message) --
+      - name: conversation host tests (ASan + UBSan)
+        working-directory: components/conversation/test/host
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-san -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
+          cmake --build build-san
+          ctest --test-dir build-san --output-on-failure
 
       # --- jtts: existing vowel-synthesis test ----------------------------
       # jtts/test/host predates ctest wiring, so drive its executable directly.

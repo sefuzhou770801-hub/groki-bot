@@ -593,6 +593,8 @@ constexpr const char* kTag = "stackchan";
 
         // 空闲头部姿态沿用旧固件「没人交互时自己动」的身体手感。
         if (!external_servo_control && !head_pet_touch_active && !head_pet_restore_pending &&
+            !g_state->servo.masked.load(std::memory_order_relaxed) &&
+            static_cast<std::int32_t>(now_ms - g_state->servo.head_hold_until_ms.load(std::memory_order_relaxed)) >= 0 &&
             now_ms >= next_pose_ms) {
             const auto pose = groki_motion::idle_pose(
                 g_state->servo.target_yaw_deg.load(std::memory_order_relaxed),

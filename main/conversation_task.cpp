@@ -26,6 +26,7 @@
 #include "avatar/expression_names.hpp"
 #include "board/si12t_touch.hpp"
 #include "conversation/gemini_live_client.hpp"
+#include "conversation/head_command.hpp"
 #include "conversation/metrics.hpp"
 #include "conversation/openai_realtime_client.hpp"
 #include "conversation/xiaozhi_client.hpp"
@@ -218,12 +219,13 @@ class Coordinator {
 public:
     Coordinator(SharedState& state, const char* api_key, config::Provider provider, board::Si12tTouch* touch,
                 const char* xiaozhi_url, const char* xiaozhi_token, const char* system_prompt,
-                const char* extra_headers, const std::array<std::int16_t*, kSegmentBuffers>& seg_buf)
+                const char* extra_headers, const ServoLimits& limits,
+                const std::array<std::int16_t*, kSegmentBuffers>& seg_buf)
         : state_{state}, api_key_{api_key != nullptr ? api_key : ""}, provider_{provider}, touch_{touch},
           xiaozhi_url_{xiaozhi_url != nullptr ? xiaozhi_url : ""},
           xiaozhi_token_{xiaozhi_token != nullptr ? xiaozhi_token : ""},
           system_prompt_{system_prompt != nullptr ? system_prompt : ""},
-          extra_headers_{extra_headers != nullptr ? extra_headers : ""}, seg_buf_{seg_buf} {
+          extra_headers_{extra_headers != nullptr ? extra_headers : ""}, limits_{limits}, seg_buf_{seg_buf} {
         // Per-provider audio rates. The OpenAI client further compands its
         // 8 kHz PCM16 into µ-law on the wire; Gemini sends raw PCM16; XiaoZhi
         // streams Opus (16 kHz mono up, server-rate down, resampled to 24 kHz).
@@ -603,6 +605,10 @@ private:
         // head still across the brief silences between streamed reply segments,
         // which is exactly where the servo was twitching and cutting the audio.
         state_.servo.masked.store(s == Local::Speaking, std::memory_order_relaxed);
+        if (s != Local::Speaking) {
+            // A head command that arrived during the reply is applied now.
+            if (auto head = head_commands_.finish()) apply_head(*head);
+        }
         ConvStatus cs = ConvStatus::Connecting;
         switch (s) {
         case Local::Init: cs = ConvStatus::Connecting; break;
@@ -1050,6 +1056,14 @@ private:
             break;
         }
 
+        case conv::ConversationEventType::HeadPose: {
+            const conv::HeadCommand head{clamp_deg(ev.head_yaw, limits_.yaw_min_deg, limits_.yaw_max_deg),
+                                         clamp_deg(ev.head_pitch, limits_.pitch_min_deg, limits_.pitch_max_deg),
+                                         ev.head_speed};
+            if (auto ready = head_commands_.receive(head, local_ == Local::Speaking)) apply_head(*ready);
+            break;
+        }
+
         case conv::ConversationEventType::LedColor: {
             const auto solid = led_runtime::from_rgb(ev.led_r, ev.led_g, ev.led_b);
             state_.led.color.store(solid.color, std::memory_order_relaxed);
@@ -1064,6 +1078,17 @@ private:
             break;
         }
         }
+    }
+
+    // Gateway head command (face tracking, move_head on voice-only firmware).
+    // Holding off the idle poses for 2 s keeps demo_loop from replacing the
+    // pose before the next command arrives.
+    void apply_head(const conv::HeadCommand& head)
+    {
+        state_.servo.speed_override.store(head.speed, std::memory_order_relaxed);
+        state_.servo.target_yaw_deg.store(head.yaw, std::memory_order_relaxed);
+        state_.servo.target_pitch_deg.store(head.pitch, std::memory_order_relaxed);
+        state_.servo.head_hold_until_ms.store(now_ms() + 2000, std::memory_order_relaxed);
     }
 
     // ---- tool dispatch -----------------------------------------------------
@@ -1256,6 +1281,8 @@ private:
     std::string xiaozhi_token_;
     std::string system_prompt_;
     std::string extra_headers_;
+    ServoLimits limits_;
+    conv::HeadCommandQueue head_commands_;
     conv::ConversationConfig config_{};
     std::unique_ptr<conv::ConversationService> client_;
     QueueHandle_t event_queue_{nullptr};
@@ -1323,7 +1350,7 @@ void conversation_task_entry(void* arg)
     auto& args = *static_cast<ConversationTaskArgs*>(arg);
     auto* coordinator = new Coordinator(*args.state, args.api_key, args.provider, args.touch,
                                         args.xiaozhi_url, args.xiaozhi_token, args.system_prompt,
-                                        args.extra_headers, args.seg_buf);
+                                        args.extra_headers, args.limits, args.seg_buf);
     coordinator->run();
     // run() only returns by deleting the task; keep the object alive regardless.
     // WithCaps 创建的任务必须用 WithCaps 删除，否则 PSRAM 栈不归还。

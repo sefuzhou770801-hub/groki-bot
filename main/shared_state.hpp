@@ -110,6 +110,9 @@ public:
         // Non-zero overrides the servo task's default Goal Speed for the next
         // write_goal_position. Used for snappy gestures (head shake).
         std::atomic<std::uint16_t> speed_override{0};
+        // Keeps the autonomous idle poses from replacing a gateway head
+        // command right away (esp_timer milliseconds).
+        std::atomic<std::uint32_t> head_hold_until_ms{0};
         // Servo torque enable. The on-device 操作 (control) screen toggles
         // this; the servo task enables/disables torque to match (false =
         // head goes limp).
