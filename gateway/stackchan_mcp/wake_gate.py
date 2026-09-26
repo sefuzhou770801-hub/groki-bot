@@ -26,22 +26,23 @@ from typing import Protocol
 
 logger = logging.getLogger(__name__)
 
-# 默认唤醒词「Hey Groki」。sherpa-onnx 是开放词表关键词检测：关键词按模型
+# 默认唤醒词「Hi Grok」。sherpa-onnx 是开放词表关键词检测：关键词按模型
 # tokens.txt 里的音素写，换词不需要重新训练模型。附加几种元音读法，覆盖不同口音。
-WAKE_PHRASE = "hey groki"
-WAKE_KEYWORD = "HH EY1 G R OW1 K IY0 @hey_groki"
+WAKE_PHRASE = "hi grok"
+WAKE_KEYWORD = "HH AY1 G R AA1 K @hi_grok"
 WAKE_KEYWORD_VARIANTS = (
-    "HH EY1 G R AA1 K IY0 @hey_groki_aa",
-    "HH EY1 G R AO1 K IY0 @hey_groki_ao",
-    "HH EY1 G R AH1 K IY0 @hey_groki_ah",
-)
-# 旧默认唤醒词「Hi Grok」：设 STACKCHAN_WAKE_PHRASE=hi grok 即可改回。
-LEGACY_WAKE_PHRASE = "hi grok"
-LEGACY_WAKE_KEYWORD = "HH AY1 G R AA1 K @hi_grok"
-LEGACY_WAKE_KEYWORD_VARIANTS = (
     "HH AY1 G R OW1 K @hi_grok_ow",
     "HH AY1 G R AO1 K @hi_grok_ao",
     "HH AY1 G R AH1 K @hi_grok_ah",
+)
+# 可选唤醒词「Hey Groki」：设 STACKCHAN_WAKE_PHRASE=hey groki 即可打开，
+# 同样带三种元音读法。
+HEY_GROKI_WAKE_PHRASE = "hey groki"
+HEY_GROKI_WAKE_KEYWORD = "HH EY1 G R OW1 K IY0 @hey_groki"
+HEY_GROKI_WAKE_KEYWORD_VARIANTS = (
+    "HH EY1 G R AA1 K IY0 @hey_groki_aa",
+    "HH EY1 G R AO1 K IY0 @hey_groki_ao",
+    "HH EY1 G R AH1 K IY0 @hey_groki_ah",
 )
 KWS_MODEL_NAME = "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20"
 DEFAULT_SAMPLE_RATE = 16_000
@@ -463,8 +464,8 @@ def keywords_file_body(keyword: str) -> str:
     variants: tuple[str, ...] = ()
     if wanted == WAKE_KEYWORD:
         variants = WAKE_KEYWORD_VARIANTS
-    elif wanted == LEGACY_WAKE_KEYWORD:
-        variants = LEGACY_WAKE_KEYWORD_VARIANTS
+    elif wanted == HEY_GROKI_WAKE_KEYWORD:
+        variants = HEY_GROKI_WAKE_KEYWORD_VARIANTS
     return "".join(f"{line}\n" for line in (wanted, *variants))
 
 
@@ -526,8 +527,8 @@ def _keyword_from_env() -> str:
         if raw and raw.strip():
             return raw.strip()
     phrase = _phrase_from_env()
-    if phrase.lower() == LEGACY_WAKE_PHRASE:
-        return LEGACY_WAKE_KEYWORD
+    if phrase.lower() == HEY_GROKI_WAKE_PHRASE:
+        return HEY_GROKI_WAKE_KEYWORD
     return WAKE_KEYWORD
 
 

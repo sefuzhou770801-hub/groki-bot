@@ -11,6 +11,7 @@ BLE / Wi-Fi / SoftAP の 3 経路設定、デバイス側 OTA をサポートし
 > **非商用利用のみ** の許諾です（全文は [third_party/emotion-ball/](third_party/emotion-ball/)）。
 > PC 側のゲートウェイ（Gemini Live 音声、ウェイクワード、MCP、Grok Bot 転送サービス）は [gateway/](gateway/README.md)、
 > 全体の構成と通信は [docs/architecture.md](docs/architecture.md)（英語）を参照してください。
+> ウェイクワードは既定で「Hi Grok」、`gateway/.env` に `STACKCHAN_WAKE_PHRASE=hey groki` を設定すると「Hey Groki」になります。
 
 ## Web Flasher / 設定ページ
 
