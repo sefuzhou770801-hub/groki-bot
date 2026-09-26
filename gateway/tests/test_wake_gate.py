@@ -519,34 +519,11 @@ def _clear_wake_env(monkeypatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def test_default_wake_word_is_hey_groki(monkeypatch, tmp_path) -> None:
+def test_default_wake_word_is_hi_grok(monkeypatch, tmp_path) -> None:
     from stackchan_mcp import wake_gate
 
     _clear_wake_env(monkeypatch)
-    assert wake_gate._phrase_from_env() == "hey groki"
-    assert wake_gate._keyword_from_env() == "HH EY1 G R OW1 K IY0 @hey_groki"
-
-    model_dir = _fake_kws_model(monkeypatch, tmp_path)
-    spotter = SherpaOnnxKeywordSpotter(
-        model_dir=model_dir,
-        keyword=wake_gate._keyword_from_env(),
-        phrase=wake_gate._phrase_from_env(),
-    )
-    lines = (model_dir / "stackchan_keywords.txt").read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "HH EY1 G R OW1 K IY0 @hey_groki"
-    assert all(line.endswith(("@hey_groki_aa", "@hey_groki_ao", "@hey_groki_ah")) for line in lines[1:])
-    assert len(lines) == 4
-    # Every variant tag counts as the wake word.
-    for tag in ("hey_groki", "hey_groki_aa", "hey_groki_ao", "hey_groki_ah"):
-        assert spotter._result_matches(tag)
-    assert not spotter._result_matches("hi_grok")
-
-
-def test_hi_grok_phrase_switches_back_to_the_old_keyword(monkeypatch, tmp_path) -> None:
-    from stackchan_mcp import wake_gate
-
-    _clear_wake_env(monkeypatch)
-    monkeypatch.setenv("STACKCHAN_WAKE_PHRASE", "Hi Grok")
+    assert wake_gate._phrase_from_env() == "hi grok"
     assert wake_gate._keyword_from_env() == "HH AY1 G R AA1 K @hi_grok"
 
     model_dir = _fake_kws_model(monkeypatch, tmp_path)
@@ -556,9 +533,41 @@ def test_hi_grok_phrase_switches_back_to_the_old_keyword(monkeypatch, tmp_path) 
         phrase=wake_gate._phrase_from_env(),
     )
     lines = (model_dir / "stackchan_keywords.txt").read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "HH AY1 G R AA1 K @hi_grok"
-    assert len(lines) == 4
-    assert spotter._result_matches("hi_grok_ow")
+    assert lines == [
+        "HH AY1 G R AA1 K @hi_grok",
+        "HH AY1 G R OW1 K @hi_grok_ow",
+        "HH AY1 G R AO1 K @hi_grok_ao",
+        "HH AY1 G R AH1 K @hi_grok_ah",
+    ]
+    # Every variant tag counts as the wake word.
+    for tag in ("hi_grok", "hi_grok_ow", "hi_grok_ao", "hi_grok_ah"):
+        assert spotter._result_matches(tag)
+    assert not spotter._result_matches("hey_groki")
+
+
+def test_hey_groki_phrase_switches_to_the_optional_keyword(monkeypatch, tmp_path) -> None:
+    from stackchan_mcp import wake_gate
+
+    _clear_wake_env(monkeypatch)
+    monkeypatch.setenv("STACKCHAN_WAKE_PHRASE", "Hey Groki")
+    assert wake_gate._keyword_from_env() == "HH EY1 G R OW1 K IY0 @hey_groki"
+
+    model_dir = _fake_kws_model(monkeypatch, tmp_path)
+    spotter = SherpaOnnxKeywordSpotter(
+        model_dir=model_dir,
+        keyword=wake_gate._keyword_from_env(),
+        phrase=wake_gate._phrase_from_env(),
+    )
+    lines = (model_dir / "stackchan_keywords.txt").read_text(encoding="utf-8").splitlines()
+    assert lines == [
+        "HH EY1 G R OW1 K IY0 @hey_groki",
+        "HH EY1 G R AA1 K IY0 @hey_groki_aa",
+        "HH EY1 G R AO1 K IY0 @hey_groki_ao",
+        "HH EY1 G R AH1 K IY0 @hey_groki_ah",
+    ]
+    for tag in ("hey_groki", "hey_groki_aa", "hey_groki_ao", "hey_groki_ah"):
+        assert spotter._result_matches(tag)
+    assert not spotter._result_matches("hi_grok")
 
 
 def test_custom_wake_keyword_is_written_alone(monkeypatch) -> None:
