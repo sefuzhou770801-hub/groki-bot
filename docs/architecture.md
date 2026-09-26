@@ -91,7 +91,7 @@ A wrong token is rejected with HTTP 401 (`ESP32 auth rejected` in the gateway lo
 
 **Audio.** Uplink: Opus, 16 kHz mono, 60 ms frames, as binary WebSocket messages. On the gateway the wake word detector (sherpa-onnx, runs locally) listens first; only after "Hi Grok" (or "Hey Groki" with `STACKCHAN_WAKE_PHRASE=hey groki`) is audio forwarded to Gemini, and the listening window closes after `STACKCHAN_WAKE_IDLE_S` seconds of silence. Downlink: Gemini's reply audio is encoded to Opus (24 kHz, 60 ms) and sent back with `tts` state messages so the robot knows when speech starts and stops.
 
-**Gemini Live.** The gateway keeps one Gemini Live session (`GEMINI_API_KEY`, model `gemini-3.8-live`, voice `Kore` by default) and gives Gemini a small set of function-calling tools: `end_conversation`, `get_current_datetime`, `ask_claude` when the `claude` CLI is installed (`STACKCHAN_ASK_CLAUDE=0` turns it off), and, when you turn them on, Mac control tools and `ask_grokbot`.
+**Gemini Live.** The gateway keeps one Gemini Live session (`GEMINI_API_KEY`, model `gemini-3.8-live`, voice `Kore` by default) and gives Gemini a small set of function-calling tools: `end_conversation`, `get_current_datetime`, `ask_claude` when the `claude` CLI is installed (`STACKCHAN_ASK_CLAUDE=0` turns it off), and, when you turn them on, Mac control tools and `ask_grokbot`. With `STACKCHAN_GEMINI_DEVICE_TOOLS=1` Gemini also gets `move_head`, `set_avatar`, `set_all_leds` and `express_emotion`; because the Groki Bot firmware has no MCP, the gateway sends these as the XiaoZhi messages `head` (firmware newer than v0.2.1), `llm` with an emotion, and `led`.
 
 **HTTP on port 8766.**
 
