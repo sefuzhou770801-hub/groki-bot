@@ -82,6 +82,10 @@ enum class ConversationEventType : std::uint8_t {
     // 后端要求把底座 LED 灯带切成一个纯色；`led_r` / `led_g` / `led_b`
     // 携带 8 位 RGB 通道，实际硬件路径由应用层负责。
     LedColor,
+    // XiaoZhi gateway `head` message: turn the head to `head_yaw` /
+    // `head_pitch` degrees at `head_speed`. The application clamps to the
+    // per-device servo limits.
+    HeadPose,
     // Backend warned that the current connection will be terminated soon
     // (Gemini Live `goAway` message — currently fires near the 15-min audio
     // session cap, but the server may send it at any time). The application
@@ -114,6 +118,9 @@ struct ConversationEvent {
     std::uint8_t led_r{0};
     std::uint8_t led_g{0};
     std::uint8_t led_b{0};
+    float head_yaw{0};
+    float head_pitch{0};
+    std::uint16_t head_speed{0};
     // `esp_timer_get_time()` at emit, in microseconds. Used by the conv-task
     // to measure event-queue latency (`now_us() - emit_us`) when diagnosing
     // audio pipeline stalls. 0 if the producer didn't set it.

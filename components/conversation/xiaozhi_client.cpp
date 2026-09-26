@@ -26,6 +26,7 @@
 #include "esp_audio_types.h"
 #include "esp_opus_dec.h"
 #include "esp_opus_enc.h"
+#include "conversation/control_dispatch.hpp"
 #include "psram_allocator.hpp"
 #include "ws_extra_headers.hpp"
 
@@ -610,32 +611,33 @@ private:
                      static_cast<int>(snip), json, snip < len ? "…" : "");
             ++rx_log_count_;
         }
-        cJSON* root = cJSON_ParseWithLength(json, len);
-        if (root == nullptr) {
-            ESP_LOGW(kTag, "json parse failed");
-            return;
-        }
-        const char* type = json_str(root, "type");
-        if (type == nullptr) {
-            cJSON_Delete(root);
-            return;
-        }
-
-        if (std::strcmp(type, "hello") == 0) {
-            handle_server_hello(root);
-        } else if (std::strcmp(type, "stt") == 0) {
-            emit_text(ConversationEventType::UserTranscript, json_str(root, "text"));
-        } else if (std::strcmp(type, "llm") == 0) {
-            emit_text(ConversationEventType::AssistantEmotion, json_str(root, "emotion"));
-        } else if (std::strcmp(type, "led") == 0) {
-            handle_led(root);
-        } else if (std::strcmp(type, "tts") == 0) {
-            handle_tts(root);
-        } else if (std::strcmp(type, "system") == 0 || std::strcmp(type, "alert") == 0) {
-            ESP_LOGI(kTag, "server %s: %s", type,
-                     json_str(root, "message") ? json_str(root, "message") : "");
-        }
-        cJSON_Delete(root);
+        conversation::parse_control(
+            json, len,
+            [this](const HeadCommand& head) {
+                ConversationEvent ev{};
+                ev.type = ConversationEventType::HeadPose;
+                ev.head_yaw = head.yaw;
+                ev.head_pitch = head.pitch;
+                ev.head_speed = head.speed;
+                emit(ev);
+            },
+            [this](const char* type, const cJSON* root) {
+                if (std::strcmp(type, "hello") == 0) {
+                    handle_server_hello(root);
+                } else if (std::strcmp(type, "stt") == 0) {
+                    emit_text(ConversationEventType::UserTranscript, json_str(root, "text"));
+                } else if (std::strcmp(type, "llm") == 0) {
+                    emit_text(ConversationEventType::AssistantEmotion, json_str(root, "emotion"));
+                } else if (std::strcmp(type, "led") == 0) {
+                    handle_led(root);
+                } else if (std::strcmp(type, "tts") == 0) {
+                    handle_tts(root);
+                } else if (std::strcmp(type, "system") == 0 || std::strcmp(type, "alert") == 0) {
+                    ESP_LOGI(kTag, "server %s: %s", type,
+                             json_str(root, "message") ? json_str(root, "message") : "");
+                }
+            },
+            [](const char* error) { ESP_LOGW(kTag, "%s", error); });
     }
 
     void handle_led(const cJSON* root)

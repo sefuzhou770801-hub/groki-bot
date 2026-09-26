@@ -796,7 +796,7 @@ extern "C" void app_main()
 
 #if CONFIG_STACKCHAN_CONVERSATION_ENABLED
     g_conversation_args = new stackchan::app::ConversationTaskArgs{
-        .state = g_state, .api_key = api_key, .provider = cfg.provider, .touch = head_touch,
+        .state = g_state, .limits = servo_limits, .api_key = api_key, .provider = cfg.provider, .touch = head_touch,
         .xiaozhi_url = xiaozhi_url, .xiaozhi_token = xiaozhi_token,
         .system_prompt = cfg.system_prompt.c_str(),
         .extra_headers = cfg.conv_extra_headers.c_str(),

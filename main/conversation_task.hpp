@@ -9,6 +9,7 @@
 
 #include "board/si12t_touch.hpp"
 #include "config_service/config_service.hpp"
+#include "servo_limits.hpp"
 #include "shared_state.hpp"
 
 namespace stackchan::app {
@@ -22,6 +23,7 @@ constexpr std::size_t kConversationSegmentBuffers = 3;
 
 struct ConversationTaskArgs {
     SharedState* state;
+    ServoLimits limits{};         // per-device servo range for gateway head commands
     const char* api_key;          // API key for the chosen provider; empty disables the task
     config::Provider provider;    // selects OpenAI Realtime / Gemini Live / XiaoZhi
     board::Si12tTouch* touch;     // top touch sensor for barge-in; may be null
