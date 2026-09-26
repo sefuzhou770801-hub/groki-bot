@@ -1,4 +1,4 @@
-# Common defaults for stackchan-idf (target-independent).
+# Common defaults for the Groki Bot firmware (target-independent).
 # Per-target overrides live in sdkconfig.defaults.<target>.
 
 # OTA-friendly partition layout (see partitions.csv).

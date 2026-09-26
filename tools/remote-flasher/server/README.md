@@ -1,4 +1,4 @@
-# stackchan-idf remote-flasher: host server
+# Groki Bot remote-flasher: host server
 
 VPN 越しの ブラウザに WebSerial + esptool-js を担当させて、ローカルの
 `idf.py` ラッパから 実機 (CoreS3) を flash するための host 中継サーバー。

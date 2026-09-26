@@ -11,8 +11,8 @@
 //   3. JSON parsing on the response landed correctly (cJSON handles the
 //      few KB Telegram returns without issues, but worth confirming)
 //
-// Once that's confirmed we replace this with a polling task + sink, per
-// PLAN.md §2.
+// Once that's confirmed, this is meant to become a polling task that feeds
+// incoming messages to a sink.
 
 #include "telegram/telegram.hpp"
 

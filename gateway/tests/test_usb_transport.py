@@ -267,7 +267,7 @@ async def test_call_tool_before_start_raises(tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_call_tool_raises_on_jsonrpc_error(tmp_path: Path):
-    """Codex U9 P2.1: an error envelope must surface as UsbToolError so
+    """An error envelope must surface as UsbToolError so
     TrackingBridge's generic except triggers the WS fallback."""
     factory = FakeSerialFactory()
     transport = UsbTransport(
@@ -304,7 +304,7 @@ async def test_call_tool_raises_on_jsonrpc_error(tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_disconnect_fails_pending_immediately(tmp_path: Path):
-    """Codex U9 P1.2: a yanked cable mid-call must surface ConnectionError
+    """A yanked cable mid-call must surface ConnectionError
     right away, not wait the full timeout. Otherwise TrackingBridge sits on
     300 ms of dead air per frame before falling back to WS."""
     factory = FakeSerialFactory()

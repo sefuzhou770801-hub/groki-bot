@@ -482,7 +482,7 @@ struct SettingsHooks {
 // individual setters below plus set_board_kind.
 void set_settings_hooks(const SettingsHooks& hooks);
 
-// --- Generic immediate-apply notification (settings redesign, 案C) ----------
+// --- Generic immediate-apply notification ----------------------------------
 // One hook for ALL settings that take effect at runtime, replacing the per-
 // setting bespoke sinks. Any transport, after an immediate write (in-RAM
 // config updated + persisted via store::save_one), calls notify_config_change

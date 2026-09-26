@@ -486,7 +486,8 @@ int main() {
     }
 
     // Expression and ExprValue are the same u8 protocol. 0-5 stay the
-    // original six; KK faces occupy 6-12. Neutral is KK Idle.
+    // original six; the extended expressions occupy 6-12. Idle is an alias
+    // of Neutral.
     {
         using stackchan::avatar::Expression;
         CHECK(static_cast<int>(Expression::Neutral) == 0);

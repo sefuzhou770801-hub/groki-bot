@@ -205,8 +205,9 @@ async def test_idle_start_is_idempotent_for_double_entry(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_idle_disabled_by_default_so_firmware_owns_idle():
-    """默认 STACKCHAN_GATEWAY_IDLE_ENABLED=0 — 固件 IdleMotionModifier
-    负责 idle，网关不发 set_head_angles。回归方案 §6 U6。"""
+    """STACKCHAN_GATEWAY_IDLE_ENABLED defaults to 0: the firmware's
+    IdleMotionModifier owns idle motion and the gateway sends no
+    set_head_angles."""
     esp32 = FakeESP32()
     idle = IdleBehavior(esp32, rng=random.Random(1))
     await idle.start()

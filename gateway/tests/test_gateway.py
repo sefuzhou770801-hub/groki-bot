@@ -85,7 +85,7 @@ async def test_gateway_start_stop(monkeypatch):
 async def test_track_endpoint_forwards_to_tracking_bridge():
     """POST /track on the capture server reaches TrackingBridge.handle_detection.
 
-    Regression for v4 U4: Vision Tracker's live-view server fans a face
+    Face-tracker fan-out: the vision tracker (or its live-view server) posts a face
     detection to http://gateway:8766/track, and the gateway routes it into
     the singleton TrackingBridge. Replace handle_detection with a recorder
     so we don't need real servos.

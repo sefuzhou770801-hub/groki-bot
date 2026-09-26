@@ -2,7 +2,7 @@
 name = "audio-cli"
 version = "0.1.0"
 edition = "2021"
-description = "BLE audio streaming CLI for stackchan-idf — mirrors the settings.html protocol so the browser path can be bypassed when debugging disconnects."
+description = "BLE audio streaming CLI for the Groki Bot firmware — mirrors the settings.html protocol so the browser path can be bypassed when debugging disconnects."
 
 [dependencies]
 btleplug = "0.11"

@@ -5,7 +5,7 @@
   "mcpServers": {
     "stackchan": {
       "command": "bun",
-      "args": ["/absolute/path/to/stackchan-idf/tools/stackchan-channel/index.ts"],
+      "args": ["/absolute/path/to/groki-bot/tools/stackchan-channel/index.ts"],
       "env": {
         "STACKCHAN_URL": "http://192.168.x.x",
         "STACKCHAN_TOKEN": "<paste-the-token-from-sdkconfig.defaults.local-here>"

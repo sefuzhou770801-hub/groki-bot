@@ -37,12 +37,10 @@ logger = logging.getLogger(__name__)
 class UsbToolError(RuntimeError):
     """Raised when the firmware MCP server returns a JSON-RPC error response.
 
-    Codex U9 review P2.1: call_tool used to set_result on the raw response,
-    which means a tools/call that returned {"error": {...}} silently looked
-    like a success — TrackingBridge would think the head moved and never
-    fall back to WS. Now an error response is surfaced as this exception,
-    which the generic except in TrackingBridge._send_head_angles catches
-    and triggers the WebSocket fallback.
+    Without it a tools/call that returned {"error": {...}} would look like a
+    success: TrackingBridge would think the head moved and never fall back to
+    WS. The generic except in TrackingBridge._send_head_angles catches this
+    exception and uses the WebSocket fallback.
     """
 
     def __init__(self, code: int, message: str, data: Any = None) -> None:
@@ -280,7 +278,7 @@ class UsbTransport:
             finally:
                 self._serial = None
                 self._signal_event(self._connected_event_clear)
-                # Codex U9 review P1.2: fail every in-flight RPC immediately
+                # Fail every in-flight RPC immediately on disconnect
                 # so callers (TrackingBridge) skip the 300 ms USB timeout and
                 # fall back to WS within the same tick. Without this a yanked
                 # cable + new face frame waits the full timeout AND lets the

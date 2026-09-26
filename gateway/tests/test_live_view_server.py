@@ -42,7 +42,7 @@ def test_live_view_html_contains_camera_and_controls():
 def test_live_view_forward_to_gateway_uses_configured_url():
     """LiveViewState.forward_to_gateway POSTs to STACKCHAN_GATEWAY_TRACK_URL.
 
-    Regression for v4 U4: calibration UI shares face detections with the
+    Face-tracker fan-out: the live view shares face detections with the
     gateway's TrackingBridge by HTTP POST so a single Vision Tracker pass
     drives both the local visualiser and the physical head.
     """

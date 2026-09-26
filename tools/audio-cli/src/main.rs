@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
 // SPDX-License-Identifier: BSL-1.0
 //
-// BLE audio streaming CLI for stackchan-idf. Implements the same protocol
+// BLE audio streaming CLI for the Groki Bot firmware. Implements the same protocol
 // the browser side of tools/settings.html does: scan for a `Stackchan-*`
 // peripheral, run an X25519 + AES-256-GCM handshake on the KeyExchange
 // chr, then stream AAC ADTS bytes on the AudioData chr framed by the

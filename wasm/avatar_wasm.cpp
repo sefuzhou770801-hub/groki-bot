@@ -238,7 +238,7 @@ EMSCRIPTEN_KEEPALIVE int avatar_width() { return g_w; }
 EMSCRIPTEN_KEEPALIVE int avatar_height() { return g_h; }
 EMSCRIPTEN_KEEPALIVE std::uint16_t* avatar_framebuffer() { return g_canvas.getBuffer(); }
 
-// expression: 0-5 original six, 6-12 KK faces. Neutral is KK Idle.
+// expression: 0-5 original six, 6-12 extended expressions. Idle is an alias of Neutral.
 EMSCRIPTEN_KEEPALIVE void avatar_set_expression(int e)
 {
     if (e < 0) e = 0;

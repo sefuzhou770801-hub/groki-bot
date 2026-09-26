@@ -59,13 +59,13 @@ SemaphoreHandle_t g_mutex = nullptr;
 config::DeviceConfig g_active;
 config::StagedConfig g_staging;
 
-// [settings redesign 案C] Immediate-apply path. For settings that take effect
+// Immediate-apply path. For settings that take effect
 // at runtime (no reboot): update the live config (g_active becomes live for
 // this key), persist just that key, and fire the generic change hook so the
 // subsystem reflects it now. Replaces g_staging.set_* for Immediate settings.
-// (Phase 1: HTTP only. BLE stays staged for these until Phase 2; a BLE Apply
-// in the same session could still re-save the boot value — see the design memo
-// §互換性 / Phase 3 g_active unification.)
+// Only the HTTP transport uses this path; BLE still stages these settings, so a
+// BLE Apply in the same session can re-save the boot value until g_active and
+// the BLE staging path are unified.
 void apply_immediate_num(const char* id, std::uint32_t v)
 {
     const auto* d = config::registry::find(id);

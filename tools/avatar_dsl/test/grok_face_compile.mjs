@@ -32,7 +32,7 @@ for (const side of ['l', 'r']) {
   }
 }
 if (SymbolicConsts.NEUTRAL !== 0 || SymbolicConsts.IDLE !== 0) {
-  throw new Error('Neutral/Idle must stay 0 (KK Idle)');
+  throw new Error('Neutral/Idle must stay 0 (Idle is an alias of Neutral)');
 }
 if (SymbolicConsts.SLEEPY !== 5) {
   throw new Error('original six must keep Sleepy = 5');

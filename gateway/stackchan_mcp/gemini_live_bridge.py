@@ -6,7 +6,7 @@ set_avatar, set_all_leds) via function calling. Audio in goes to Gemini, audio
 out comes back as PCM, and any tool call is dispatched to the same ESP32
 manager the rest of the gateway uses.
 
-POC scope (v4 U6):
+What this module covers:
 - Configurable system instruction (overridable by callers, plus an optional
   personality file, see STACKCHAN_PERSONALITY_FILE).
 - Three function declarations matched to ESP32 MCP tools.
@@ -14,7 +14,7 @@ POC scope (v4 U6):
 - send_audio() entry point so an external mic source can stream PCM.
 - start()/stop() lifecycle for an asyncio context.
 
-Not in v4 POC scope:
+Not covered here:
 - 15-min session auto-resume.
 - Built-in microphone capture (callers supply 16 kHz PCM).
 - TTS-out → device speaker pipeline (callers receive the 24 kHz PCM stream).
@@ -781,7 +781,7 @@ def build_live_config(
     session_resumption_handle: str | None = None,
     model: str = DEFAULT_MODEL,
 ) -> Any:
-    """Construct the LiveConnectConfig POC uses for setup.
+    """Construct the LiveConnectConfig used for session setup.
 
     response_modality:
       - "AUDIO" (default): Gemini emits 24 kHz PCM. Caller supplies on_audio

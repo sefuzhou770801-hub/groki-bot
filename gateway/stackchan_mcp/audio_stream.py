@@ -1,6 +1,6 @@
 """Opus audio frame forwarding for the StackChan voice proxy.
 
-The gateway doesn't decode Opus in U0.  It forwards binary frames between the
+The gateway does not decode Opus here.  It forwards binary frames between the
 ESP32 and the xiaozhi cloud WebSocket while keeping the local MCP channel alive.
 """
 
@@ -99,7 +99,7 @@ async def forward_cloud_audio_frame(data: bytes, send_to_device: Any) -> bool:
 async def send_audio_frame(data: bytes) -> bytes:
     """Prepare an outgoing Opus frame.
 
-    U0 proxies already-encoded Opus bytes.  Future speak/TTS engines can replace
+    Frames are already Opus-encoded and pass through unchanged.  A TTS engine can replace
     this with an encoder or packet wrapper without touching callers.
     """
     return data
