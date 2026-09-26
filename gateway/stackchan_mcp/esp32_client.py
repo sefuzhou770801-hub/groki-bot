@@ -353,6 +353,14 @@ class ESP32Manager:
         return self._connection is not None and self._connection.connected
 
     @property
+    def mcp_supported(self) -> bool:
+        """False only while a voice-only (features.mcp=false) device is connected."""
+        conn = self._connection
+        if conn is None or not conn.connected:
+            return True
+        return bool(getattr(conn, "mcp_supported", True))
+
+    @property
     def usb_connected(self) -> bool:
         usb = self.usb_transport
         return usb is not None and bool(getattr(usb, "connected", False))
@@ -472,7 +480,10 @@ class ESP32Manager:
                     continue
 
                 msg_type = data.get("type", "")
-                self._observe_device_state(data)
+                # A replaced socket can still deliver queued TTS events. Only
+                # the current device may update its speaking state.
+                if connection is self._connection:
+                    self._observe_device_state(data)
 
                 if msg_type == "hello":
                     # ESP32 hello handshake
@@ -528,9 +539,14 @@ class ESP32Manager:
 
                     # Register connection
                     async with self._lock:
-                        if self._connection and self._connection.connected:
-                            logger.warning("Replacing existing ESP32 connection")
+                        if self._connection is not None and self._connection is not connection:
+                            if self._connection.connected:
+                                logger.warning("Replacing existing ESP32 connection")
                             self._connection.disconnect()
+                            # The old handler's finally no longer owns _connection,
+                            # so release its device and local speaking sources now.
+                            self._debug_status.on_tts_state(False, source="device")
+                            self._debug_status.on_tts_state(False, source="local")
                         self._connection = connection
                         self._debug_status.on_device_connected(device_id)
 
@@ -575,6 +591,8 @@ class ESP32Manager:
                 if self._connection is connection:
                     self._connection = None
                     self._debug_status.on_device_disconnected()
+                    self._debug_status.on_tts_state(False, source="local")
+                    self._debug_status.on_tts_state(False, source="device")
 
     async def _init_device(self, connection: ESP32Connection, device_id: str) -> None:
         """Initialize MCP session with a newly connected device."""
@@ -640,7 +658,7 @@ class ESP32Manager:
                     "isError": False,
                 }
                 error = None
-            elif self._local_tool_handler is not None and tool_name in {"say", "set_voice_mode", "gemini_say"}:
+            elif self._local_tool_handler is not None and tool_name in {"say", "set_voice_mode", "gemini_say", "set_face_tracking"}:
                 try:
                     local_result = self._local_tool_handler(
                         tool_name,
@@ -803,10 +821,21 @@ class ESP32Manager:
         into ``kDeviceStateSpeaking`` and back; see
         :meth:`ESP32Connection.send_tts_state` for the full rationale.
         """
-        if not self._connection or not self._connection.connected:
+        connection = self._connection
+        if not connection or not connection.connected:
             raise ConnectionError("No ESP32 device connected")
         self._observe_outgoing_tts_state(state)
-        await self._connection.send_tts_state(state)
+        if state == "start":
+            self._debug_status.on_tts_state(True, source="local")
+        try:
+            await connection.send_tts_state(state)
+        except BaseException:
+            if state == "start" and self._connection is connection:
+                self._debug_status.on_tts_state(False, source="local")
+            raise
+        finally:
+            if state == "stop" and self._connection is connection:
+                self._debug_status.on_tts_state(False, source="local")
 
     async def speak(self, text: str, emotion: str | None = None) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         """Speak through the connected ESP32 device."""
@@ -836,9 +865,11 @@ class ESP32Manager:
                     callback("idle")
         elif msg_type == "tts":
             if state == "start":
+                self._debug_status.on_tts_state(True, source="device")
                 if callback is not None:
                     callback("speaking")
             elif state == "stop":
+                self._debug_status.on_tts_state(False, source="device")
                 if callback is not None:
                     callback("idle")
 

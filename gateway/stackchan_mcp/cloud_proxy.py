@@ -17,6 +17,8 @@ from typing import Any
 
 import websockets
 
+from .debug_status import DebugStatus, get_debug_status
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_CLOUD_URL = "wss://api.tenclass.net/xiaozhi/v1/"
@@ -71,6 +73,7 @@ class CloudProxy:
     """Bidirectional proxy between one ESP32 connection and xiaozhi cloud."""
 
     voice_bridge: Any | None = None
+    debug_status: DebugStatus | None = None
     connect_factory: Any = websockets.connect
     info: CloudConnectionInfo | None = None
     server_hello: dict[str, Any] | None = None
@@ -84,6 +87,10 @@ class CloudProxy:
     _ready_event: asyncio.Event = field(default_factory=asyncio.Event)
     _active_tts: dict[str, Any] | None = None
     _device_hello: dict[str, Any] | None = None
+
+    @property
+    def _status(self) -> DebugStatus:
+        return self.debug_status or get_debug_status()
 
     @property
     def connected(self) -> bool:
@@ -136,6 +143,8 @@ class CloudProxy:
             except asyncio.CancelledError:
                 pass
         self._proxy_to_cloud_id.clear()
+        self._status.on_tts_state(False, source="xiaozhi")
+        self._status.on_tts_state(False, source="xiaozhi_request")
 
     async def ensure_connected(self) -> bool:
         """Reconnect the xiaozhi cloud socket if it closed while ESP32 stayed online."""
@@ -198,6 +207,7 @@ class CloudProxy:
                 "error": None,
             }
             self._active_tts = state
+            self._status.on_tts_state(True, source="xiaozhi_request")
             try:
                 if emotion and self._send_to_device is not None:
                     await self._send_to_device(json.dumps({"type": "llm", "emotion": emotion}, ensure_ascii=False))
@@ -222,6 +232,7 @@ class CloudProxy:
                 state["error"] = str(exc)
             finally:
                 self._active_tts = None
+                self._status.on_tts_state(False, source="xiaozhi_request")
 
             return {
                 "ok": not state["error"] and state["frames_sent"] > 0,
@@ -280,6 +291,8 @@ class CloudProxy:
             self._ready_event.set()
         finally:
             self._ws = None
+            self._status.on_tts_state(False, source="xiaozhi")
+            self._status.on_tts_state(False, source="xiaozhi_request")
             self._ready_event.set()
 
     async def _wait_until_ready(self) -> None:
@@ -306,6 +319,9 @@ class CloudProxy:
             return
 
         self._observe_tts_json(message)
+        tts_state = message.get("state") if msg_type == "tts" else None
+        if tts_state == "start":
+            self._status.on_tts_state(True, source="xiaozhi")
         if self._active_tts is not None and msg_type == "stt":
             logger.debug("suppressing prompt STT during local speak request")
             return
@@ -320,6 +336,8 @@ class CloudProxy:
             message = self._remap_cloud_mcp_request(message)
 
         await self._forward_cloud_json(message)
+        if tts_state == "stop":
+            self._status.on_tts_state(False, source="xiaozhi")
 
     def _remap_cloud_mcp_request(self, message: dict[str, Any]) -> dict[str, Any]:
         payload = message.get("payload")

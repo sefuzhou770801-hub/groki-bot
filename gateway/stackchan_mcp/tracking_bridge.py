@@ -46,11 +46,15 @@ class TrackingBridge:
         on_face_detected: Callable[[], None] | None = None,
         on_auto_head_command: Callable[[], None] | None = None,
         on_head_command: Callable[[], None] | None = None,
+        is_tts_active: Callable[[], bool] | None = None,
+        is_listening: Callable[[], bool] | None = None,
     ) -> None:
         self.esp32 = esp32
         self.config = config or TrackingConfig()
         self.enabled = True
-        self.mode = "idle"
+        self._mode = "idle"
+        self._is_tts_active = is_tts_active
+        self._is_listening = is_listening
         neutral = float(self.config.neutral_pitch)
         self._yaw = self._output_yaw = self._segment_start_yaw = self._segment_end_yaw = self._cached_yaw = 0.0
         self._pitch = self._output_pitch = self._segment_start_pitch = self._segment_end_pitch = self._cached_pitch = neutral
@@ -67,6 +71,18 @@ class TrackingBridge:
         # Backward-compatible alias: tracking head writes are automatic
         # control, not manual user move_head commands.
         self._on_auto_head_command = on_auto_head_command or on_head_command
+
+    @property
+    def mode(self) -> str:
+        if self._is_tts_active is not None and self._is_tts_active():
+            return "working"
+        if self._is_listening is not None and self._is_listening():
+            return "quiet"
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: str) -> None:
+        self._mode = value
 
     async def stop(self) -> None:
         if self._resample_task is None:
@@ -113,7 +129,24 @@ class TrackingBridge:
                 logger.warning("USB set_head_angles failed (%s); WS fallback", exc)
         await self._call_esp32_head(args)
 
+    def _esp32_voice_only(self) -> bool:
+        return getattr(self.esp32, "mcp_supported", True) is False
+
     async def _call_esp32_head(self, args: dict[str, Any]) -> None:
+        send_head = getattr(self.esp32, "send_head", None)
+        if callable(send_head) and self._esp32_voice_only():
+            # Voice-only firmware rejects MCP set_head_angles; use the WS
+            # ``head`` message, same fallback as Gemini's move_head.
+            _result, error = await send_head(
+                args["yaw"],
+                args["pitch"],
+                args["speed"],
+                notify_activity=False,
+                notify_head_command=False,
+            )
+            if error:
+                logger.debug("WS head send failed: %s", error.get("message", error))
+            return
         try:
             await self.esp32.call_tool(
                 "self.robot.set_head_angles",
@@ -219,7 +252,9 @@ class TrackingBridge:
         if now is None:
             now = asyncio.get_running_loop().time()
         if (
-            self._last_target_update_s is None
+            self.mode in {"working", "quiet"}
+            or not self.enabled
+            or self._last_target_update_s is None
             or now - self._last_target_update_s > self.STALE_TARGET_S
             or not self._device_reachable()
         ):

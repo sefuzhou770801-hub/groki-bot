@@ -100,6 +100,7 @@ class GeminiVoiceProxy:
     wake_gate_factory: Callable[[], WakeGate | None] | None = None
     on_head_command: Callable[[], None] | None = None
     on_device_state: Callable[[str], None] | None = None
+    set_face_tracking: Callable[[bool], Awaitable[dict[str, Any]]] | None = None
     debug_status: DebugStatus | None = None
 
     info: CloudConnectionInfo | None = None
@@ -329,6 +330,7 @@ class GeminiVoiceProxy:
             usb_transport=self.usb_transport,
             on_head_command=self.on_head_command,
             wake_gate_state_getter=self._wake_gate_state,
+            set_face_tracking=self.set_face_tracking,
             debug_status=self._status,
         )
         try:

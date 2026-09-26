@@ -120,6 +120,11 @@ class DebugStatus:
     # ---- audio ----
     last_device_audio_at: float | None = None
     tts_active: bool = False
+    _tts_sources: set[str] = field(default_factory=set, repr=False)
+
+    # ---- face tracking ----
+    # Set by the gateway; returns the "face_tracking" section of the snapshot.
+    face_tracking_provider: Callable[[], dict[str, Any]] | None = field(default=None, repr=False)
 
     # ---- recent ----
     recent_tool_calls: deque[dict[str, Any]] = field(
@@ -272,8 +277,13 @@ class DebugStatus:
     def on_device_audio(self) -> None:
         self.last_device_audio_at = self.clock()
 
-    def on_tts_state(self, active: bool) -> None:
-        self.tts_active = active
+    def on_tts_state(self, active: bool, *, source: str = "gemini") -> None:
+        """Merge independent speakers so one backend cannot clear another's TTS."""
+        if active:
+            self._tts_sources.add(source)
+        else:
+            self._tts_sources.discard(source)
+        self.tts_active = bool(self._tts_sources)
 
     # ---- recent 埋点 ----
 
@@ -336,6 +346,9 @@ class DebugStatus:
                 "last_device_audio_at": self.last_device_audio_at,
                 "tts_active": self.tts_active,
             },
+            "face_tracking": (
+                self.face_tracking_provider() if self.face_tracking_provider is not None else None
+            ),
             "recent": {
                 "tool_calls": list(reversed(self.recent_tool_calls)),
                 "transcripts": list(reversed(self.recent_transcripts)),

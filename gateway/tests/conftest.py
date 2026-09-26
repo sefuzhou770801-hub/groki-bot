@@ -35,6 +35,13 @@ def asyncio_test(item):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_face_tracker(monkeypatch):
+    """Gateway tests never launch the real Mac camera face tracker."""
+    monkeypatch.setenv("STACKCHAN_FACE_TRACKER_AUTOSTART", "0")
+    monkeypatch.delenv("STACKCHAN_FACE_TRACKER_CAMERA", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _reset_debug_status():
     """Keep the process-wide debug snapshot from leaking across tests."""
     from stackchan_mcp.debug_status import reset_debug_status
