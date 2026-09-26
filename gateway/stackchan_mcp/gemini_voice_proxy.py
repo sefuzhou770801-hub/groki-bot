@@ -595,7 +595,7 @@ class GeminiVoiceProxy:
             await bridge.send_audio(chunk)
 
     async def _handle_session_dead(self) -> None:
-        """Session reconnect exceeded the audio-cache TTL: close listen and 报死."""
+        """Session reconnect exceeded the audio-cache TTL: close listening and report that the session could not be resumed."""
         self._reported_dead = True
         try:
             gate = self._wake_gate

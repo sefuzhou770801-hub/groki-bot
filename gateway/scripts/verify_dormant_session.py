@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""手动验证 DORMANT 静默期间 Gemini 会话行为（D1 交付验收辅助）。
+"""Verify Gemini session behaviour while the wake gate is dormant.
 
-用法（网关须已在运行，且唤醒词闸门可用）::
+Usage (the gateway must be running with the wake word gate available)::
 
     cd gateway && uv run python scripts/verify_dormant_session.py
     cd gateway && uv run python scripts/verify_dormant_session.py --minutes 12
 
-判定口径：：
+What is checked:
 
-* 手动 VAD 已启用（``STACKCHAN_MANUAL_VAD`` 默认 1）：真实语音走
-  activity_start/activity_end，不再发送周期静音 PCM 保活。
-* DORMANT 空闲期间服务端仍可能按生命周期发 1008；本脚本观测
-  ``reconnect_1008_count`` 与 ``reconnect_receive_stall_count`` 是否异常增长。
-* 10+ 分钟静默后 ``reconnect_receive_stall_count`` 应为 0（D3 兜底未误触发）。
+* Manual VAD is on (``STACKCHAN_MANUAL_VAD`` defaults to 1): real speech is
+  bracketed by activity_start/activity_end, and no periodic silent PCM is
+  sent to keep the session alive.
+* While DORMANT the server may still close the session with 1008 as part of
+  its normal lifecycle; the script watches whether ``reconnect_1008_count``
+  and ``reconnect_receive_stall_count`` grow unexpectedly.
+* After 10+ minutes of silence ``reconnect_receive_stall_count`` must still
+  be 0 (the receive-stall fallback did not fire by mistake).
 
-退出码：0 = 观测完成且指标在预期内；1 = 网关不可达或指标异常。
+Exit code: 0 = observation finished and the counters are as expected;
+1 = gateway unreachable or a counter is off.
 """
 
 from __future__ import annotations
@@ -34,30 +38,30 @@ def fetch_status(base_url: str) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="观测 DORMANT 期间 Gemini 会话指标")
+    parser = argparse.ArgumentParser(description="Watch Gemini session counters while the wake gate is dormant")
     parser.add_argument(
         "--base-url",
         default="http://127.0.0.1:8766",
-        help="网关 capture server 根地址",
+        help="Base URL of the gateway capture server",
     )
     parser.add_argument(
         "--minutes",
         type=float,
         default=10.0,
-        help="观测窗口（分钟）",
+        help="Observation window in minutes",
     )
     parser.add_argument(
         "--poll-s",
         type=float,
         default=30.0,
-        help="轮询间隔（秒）",
+        help="Polling interval in seconds",
     )
     args = parser.parse_args()
 
     try:
         baseline = fetch_status(args.base_url)
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        print(f"FAIL: 无法读取 {args.base_url}/debug/status: {exc}")
+        print(f"FAIL: cannot read {args.base_url}/debug/status: {exc}")
         return 1
 
     gemini0 = baseline.get("gemini", {})
@@ -66,12 +70,12 @@ def main() -> int:
     stall_0 = int(gemini0.get("reconnect_receive_stall_count", 0))
     keepalive_running = bool(gemini0.get("keepalive_running"))
 
-    print("=== DORMANT 会话观测基线 ===")
+    print("=== Baseline (wake gate dormant) ===")
     print(f"wake_state={wake0.get('state')} keepalive_running={keepalive_running}")
     print(f"reconnect_1008_count={c1008_0}")
     print(f"reconnect_receive_stall_count={stall_0}")
     print(f"has_resumption_handle={gemini0.get('has_resumption_handle')}")
-    print(f"观测 {args.minutes:.1f} 分钟，每 {args.poll_s:.0f}s 轮询…")
+    print(f"Watching for {args.minutes:.1f} min, polling every {args.poll_s:.0f}s...")
 
     deadline = time.time() + args.minutes * 60.0
     last = baseline
@@ -80,7 +84,7 @@ def main() -> int:
         try:
             last = fetch_status(args.base_url)
         except (urllib.error.URLError, TimeoutError) as exc:
-            print(f"WARN: 轮询失败: {exc}")
+            print(f"WARN: poll failed: {exc}")
             continue
         g = last.get("gemini", {})
         print(
@@ -96,27 +100,27 @@ def main() -> int:
     delta_1008 = c1008_1 - c1008_0
     delta_stall = stall_1 - stall_0
 
-    print("=== 观测结果 ===")
+    print("=== Result ===")
     print(f"Δ reconnect_1008_count = {delta_1008}")
     print(f"Δ reconnect_receive_stall_count = {delta_stall}")
 
     ok = True
     if delta_stall > 0:
-        print("FAIL: 接收活性兜底误触发（D3）")
+        print("FAIL: the receive-stall fallback fired during silence")
         ok = False
     if keepalive_running:
         print(
-            "NOTE: 实验性静音保活仍在运行；"
-            "默认应停用（STACKCHAN_GEMINI_KEEPALIVE_S 未设置或为 0）"
+            "NOTE: the experimental silent keepalive is still running; "
+            "it should be off by default (STACKCHAN_GEMINI_KEEPALIVE_S unset or 0)"
         )
     if delta_1008 > 0:
         print(
-            "NOTE: DORMANT 期间出现 1008 重连。"
-            "手动 VAD 不伪造空闲 activity，此为可预期生命周期事件；"
-            "请结合 has_resumption_handle / last_reconnect_used_handle 评估上下文损失。"
+            "NOTE: a 1008 reconnect happened while dormant. "
+            "Manual VAD does not fake idle activity, so this is an expected lifecycle event; "
+            "check has_resumption_handle / last_reconnect_used_handle for lost context."
         )
     else:
-        print("PASS: 观测窗口内 reconnect_1008_count 未增长")
+        print("PASS: reconnect_1008_count did not grow during the window")
 
     return 0 if ok else 1
 

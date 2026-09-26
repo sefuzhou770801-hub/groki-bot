@@ -1,4 +1,4 @@
-"""Unit tests for the Gemini Live POC bridge.
+"""Unit tests for the Gemini Live bridge.
 
 Tests don't open a real Live WebSocket — they validate the in-process
 contract: tool-name to ESP32-tool mapping, argument clamping, error
@@ -428,7 +428,7 @@ def test_system_instruction_tells_gemini_how_to_use_agent_tools():
 
 
 def test_system_instruction_appends_personality(monkeypatch):
-    """U8 personality file is appended below the base operational rules."""
+    """The personality file is appended below the base operational rules."""
 
     def fake_loader() -> str:
         return "我是桌上的小机器人，好奇又有点害羞。"

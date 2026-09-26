@@ -103,9 +103,9 @@ export const ConstTag = Object.freeze({
 });
 
 // Symbolic constants the parser inlines (expression enum, etc.). These match
-// stackchan::avatar::Expression: 0-5 stay the original six, extended faces 6-12,
-// Affection (stroke) is 13. Bored (idle decay) is 14.
-// IDLE is extended's name for Neutral.
+// stackchan::avatar::Expression: 0-5 stay the original six, the extended
+// expressions are 6-12, Affection (stroke) is 13. Bored (idle decay) is 14.
+// IDLE is an alias of NEUTRAL.
 export const SymbolicConsts = Object.freeze({
   NEUTRAL: 0,
   IDLE: 0,

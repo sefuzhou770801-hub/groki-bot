@@ -9,9 +9,9 @@
 namespace stackchan::avatar {
 
 // SharedState stores this as u8. 0-5 are the original six and must not
-// move. extended's Idle is Neutral; the remaining extended faces occupy 6-12.
+// move. The extended expressions occupy 6-12 (Idle is an alias of Neutral).
 // Affection is the stroke face (squinting smile). Bored is the idle-decay
-// look-around face (after Sleepy so the original six and extended block stay put).
+// look-around face (appended after them so 0-12 keep their values).
 enum class Expression : std::uint8_t {
     Neutral = 0,
     Happy = 1,

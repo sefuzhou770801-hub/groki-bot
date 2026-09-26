@@ -349,7 +349,7 @@ class Gateway:
         # (cable unplugged, device booting), start() returns False and the
         # reader thread keeps retrying in the background. TrackingBridge
         # falls back to WS until USB comes online.
-        # Codex U9 review P1.3: macOS /dev/cu.usbmodem* is exclusive — log a
+        # macOS /dev/cu.usbmodem* is exclusive — log a
         # visible reminder so flashing/monitoring doesn't silently collide.
         if self.usb_transport is not None:
             await self.usb_transport.start(wait_connect=False)

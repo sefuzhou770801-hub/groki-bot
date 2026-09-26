@@ -9,9 +9,9 @@
 
 #include <tl/expected.hpp>
 
-// Phase 1 surface — just enough to verify HTTPS to api.telegram.org works
-// and the bot token is usable. Phase 2+ will replace this with a polling
-// task + incoming-message sink + sendMessage API; see PLAN.md §8.
+// Minimal surface: just enough to verify that HTTPS to api.telegram.org works
+// and the bot token is usable. A polling task, an incoming-message sink and a
+// sendMessage API are not implemented yet.
 
 namespace stackchan::telegram {
 

@@ -56,7 +56,7 @@ async def test_tracking_detection_moves_head_when_confident():
 
 @pytest.mark.asyncio
 async def test_tracking_default_pitch_limit_allows_higher_head_raise():
-    """v4 U4 follow mode should use the expanded head pitch range."""
+    """Follow mode uses the expanded head pitch range."""
     esp32 = FakeESP32()
     bridge = TrackingBridge(
         esp32,
@@ -186,7 +186,7 @@ async def test_tracking_resampler_lerps_between_detection_targets():
 
 
 def test_last_position_is_none_before_any_detection():
-    """v4 U7: snap-on-wake distinguishes 'never seen' from 'centred'."""
+    """Snap-on-wake distinguishes 'never seen' from 'centred'."""
     bridge = TrackingBridge(FakeESP32())
     assert bridge.last_position is None
 
@@ -242,7 +242,7 @@ async def test_snap_to_last_position_skips_when_device_offline():
     assert esp32.calls == []
 
 
-# --- v4 U9-C: USB transport path ----------------------------------------------
+# --- USB transport path ------------------------------------------------------
 
 
 class FakeUsbTransport:
@@ -365,7 +365,7 @@ async def test_snap_to_last_position_uses_usb_when_connected():
     assert esp32.calls == []
 
 
-# --- Codex U9 review P1.1: control availability is USB ∪ WS ---
+# --- Control is available when either USB or WS is up ---
 
 
 @pytest.mark.asyncio
@@ -412,7 +412,7 @@ async def test_snap_to_last_position_works_when_ws_down_but_usb_up():
     assert len(usb.calls) == 1
 
 
-# --- P2.4 pitch split-swing ---------------------------------------------------
+# --- Pitch swings separately above and below neutral --------------------------
 
 
 def _build_bridge_for_pitch() -> TrackingBridge:
@@ -441,7 +441,7 @@ def test_map_to_head_pitch_hits_max_only_at_bottom():
 
 
 def test_map_to_head_pitch_does_not_saturate_at_two_thirds():
-    """Regression for the pre-P2.4 bug where y≈0.66 already maxed out."""
+    """Regression: using the full range on both sides made y≈0.66 max out already."""
     bridge = _build_bridge_for_pitch()
     _, pitch = bridge._map_to_head(0.5, 0.66)
     # neutral 15 + dy=0.16 * 2.0 * 30 swing ≈ 24.6 → well under 45.

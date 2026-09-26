@@ -126,14 +126,14 @@ function statusHtml(): string {
     const flashing = activeJob ? `flashing job ${activeJob.id}` : 'idle';
     return `<!doctype html>
 <html lang="ja"><meta charset="utf-8">
-<title>stackchan-idf remote-flasher</title>
+<title>Groki Bot remote-flasher</title>
 <style>
  body{font-family:system-ui,sans-serif;max-width:760px;margin:2em auto;padding:0 1em;color:#222}
  code,pre{background:#f4f4f4;padding:.1em .3em;border-radius:3px}
  pre{padding:.8em;overflow:auto}
  .ok{color:#0a0}.warn{color:#a60}
 </style>
-<h1>stackchan-idf remote-flasher</h1>
+<h1>Groki Bot remote-flasher</h1>
 <p>Listening on <code>${HOST}:${PORT}</code></p>
 <p>Browser: <strong class="${browser ? 'ok' : 'warn'}">${connected}</strong></p>
 <p>Flash state: <strong>${flashing}</strong></p>

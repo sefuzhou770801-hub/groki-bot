@@ -1,14 +1,16 @@
-"""网关运行状态的集中数据结构（可观测性三件套之一）。
+"""Central gateway runtime-status state.
 
-gateway / esp32_client / gemini_voice_proxy / gemini_live_bridge 在关键事件处
-调用本模块的埋点方法更新状态；capture server 的 ``GET /debug/status`` 和
-``GET /debug/panel`` 只读快照渲染，渲染层不做任何猜测。
+gateway / esp32_client / gemini_voice_proxy / gemini_live_bridge call the
+event methods here at key moments; the capture server's ``GET /debug/status``
+and ``GET /debug/panel`` only render a read-only snapshot and never guess.
 
-设计约束：
+Design constraints:
 
-* 所有方法都是同步的，只在网关的单一事件循环里被调用，不需要锁。
-* 时间戳统一用 ``time.time()``（unix epoch 秒），面板侧格式化为本地时间。
-* ``recent`` 两个队列固定保留最近 10 条。
+* Every method is synchronous and only called from the gateway's single event
+  loop, so no locks are needed.
+* Timestamps are ``time.time()`` (unix epoch seconds); the panel formats them
+  as local time.
+* The two ``recent`` queues keep the latest 10 entries.
 """
 
 from __future__ import annotations

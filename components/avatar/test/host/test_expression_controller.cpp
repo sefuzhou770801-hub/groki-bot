@@ -315,13 +315,13 @@ int main() {
         CHECK(std::fabs(mix_lhs(ctx) - lhs_before) < 1.5f);
     }
 
-    // Duration sits in the 200–400 ms window the ticket asked for.
+    // The ease duration stays within 200–400 ms.
     {
         CHECK(ExpressionController::kDurationMs >= 200);
         CHECK(ExpressionController::kDurationMs <= 400);
     }
 
-    // New extended faces mix through the same from/to path; Thinking's lhs (13)
+    // The extended expressions (6-12) mix through the same from/to path; Thinking's lhs (13)
     // is distinct from Neutral (11.3) once the ease completes.
     {
         ExpressionController c;

@@ -36,8 +36,8 @@ public:
         // M5/Takao/AtomNyan bases, but the data line varies: CoreS3 uses
         // GPIO9 (free pin near the M-BUS), AtomNyan uses GPIO38 (the
         // available pin on Atomic ECHO BASE's headers). We prefer the
-        // nekomimi strip over the M5-base PY32 ring (currently disabled —
-        // JOURNAL: "M5 base 背面 NeoPixel … 完全に無効化中"); the PY32
+        // nekomimi strip over the M5-base PY32 ring, whose rear NeoPixels are
+        // currently disabled entirely; the PY32
         // path can come back via a separate accessor without disturbing
         // this one. StopWatch (C152) has no nekomimi wiring at all — leave
         // led_ as nullptr so app_main / led_task null-check naturally.

@@ -1,4 +1,4 @@
-# Project-build-level Kconfig for stackchan-idf main.
+# Project-build-level Kconfig for the Groki Bot firmware (main component).
 #
 # Currently only the Phase 1+2 QR scanner test trigger lives here. Once Phase
 # 3 lands (device_ui タブから start_qr_scan を呼ぶ) this entry will be removed

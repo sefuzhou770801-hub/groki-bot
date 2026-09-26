@@ -307,7 +307,7 @@ void say_kana(std::string_view kana_utf8)
 
 namespace {
 
-// 汎用 immediate-apply ディスパッチ (settings redesign 案C, Phase 1)。
+// 汎用 immediate-apply ディスパッチ (immediate-apply settings)。
 // トランスポートが per-key 書き込み(in-RAM 更新 + store::save_one 永続化)後に
 // config::notify_config_change 経由で 1 回呼ぶ。ここで id ごとに実行時反映する。
 // 反映先を持たない設定(RebootRequired / boot-only)は default で何もしない

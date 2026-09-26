@@ -29,8 +29,8 @@ struct SpringParams {
     float rest_delta_deg;
 };
 
-// 弹簧参数与姿态取向沿用本项目早期固件（xiaozhi 系 stackchan 分支）里
-// 舵机动作与板级姿态的调参结果。
+// Spring parameters tuned for the SCS0009 head: higher speeds give a stiffer,
+// faster spring.
 SpringParams spring_params_for_speed(std::uint16_t speed) noexcept;
 
 class SpringAxis {
@@ -52,15 +52,16 @@ private:
     SpringParams params_{spring_params_for_speed(200)};
 };
 
-// 这些姿态生成器只移植旧固件 head_pet.h / idle_motion.h 的行为取向，
-// 不复制旧实现代码。
+// Pose generators for being petted and for idle looking around. entropy
+// seeds the random choice, so the same value gives the same pose.
 Pose head_pet_pose(float base_yaw_deg, float base_pitch_deg, Limits limits,
                    std::uint32_t entropy) noexcept;
 Pose idle_pose(float current_yaw_deg, float current_pitch_deg, Limits limits,
                std::uint32_t entropy) noexcept;
 
-// 抚摸后的四轮左右摆动。speed_override 是单次消费：调用方必须在
-// 每一段目标变化之前重新写入 speed。
+// Four rounds of left/right wobble after a stroke. speed_override is consumed
+// once per target change, so the caller writes the speed again before every
+// step.
 constexpr std::uint16_t kNadenadeWobbleSpeed = 800;
 constexpr float kNadenadeWobbleDeg = 8.0f;
 constexpr int kNadenadeWobbleRounds = 4;

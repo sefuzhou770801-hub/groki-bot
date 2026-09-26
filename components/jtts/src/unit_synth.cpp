@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
 // SPDX-License-Identifier: BSL-1.0
 //
-// モーラ単位連結 + TD-PSOLA エンジン (案 B)。
+// モーラ単位連結 + TD-PSOLA エンジン。
 // .jvox の単位波形 (実音声 or ブートストラップ合成) を連結し、ピッチマーク
 // 同期の overlap-add で目標 F0・時間長に変形する。
 //
