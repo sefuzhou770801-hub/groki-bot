@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 """Checks on the examples in the public documentation.
 
-The Grok Bot hand-off examples used to show one maintainer's own agent name.
-Examples should use a neutral name, in English for the English documents.
+The Grok Bot hand-off examples use the neutral agent name "assistant" (the
+Chinese documents translate it as 助手) or a placeholder such as
+<agent name>, in English for the English documents.
 """
 
 from __future__ import annotations
@@ -29,20 +30,27 @@ def _read(rel: str) -> str:
     return (REPO_ROOT / rel).read_text(encoding="utf-8")
 
 
+EXAMPLE_AGENT_NAMES = {"assistant", "助手"}
+
+
+def _agent_examples(text: str) -> list[str]:
+    return (
+        TOOL_BOT_EXAMPLE.findall(text)
+        + BOT_CREATE_EXAMPLE.findall(text)
+        + TARGET_EXAMPLE.findall(text)
+    )
+
+
 @pytest.mark.parametrize("rel", ENGLISH_DOCS + CHINESE_DOCS)
-def test_docs_do_not_use_a_personal_agent_name(rel):
-    assert "助手" not in _read(rel)
+def test_docs_use_the_agreed_example_agent_name(rel):
+    for name in _agent_examples(_read(rel)):
+        assert name in EXAMPLE_AGENT_NAMES or name.startswith("<"), f"{rel}: example agent name {name!r}"
 
 
 @pytest.mark.parametrize("rel", ENGLISH_DOCS)
 def test_english_docs_use_english_agent_examples(rel):
     text = _read(rel)
-    names = (
-        TOOL_BOT_EXAMPLE.findall(text)
-        + BOT_CREATE_EXAMPLE.findall(text)
-        + TARGET_EXAMPLE.findall(text)
-    )
-    for name in names:
+    for name in _agent_examples(text):
         assert not CJK.search(name), f"{rel}: example agent name {name!r}"
     # Example conversations use English. The code's own Chinese templates may
     # still be quoted, but only with the {agent} placeholder, never a name.

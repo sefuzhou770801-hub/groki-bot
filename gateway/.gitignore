@@ -8,6 +8,8 @@ venv/
 .pytest_cache/
 
 # Environment / secrets
+# Local list of private words for tests/test_public_wording.py; never commit it.
+tests/private_wordlist.txt
 .env
 .env.local
 *.local
