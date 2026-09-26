@@ -1,15 +1,17 @@
-"""Gemini Live 会话保活调度（实验性静音帧策略）。
+"""Gemini Live session keepalive scheduler (experimental silent frames).
 
-2026-07-06 诊断确认：全零 PCM 在 automatic VAD 下不算 activity，无法阻止
-1008 闲置踢线。真保活改由手动 VAD 的 activity_start/activity_end（见
-gemini_live_bridge + gemini_voice_proxy）表达真实用户语音边界；DORMANT 空闲
-断线由 session resumption + 自动重连兜底。
+All-zero PCM does not count as activity under automatic VAD, so it cannot
+prevent the idle 1008 disconnect. Real user speech is instead marked with
+manual VAD activity_start/activity_end (see gemini_live_bridge and
+gemini_voice_proxy); an idle disconnect while DORMANT is recovered by session
+resumption and automatic reconnect.
 
-本模块保留为可选实验策略：``STACKCHAN_GEMINI_KEEPALIVE_S`` 默认 0（停用）。
-仅当显式设为正数时，才在 DORMANT 期间周期发送静音 PCM——不宣称防 1008。
+This module stays as an optional experiment: ``STACKCHAN_GEMINI_KEEPALIVE_S``
+defaults to 0 (off). Only when it is set to a positive number is silent PCM
+sent periodically while DORMANT, and it is not claimed to prevent 1008.
 
-调度器把睡眠和发送都做成可注入的 seam，单元测试用假 sleep 驱动，不依赖
-真实时间。
+Sleeping and sending are injectable, so unit tests drive the scheduler with a
+fake sleep and no real time.
 """
 
 from __future__ import annotations
@@ -29,12 +31,12 @@ BYTES_PER_SAMPLE = 2
 
 
 def silence_pcm(duration_ms: int = DEFAULT_SILENCE_MS) -> bytes:
-    """生成 16 kHz 有符号 16 位单声道静音 PCM。"""
+    """Generate 16 kHz signed 16-bit mono silent PCM."""
     return b"\x00" * int(SAMPLE_RATE * BYTES_PER_SAMPLE * duration_ms / 1000)
 
 
 def keepalive_interval_from_env() -> float:
-    """读取 STACKCHAN_GEMINI_KEEPALIVE_S；未设置或 0/负数表示停用保活。"""
+    """Read STACKCHAN_GEMINI_KEEPALIVE_S; unset, 0 or negative turns the keepalive off."""
     raw = os.getenv("STACKCHAN_GEMINI_KEEPALIVE_S")
     if raw is None:
         return 0.0
@@ -50,11 +52,11 @@ def keepalive_interval_from_env() -> float:
 
 @dataclass
 class SessionKeepalive:
-    """周期静音帧发送器。
+    """Periodic silent-frame sender.
 
-    ``should_send`` 每个周期评估一次：只有闸门 DORMANT 且会话在线时才发送。
-    发送失败只记 debug 日志并继续下一轮——重连由 bridge 自己负责，保活器
-    不参与错误恢复。
+    ``should_send`` is evaluated every period: frames go out only while the gate is DORMANT and the session is online.
+    A failed send is logged at debug level and the next round goes on; the bridge handles reconnects itself and the keepalive
+    takes no part in error recovery.
     """
 
     send_silence: Callable[[bytes], Awaitable[None]]

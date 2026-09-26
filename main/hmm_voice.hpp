@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 //
 // HMM 合成 (hts_engine) の .htsvoice の永続化とロード。
-// 保存先只允许名为 "voice" 的独立分区。没有该分区时所有写入 API
-// 返回错误，严禁把待机 OTA 槽当作语音存储。
+// Storage is only a separate partition named "voice". Without that partition every write API
+// returns an error; the standby OTA slot must never be used for voice storage.
 // 先頭にヘッダ {magic "HVOX", サイズ, CRC32} を置き、データ部を
 // esp_partition_mmap して jtts::set_hmm_voice にゼロコピーで渡す。
 #pragma once

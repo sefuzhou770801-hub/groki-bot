@@ -63,11 +63,11 @@ public:
     // returning from the on-device UI. No-op cost on the buffered strategy.
     void request_full_repaint() noexcept;
 
-    // aora 眼环接线：调用方（render task）持有 kRingVarCount 个 float 的
-    // 帧缓冲，每帧在 tick() 前用合成器（main/aora_face.hpp）填好；这里只
-    // 存非所有权指针，VM 经 Var::RingBase 区间读取。nullptr = 区间读 0。
+    // aora eye-ring wiring: the caller (render task) owns a frame buffer of kRingVarCount floats
+    // and fills it with the compositor (main/aora_face.hpp) before tick() every frame; this only
+    // stores a non-owning pointer, which the VM reads through the Var::RingBase range. nullptr reads 0.
     void set_eye_ring_buffer(const float* buffer) noexcept;
-    // 合成器需要读取当前表情权重 / 眨眼 / 注视（上一帧 tick 的值）。
+    // The compositor reads the current expression weights / blink / gaze (values from the previous tick).
     const DrawContext& draw_context() const noexcept;
 
     // Hot-swap the face bytecode. `bytes` must hold an `AVDS` v1 file (see

@@ -24,8 +24,8 @@ class TrackingConfig:
     max_yaw: int = 60
     min_pitch: int = 0
     max_pitch: int = 45
-    # dy<0（脸在上半）收缩到 min_pitch；dy>0 拉到 max_pitch。
-    # 两边都按 max_pitch 当满幅会让 y≈0.66 提前饱和。
+    # dy<0 (face in the upper half) swings toward min_pitch; dy>0 toward max_pitch.
+    # Using max_pitch as the full swing on both sides would saturate at y≈0.66.
     neutral_pitch: int = 15
 
 

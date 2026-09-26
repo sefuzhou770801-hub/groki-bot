@@ -477,8 +477,8 @@ extern "C" void app_main()
     {
         constexpr std::uint32_t kProbeRate = 16'000;
         constexpr std::size_t kProbeSamples = kProbeRate * 300 / 1000; // 300 ms
-        // PSRAM + 用完释放：原先的函数内 static 数组让这 9.4 KiB 内部 RAM
-        // 终生陪跑（2026-08-30 内存治理，#13）。playRaw 的源缓冲允许 PSRAM。
+        // PSRAM, freed after use: a function-local static array would keep these 9.4 KiB of internal RAM
+        // allocated for the whole run. playRaw accepts a source buffer in PSRAM.
         auto* probe_pcm = static_cast<std::int16_t*>(
             heap_caps_malloc(kProbeSamples * sizeof(std::int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
         if (probe_pcm != nullptr) {

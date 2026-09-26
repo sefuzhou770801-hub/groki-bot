@@ -621,7 +621,7 @@ def _audio_payloads(session: _RecordingLiveSession) -> list[bytes]:
 
 @pytest.mark.asyncio
 async def test_device_audio_is_cached_when_live_session_missing(monkeypatch, info):
-    """设备二进制路径在 Live 会话缺失时必须进入缓存，而不是在代理入口丢弃。"""
+    """Without a Live session, device binary audio must be buffered, not dropped at the proxy entry."""
     proxy, esp32, sent = _make_proxy(monkeypatch=monkeypatch)
     gate = WakeGate(
         kws=ScriptedKeywordSpotter([True, False]),
@@ -1536,12 +1536,12 @@ async def test_bridge_factory_receives_voice_callbacks(monkeypatch, info):
 
 @pytest.mark.asyncio
 async def test_drain_restores_cushion_after_source_stall(monkeypatch, info):
-    """源端（Gemini）中途断流后，排空任务必须补发以恢复设备侧缓冲垫。
+    """After the source (Gemini) stalls mid-reply, the drain task must catch up to restore the device-side cushion.
 
-    垫位按开环估算：第 n 帧发出时设备已收到 n×60ms 音频、自首帧起消耗了
-    (t_n − t_0) 的墙钟时间，垫位 = n×60 − (t_n − t_0)。若断流 T ms 后恢复
-    仍按单帧节奏发送（不回补），垫位被永久吃掉 T ms——回合越长垫越薄，
-    低于设备抖动容忍即出现可闻断续。
+    The cushion is estimated open-loop: when frame n goes out the device has received n×60 ms of audio and has used
+    (t_n − t_0) of wall-clock time since the first frame, so cushion = n×60 − (t_n − t_0). If after a T ms stall
+    frames are still sent one per period (no catch-up), T ms of cushion are lost for good; the longer the turn, the thinner the cushion,
+    and below the device's jitter tolerance the audio audibly breaks up.
     """
     proxy, _, sent = _make_proxy(monkeypatch=monkeypatch)
     proxy.device_frame_pace_ms = 60.0
@@ -1556,30 +1556,30 @@ async def test_drain_restores_cushion_after_source_stall(monkeypatch, info):
     await proxy.start(info, {"type": "hello"}, send)
     sent.clear()
 
-    # 第一批 10 帧（600ms 音频）：7 帧预热 + 3 帧稳定节奏，垫位约 420ms。
+    # First batch of 10 frames (600 ms of audio): 7 warm-up + 3 at the steady pace, cushion about 420 ms.
     for _ in range(10):
         await proxy._handle_gemini_audio(b"\x00" * OUTPUT_FRAME_BYTES)
     await proxy._frame_queue.join()
-    # 源端停顿 400ms —— 接近吃穿整个预热垫。
+    # The source pauses 400 ms, nearly the whole warm-up cushion.
     await asyncio.sleep(0.4)
-    # 第二批 10 帧：恢复供帧，排空任务应立即补发把垫位拉回目标。
+    # Second batch of 10 frames: the drain task must catch up at once and bring the cushion back to target.
     for _ in range(10):
         await proxy._handle_gemini_audio(b"\x00" * OUTPUT_FRAME_BYTES)
     await proxy._frame_queue.join()
 
     binary_msgs = [m for m in sent if isinstance(m, (bytes, bytearray))]
-    assert len(binary_msgs) == 20, "每一帧都必须到达设备"
+    assert len(binary_msgs) == 20, "every frame must reach the device"
     t0 = send_times[0]
     cushions = [
         (i + 1) * 60.0 - (t - t0) * 1000.0 for i, t in enumerate(send_times)
     ]
     assert cushions[-1] >= 300.0, (
-        f"断流后垫位未回补：尾帧垫位 {cushions[-1]:.0f}ms，"
-        f"全程 {[f'{c:.0f}' for c in cushions]}"
+        f"cushion not restored after the stall: last frame {cushions[-1]:.0f} ms, "
+        f"all {[f'{c:.0f}' for c in cushions]}"
     )
 
 
-# --- 会话保活接线（可观测性 v3）----------------------------------------------
+# --- Session keepalive wiring --------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -1665,7 +1665,7 @@ async def test_start_without_wake_gate_skips_keepalive(monkeypatch, info):
 
     async def send(msg): sent.append(msg)
 
-    await proxy.start(info, {"type": "hello"}, send)  # 唤醒词停用 → 直通模式
+    await proxy.start(info, {"type": "hello"}, send)  # wake word off → pass-through
     try:
         assert proxy._wake_gate is None
         assert proxy._keepalive is None
@@ -1711,7 +1711,7 @@ async def test_send_keepalive_silence_falls_back_to_send_audio(monkeypatch, info
 
     await proxy.start(info, {"type": "hello"}, send)
     try:
-        bridge = proxy._bridge  # FakeBridge 没有 send_keepalive_audio
+        bridge = proxy._bridge  # FakeBridge has no send_keepalive_audio
         await proxy._send_keepalive_silence(b"\x00" * 64)
         assert bridge.audio_sent == [b"\x00" * 64]
     finally:

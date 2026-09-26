@@ -55,9 +55,9 @@ struct DrawContext {
     // (i.e. hold time elapsed for short text, or one marquee cycle for long
     // text). The render task polls this and notifies the application.
     bool balloon_done{false};
-    // aora 眼环屏幕坐标（非所有权指针，指向 render task 的帧缓冲数组，
-    // kRingVarCount 个 float：l0x,l0y..l47y,r0x..r47y）。空指针时
-    // Var::RingBase 区间读到 0。
+    // aora eye-ring screen coordinates (non-owning pointer to the render task's frame buffer,
+    // kRingVarCount floats: l0x,l0y..l47y,r0x..r47y). With a null pointer
+    // the Var::RingBase range reads 0.
     const float* aora_ring{nullptr};
 };
 

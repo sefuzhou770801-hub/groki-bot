@@ -1,16 +1,16 @@
 #!/usr/bin/env zsh
 # SPDX-FileCopyrightText: 2026 sefuzhou770801-hub
 # SPDX-License-Identifier: BSL-1.0
-# groki-face：拍摄用表情遥控
+# groki-face: remote control for the robot's expressions, e.g. while filming
 #
-# 用法：
-#   groki-face <表情名>                 单次切换
-#   groki-face                          交互式按键模式（q 退出）
-#   groki-face play <段名>              按预设脚本串演（内置 demo）
-#   groki-face balloon "<文字>" [hold_ms]  发送气泡
+# Usage:
+#   groki-face <expression>             switch once
+#   groki-face                          interactive key mode (q quits)
+#   groki-face play <segment>           play a preset expression sequence (built-in demo)
+#   groki-face balloon "<text>" [hold_ms]  show a speech balloon
 #
-# 连接：GROKI_HOST（可省略，自动发现）、GROKI_TOKEN（必填）。
-# 也可写入 ~/.config/groki/env（KEY=VALUE），环境变量优先。
+# Connection: GROKI_HOST (optional, discovered automatically), GROKI_TOKEN (required).
+# Both can also go in ~/.config/groki/env (KEY=VALUE); environment variables win.
 
 set -uo pipefail
 typeset -F SECONDS
@@ -38,8 +38,8 @@ KEYMAP[a]=affection
 KEYMAP[b]=bored
 KEYMAP[i]=idle
 
-# 段表：键为段名，值为换行分隔的「表情 秒数」。秒数为 0 表示切完即停。
-# 新增段只在此表加一项。
+# Segment table: key = segment name, value = newline-separated "expression seconds" lines. 0 seconds means switch and stop.
+# To add a segment, add one entry here.
 typeset -A GROKI_SEGMENTS
 GROKI_SEGMENTS[demo]='
 sleepy 3
@@ -133,9 +133,9 @@ load_env_file() {
     done < "$f"
 }
 
-# dns-sd -B 的 instance 可能是 "Stack-chan config"，不含主机名。
-# 先在 browse 输出里找 stackchan-XXXXXX；找不到再对 instance 做 -L 解析。
-# 整个发现过程限时 3 秒。
+# The dns-sd -B instance may be "Stack-chan config", without the host name.
+# Look for stackchan-XXXXXX in the browse output first; otherwise resolve the instance with -L.
+# Discovery as a whole is limited to 3 seconds.
 discover_host() {
     local start=$SECONDS service host
     for service in _stackchan-config._tcp _http._tcp; do

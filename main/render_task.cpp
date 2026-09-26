@@ -81,8 +81,8 @@ void render_task_entry(void* arg) {
     // time (AtomS3 slim profile) esp_psram_get_size is removed from the
     // build, so guard the call out and force the direct path.
 #if CONFIG_SPIRAM
-    // direct 路径实测（2026-08-29）：帧率升到 10-16fps 但无双缓冲持续频闪，
-    // 已回退 buffered。帧率结构优化（内部 RAM 画布/脏矩形）另行排期。
+    // The direct (unbuffered) path was measured at 10-16 fps but flickers constantly without double buffering,
+    // so the buffered path is used. Faster frame structures (internal-RAM canvas / dirty rectangles) are not done yet.
     const bool has_psram = esp_psram_get_size() > 0;
 #else
     const bool has_psram = false;
@@ -182,10 +182,11 @@ void render_task_entry(void* arg) {
             avatar.request_full_repaint();
         }
 
-        // 情绪自动回落（2026-08-30 维护者：常态应是待机放空）：BtnB/摇动/MCP/
-        // LLM 写入的 mood 是持久值，测试残留会永远占住脸。45 秒无新写入即
-        // 回落 Neutral；对话中 LLM 持续换情绪会不断刷新时间戳，不受影响。
-        // 冷落衰减（2 分钟无聊 / 5 分钟瞌睡）在回落后照常接管。
+        // Mood falls back automatically (the resting state is the idle face): the mood written by
+        // BtnB / shaking / MCP / the LLM persists, so a leftover test value would hold the face forever.
+        // After 45 s without a new write it falls back to Neutral; during a conversation the LLM keeps
+        // changing the mood, which refreshes the timestamp. Idle decay (bored after 2 min, sleepy after
+        // 5 min) takes over after the fallback as usual.
         std::int32_t mood = args.state->face.expression.load(std::memory_order_relaxed);
         static std::uint32_t mood_set_ms = 0;
         constexpr std::uint32_t kMoodAutoClearMs = 45'000;
@@ -244,8 +245,8 @@ void render_task_entry(void* arg) {
 
         // Grok (Avatar VM) is the only face.
         {
-            // aora 眼环：用上一帧 tick 后的表情权重合成当帧眼形（1 帧滞后，
-            // 视觉无感），VM 经 Var::RingBase 区间读取绘制。
+            // aora eye rings: build this frame's eye shape from the expression weights after the previous
+            // tick (one frame late, not visible); the VM reads them through the Var::RingBase range.
             static float ring_buf[aora::kOutFloats];
             aora::compose(avatar.draw_context(), now_ms, ring_buf);
             avatar.set_eye_ring_buffer(ring_buf);
@@ -254,8 +255,8 @@ void render_task_entry(void* arg) {
             avatar.tick(now_ms, canvas);
         }
 
-        // Battery gauge removed from the face (2026-08-29 维护者定案)：数值仍在
-        // SharedState/设置页可查，屏幕上不再绘制。徽章排版保留原位。
+        // The battery gauge is not drawn on the face: the value is still
+        // available in SharedState and on the settings page. The badge layout keeps its place.
         const bool gauge_shown = false;
 
         // Mute badge, below the battery gauge when both are up. Round

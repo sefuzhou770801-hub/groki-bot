@@ -79,8 +79,8 @@ enum class ConversationEventType : std::uint8_t {
     ToolCallRequested,
     ResponseDone,
     Error,
-    // 后端要求把底座 LED 灯带切成一个纯色；`led_r` / `led_g` / `led_b`
-    // 携带 8 位 RGB 通道，实际硬件路径由应用层负责。
+    // The backend asks to switch the base LED strip to one solid colour; `led_r` / `led_g` / `led_b`
+    // carry the 8-bit RGB channels, and the application owns the hardware path.
     LedColor,
     // XiaoZhi gateway `head` message: turn the head to `head_yaw` /
     // `head_pitch` degrees at `head_speed`. The application clamps to the

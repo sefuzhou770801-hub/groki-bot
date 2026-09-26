@@ -269,6 +269,9 @@ async def synthesize_speech(text: str, *, emotion: str | None = None) -> Synthes
     )
 
 
+DEFAULT_CLOUD_TTS_PROMPT_TEMPLATE = "Repeat after me: {text}. Say only: {text}."
+
+
 async def synthesize_cloud_prompt(text: str) -> SynthesizedSpeech:
     """Encode a short spoken prompt that asks xiaozhi cloud to speak the text.
 
@@ -277,11 +280,12 @@ async def synthesize_cloud_prompt(text: str) -> SynthesizedSpeech:
     does not expose a reliable direct text-to-TTS command on the device socket,
     so the gateway feeds a concise prompt as upstream Opus audio and forwards
     only the cloud TTS audio back to StackChan.
+
+    XIAOZHI_CLOUD_TTS_PROMPT_TEMPLATE overrides the prompt; ``{text}`` is
+    replaced by the text as is. For a Chinese-speaking cloud assistant, for
+    example: ``跟我说：{text}。只说这句：{text}``.
     """
-    template = os.getenv(
-        "XIAOZHI_CLOUD_TTS_PROMPT_TEMPLATE",
-        "跟我说：{text}。只说这句：{text}",
-    )
+    template = os.getenv("XIAOZHI_CLOUD_TTS_PROMPT_TEMPLATE", DEFAULT_CLOUD_TTS_PROMPT_TEMPLATE)
     prompt = template.format(text=text)
     return await _synthesize_macos_say(prompt, sample_rate=16000)
 

@@ -78,10 +78,10 @@ constexpr TickType_t kI2sSettle = pdMS_TO_TICKS(20);
 // face deadline.
 constexpr std::uint32_t kThinkingTimeoutMs = 60000;
 
-// 思考脸的视觉期限（2026-08-30 维护者：没有工作时也显示思考——环境音被
-// 云端 VAD 误判成说话，进 Thinking 后回复永不到来，脸就一直挂着）。真实
-// 回复几乎都在 12 秒内开始；超过就把脸放回待命，状态机继续等结果（回复
-// 到达仍正常进 Speaking）。
+// How long the thinking face may stay. Background noise that the cloud VAD takes for speech can move the
+// state to Thinking with no reply ever coming, which would leave the thinking face up forever. Real
+// replies almost always start within 12 s; after that the face goes back to idle while the state machine
+// keeps waiting (a late reply still moves to Speaking as usual).
 constexpr std::uint32_t kThinkingFaceMs = 12000;
 
 // Recover from a stuck "Speaking" (assistant playback drained but the
@@ -289,7 +289,7 @@ public:
         }
         client_->set_event_callback([this](const conv::ConversationEvent& ev) { enqueue_event(ev); });
 
-        (void)connect_with_retries("首次连接", /*allow_audio_abort=*/false);
+        (void)connect_with_retries("initial connect", /*allow_audio_abort=*/false);
 
         for (;;) {
             // Full conversation shutdown for BLE audio streaming. Yielding
@@ -322,7 +322,7 @@ public:
             if (local_ == Local::Yielded) {
                 ESP_LOGI(kTag, "BLE audio done — restarting conversation");
                 state_.conv.yielded_i2s.store(false, std::memory_order_release);
-                if (!connect_with_retries("BLE 音频结束后的重连",
+                if (!connect_with_retries("reconnect after BLE audio",
                                           /*allow_audio_abort=*/true)) {
                     continue;
                 }
@@ -420,17 +420,17 @@ private:
         if (wifi_is_connected()) {
             return true;
         }
-        ESP_LOGW(kTag, "Wi-Fi 已断开；等待后再重连会话");
+        ESP_LOGW(kTag, "Wi-Fi disconnected; waiting before reconnecting the session");
         state_.conv.status.store(ConvStatus::WaitingWifi, std::memory_order_relaxed);
         while (!wifi_is_connected()) {
             if (allow_audio_abort &&
                 state_.audio_stream_active.load(std::memory_order_acquire)) {
-                ESP_LOGI(kTag, "会话重连暂停：BLE 音频正在使用");
+                ESP_LOGI(kTag, "session reconnect paused: BLE audio in use");
                 return false;
             }
             vTaskDelay(pdMS_TO_TICKS(500));
         }
-        ESP_LOGI(kTag, "Wi-Fi 已恢复；继续重连会话");
+        ESP_LOGI(kTag, "Wi-Fi back; continuing to reconnect the session");
         return true;
     }
 
@@ -440,7 +440,7 @@ private:
         while (waited_ms < delay_ms) {
             if (allow_audio_abort &&
                 state_.audio_stream_active.load(std::memory_order_acquire)) {
-                ESP_LOGI(kTag, "会话重连退避暂停：BLE 音频正在使用");
+                ESP_LOGI(kTag, "session reconnect backoff paused: BLE audio in use");
                 return false;
             }
             const std::uint32_t step_ms = std::min<std::uint32_t>(500, delay_ms - waited_ms);
@@ -456,17 +456,17 @@ private:
         for (;;) {
             if (allow_audio_abort &&
                 state_.audio_stream_active.load(std::memory_order_acquire)) {
-                ESP_LOGI(kTag, "%s 暂停：BLE 音频正在使用", context);
+                ESP_LOGI(kTag, "%s paused: BLE audio in use", context);
                 return false;
             }
             if (!wait_for_wifi_for_reconnect(allow_audio_abort)) {
                 return false;
             }
 
-            ESP_LOGI(kTag, "%s：传输启动第 %u 次尝试",
+            ESP_LOGI(kTag, "%s: transport start attempt %u",
                      context, failed_starts + 1);
             if (connect()) {
-                ESP_LOGI(kTag, "%s：传输启动已接受", context);
+                ESP_LOGI(kTag, "%s: transport start accepted", context);
                 return true;
             }
 
@@ -474,7 +474,7 @@ private:
             state_.conv.status.store(ConvStatus::Error, std::memory_order_relaxed);
             flush_events();
             const std::uint32_t backoff_ms = reconnect_backoff_ms(failed_starts);
-            ESP_LOGE(kTag, "%s：传输启动第 %u 次失败；%u ms 后重试",
+            ESP_LOGE(kTag, "%s: transport start attempt %u failed; retrying in %u ms",
                      context, failed_starts, static_cast<unsigned>(backoff_ms));
             state_.conv.status.store(ConvStatus::Reconnecting, std::memory_order_relaxed);
             if (!delay_reconnect(backoff_ms, allow_audio_abort)) {
@@ -490,12 +490,12 @@ private:
     {
         if (from_failure) {
             ++consecutive_recover_failures_;
-            // 封顶 30 秒。第 n 次失败退避为 500 ms × 2^(n-1)，序列是
-            // 500 / 1k / 2k / 4k / 8k / 16k / 30k。第一次失败不在这里
-            // 额外等待，避免瞬时抖动带来可感知延迟。
+            // capped at 30 s. After the n-th failure the backoff is 500 ms × 2^(n-1), i.e.
+            // 500 / 1k / 2k / 4k / 8k / 16k / 30k. The first failure adds no wait here,
+            // so a brief glitch does not cause a noticeable delay.
             const std::uint32_t backoff_ms =
                 reconnect_backoff_ms(consecutive_recover_failures_);
-            ESP_LOGW(kTag, "会话恢复：第 %u 次，退避 %u ms",
+            ESP_LOGW(kTag, "session recovery: attempt %u, backoff %u ms",
                      consecutive_recover_failures_, static_cast<unsigned>(backoff_ms));
             if (consecutive_recover_failures_ > 1) {
                 // Skip the wait on the first try so transient blips don't
@@ -506,7 +506,7 @@ private:
                 }
             }
         } else {
-            ESP_LOGI(kTag, "会话平滑切换（goAway）");
+            ESP_LOGI(kTag, "session handover (goAway)");
         }
         state_.conv.status.store(ConvStatus::Reconnecting, std::memory_order_relaxed);
         state_.conv.reconnects.fetch_add(1, std::memory_order_relaxed);
@@ -565,7 +565,7 @@ private:
         assistant_pcm_.clear();
         assistant_text_.clear();
         if (state_.audio_stream_active.load(std::memory_order_acquire)) return;
-        (void)connect_with_retries("故障恢复重连", /*allow_audio_abort=*/true);
+        (void)connect_with_retries("reconnect after an error", /*allow_audio_abort=*/true);
     }
 
     // ---- per-state servicing ----------------------------------------------
@@ -1067,11 +1067,11 @@ private:
         case conv::ConversationEventType::LedColor: {
             const auto solid = led_runtime::from_rgb(ev.led_r, ev.led_g, ev.led_b);
             state_.led.color.store(solid.color, std::memory_order_relaxed);
-            // XiaoZhi LED 消息是临时状态灯，不是用户设置：这里只写运行时
-            // 状态，下一次 led_task tick 会驱动真实 Board::LedStrip，不写 NVS。
+            // A XiaoZhi LED message is a temporary status light, not a user setting: only runtime state is
+            // written here; the next led_task tick drives the real Board::LedStrip. Nothing goes to NVS.
             state_.led.mode.store(solid.mode, std::memory_order_relaxed);
             state_.led.brightness.store(solid.brightness, std::memory_order_relaxed);
-            ESP_LOGI(kTag, "LED 状态灯: r=%u g=%u b=%u",
+            ESP_LOGI(kTag, "LED status light: r=%u g=%u b=%u",
                      static_cast<unsigned>(ev.led_r),
                      static_cast<unsigned>(ev.led_g),
                      static_cast<unsigned>(ev.led_b));
@@ -1295,7 +1295,7 @@ private:
 
     Local local_{Local::Init};
     std::uint32_t thinking_since_ms_{0};
-    // 思考脸已提前放回待命（kThinkingFaceMs 视觉期限），进 Thinking 时复位。
+    // The thinking face may already be back to idle (kThinkingFaceMs limit); reset on entering Thinking.
     bool thinking_face_released_{false};
     bool tool_pending_{false};
 
@@ -1353,7 +1353,7 @@ void conversation_task_entry(void* arg)
                                         args.extra_headers, args.limits, args.seg_buf);
     coordinator->run();
     // run() only returns by deleting the task; keep the object alive regardless.
-    // WithCaps 创建的任务必须用 WithCaps 删除，否则 PSRAM 栈不归还。
+    // A task created WithCaps must be deleted WithCaps, or the PSRAM stack is not returned.
     vTaskDeleteWithCaps(nullptr);
 }
 
@@ -1361,8 +1361,8 @@ void conversation_task_entry(void* arg)
 
 void start_conversation_task(ConversationTaskArgs& args)
 {
-    // 栈放 PSRAM（#13 内存治理）：本任务是 TLS/WS 读写循环，不做 flash
-    // 写（与 say_worker / asr 的 PSRAM 栈同一先例），8 KiB 还给内部 RAM。
+    // Stack in PSRAM to save internal RAM: this task is a TLS/WS read-write loop with no flash
+    // writes (same as the say_worker / asr PSRAM stacks), so 8 KiB go back to internal RAM.
     constexpr UBaseType_t kCaps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
     xTaskCreatePinnedToCoreWithCaps(conversation_task_entry, "conversation", 8192, &args, 5, nullptr,
                                     0, kCaps);

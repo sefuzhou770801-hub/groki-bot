@@ -146,7 +146,7 @@ fn fill_ellipse(cx, cy, rx, ry, color)
 end
 
 ----------------------------------------------------------------------
--- Entry point. RGB565（黑底白表情，2026-08-29 维护者定案）:
+-- Entry point. RGB565, white face on a black background:
 --   0x0000 = black background, 0xFFFF = white body, 0x0000 = black eyes.
 -- Eye geometry/motion lives in C++ (aora rings); this draws body + eyes.
 ----------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn draw()
     fill_circle(cx, cy, base_r, body)
   end
 
-  -- Sleeping zzz trail floating up past the top-right edge (aora 00 睡眠).
+  -- Sleeping zzz trail floating up past the top-right edge (aora emotion 00 睡眠, "sleep").
   if expr == SLEEPY then
     let zi = 0
     while zi < 3 do
@@ -264,7 +264,7 @@ fn draw()
     end
   end
 
-  -- Petting = aora 14 害羞: blush riding just below each eye. The eyes dart
+  -- Petting = aora emotion 14 害羞 ("shy"): blush riding just below each eye. The eyes dart
   -- around while shy (look-away sweep + ring pool swaps), so the blush
   -- centres are sampled live from the ring coordinates (4-point centroid)
   -- instead of fixed positions. Plus a little heart floating up beside the

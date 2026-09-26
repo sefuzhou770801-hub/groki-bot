@@ -78,7 +78,7 @@ _bot_locks: dict[str, threading.Lock] = {}
 
 
 def _lock_for_bot(bot: str) -> threading.Lock:
-    """同一 bot 的 /send 串行化，避免并发快照把回复配给错误的请求。"""
+    """Serialise /send per bot so concurrent snapshots cannot match a reply to the wrong request."""
     with _bot_locks_guard:
         lock = _bot_locks.get(bot)
         if lock is None:
@@ -101,7 +101,7 @@ def first_short_sentence(text: str) -> str:
 
 
 def ready_utterance(body: str, *, unchanged_s: float) -> str:
-    """完整短句，或短句已停笔（无句号也认）。"""
+    """A complete short sentence, or a short sentence whose text has stopped changing (no full stop needed)."""
     sent = first_short_sentence(body)
     if sent:
         return sent
@@ -121,7 +121,7 @@ def looks_busy(text: str) -> bool:
 
 
 def extract_bot_replies_meta(thread: dict) -> list[tuple[str, str, int]]:
-    """send-message 条目：(id, text, timestampMs)。旧消息靠 id + ts 过滤。"""
+    """send-message entries as (id, text, timestampMs). Old messages are filtered out by id and timestamp."""
     payload = thread.get("transcript") or thread.get("thread") or thread
     entries = payload.get("entries") if isinstance(payload, dict) else None
     if not isinstance(entries, list):
@@ -147,7 +147,7 @@ def extract_bot_replies_meta(thread: dict) -> list[tuple[str, str, int]]:
 
 
 def _run_gbot_send(text: str, dest: str) -> tuple[bool, str]:
-    """真正执行 gbot --json send。成功只表示 CLI 发出去了。"""
+    """Run gbot --json send. Success only means the CLI sent the message."""
     bin_path = resolve_gbot_bin()
     if not bin_path:
         return False, gbot_missing_error()
@@ -162,7 +162,7 @@ def _run_gbot_send(text: str, dest: str) -> tuple[bool, str]:
     except subprocess.TimeoutExpired:
         return False, "gbot send timeout"
     except OSError as exc:
-        return False, f"gbot 执行失败：{exc}"
+        return False, f"gbot could not run: {exc}"
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or f"gbot exit {proc.returncode}")[:400]
         return False, err
@@ -515,7 +515,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._json(504, payload)
         finally:
-            # 发送链自身有超时（直接 send 一次 + 客户端两次重试），这里不加更短的 join 上限。
+            # The send has its own timeouts (one direct send plus two client retries), so no shorter join limit is added here.
             send_thread.join()
 
 

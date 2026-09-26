@@ -24,7 +24,7 @@ SEND_RETRY_SLEEP_S = 0.4
 
 
 def send_timeout_s() -> float:
-    """gbot 单次 subprocess 超时。发送链为一次直接 send 加客户端两次重试。"""
+    """Timeout of one gbot subprocess. A send is one direct send plus two client retries."""
     raw = os.getenv("STACKCHAN_GBOT_SEND_TIMEOUT_S", str(SEND_TIMEOUT_DEFAULT_S))
     try:
         value = float(raw)
@@ -34,11 +34,11 @@ def send_timeout_s() -> float:
 
 
 class AskError(RuntimeError):
-    """问答失败。调用方不得把该错误文本当成 bot 回复。"""
+    """The exchange failed. Callers must not treat this error text as the bot's reply."""
 
 
 def resolve_gbot_bin() -> str | None:
-    """解析 gbot 可执行文件。只认环境变量与 PATH，不含私人目录候选。"""
+    """Locate the gbot executable, from the environment variable or PATH only."""
     override = (
         os.environ.get("STACKCHAN_GBOT_BIN") or os.environ.get("STACKCHAN_ASK_GBOT") or ""
     ).strip()
@@ -56,12 +56,12 @@ def gbot_missing_error() -> str:
         os.environ.get("STACKCHAN_GBOT_BIN") or os.environ.get("STACKCHAN_ASK_GBOT") or ""
     ).strip()
     if override:
-        return f"找不到 gbot：{override}（请检查 STACKCHAN_GBOT_BIN）"
-    return "找不到 gbot，请安装 grok-bot-cli 并确保其在 PATH 中，或设置 STACKCHAN_GBOT_BIN"
+        return f"gbot not found: {override} (check STACKCHAN_GBOT_BIN)"
+    return "gbot not found; install grok-bot-cli and put it on PATH, or set STACKCHAN_GBOT_BIN"
 
 
 def extract_bot_replies(thread: dict[str, Any]) -> list[tuple[str, str]]:
-    """从 gbot --json thread 里取出 kind=send-message 的回复。"""
+    """Extract the kind=send-message replies from gbot --json thread."""
     payload = thread.get("transcript") or thread.get("thread") or thread
     entries = payload.get("entries") if isinstance(payload, dict) else None
     if not isinstance(entries, list):
@@ -89,7 +89,7 @@ class GrokBotClient:
             raise AskError(gbot_missing_error())
 
     def _run(self, args: list[str]) -> dict[str, Any]:
-        last_error = "gbot 失败"
+        last_error = "gbot failed"
         for attempt in range(SEND_RETRY_ATTEMPTS):
             try:
                 proc = subprocess.run(
@@ -100,7 +100,7 @@ class GrokBotClient:
                     check=False,
                 )
             except (OSError, subprocess.TimeoutExpired) as exc:
-                last_error = f"gbot 执行失败：{exc}"
+                last_error = f"gbot could not run: {exc}"
                 if attempt + 1 < SEND_RETRY_ATTEMPTS:
                     time.sleep(SEND_RETRY_SLEEP_S)
                     continue
@@ -109,15 +109,15 @@ class GrokBotClient:
                 try:
                     payload = json.loads(proc.stdout)
                 except json.JSONDecodeError as exc:
-                    raise AskError("gbot 返回的 JSON 无法解析") from exc
+                    raise AskError("gbot returned JSON that cannot be parsed") from exc
                 if not isinstance(payload, dict):
-                    raise AskError("gbot 返回的 JSON 不是对象")
+                    raise AskError("gbot returned JSON that is not an object")
                 return payload
             last_error = (proc.stderr or proc.stdout or "").strip() or f"exit {proc.returncode}"
             if attempt + 1 < SEND_RETRY_ATTEMPTS:
                 time.sleep(SEND_RETRY_SLEEP_S)
                 continue
-        raise AskError(f"gbot 失败：{last_error}")
+        raise AskError(f"gbot failed: {last_error}")
 
     def send(self, bot: str, text: str) -> None:
         payload = self._run(["send", bot, text])
@@ -126,7 +126,7 @@ class GrokBotClient:
         if isinstance(result, dict):
             accepted = bool(result.get("accepted", True))
         if not accepted:
-            raise AskError("gbot 未接受这条消息")
+            raise AskError("gbot did not accept the message")
 
     def thread(self, bot: str) -> dict[str, Any]:
         return self._run(["thread", bot, "--limit", "20"])

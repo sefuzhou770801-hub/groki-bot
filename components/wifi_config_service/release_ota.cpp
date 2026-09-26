@@ -342,9 +342,9 @@ bool fetch_versions_json(std::string& out)
     v.done = xSemaphoreCreateBinary();
     if (v.done == nullptr) return false;
 
-    // 12 KiB stack in PSRAM（#13 内存治理）：本任务只做 mbedTLS 握手 +
-    // JSON 读取，无 flash 写；内部 RAM 常态水位太低，12 KiB 的内部栈
-    // 峰值分配曾直接失败（2026-08-30 真机 ALLOC_FAIL 12288）。
+    // 12 KiB stack in PSRAM: this task only does the mbedTLS handshake and
+    // reads JSON, with no flash writes; free internal RAM is usually too low, and a 12 KiB internal stack
+    // failed to allocate at peak (ALLOC_FAIL 12288 seen on a device).
     constexpr UBaseType_t kCaps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
     BaseType_t ok = xTaskCreateWithCaps(&versions_fetch_task, "vfetch", 12 * 1024, &v,
                                         tskIDLE_PRIORITY + 3, nullptr, kCaps);

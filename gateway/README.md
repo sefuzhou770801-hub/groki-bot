@@ -104,7 +104,7 @@ offline (macOS, uses the `say` command):
 
 ```bash
 uv run python scripts/kws_offline_repro.py --generate-say
-# prints 命中 (hit) or 未命中 (miss)
+# prints "hit: ..." or "miss: ..."
 ```
 
 ### Changing the wake word
@@ -404,7 +404,7 @@ reconnect the MCP client, after a change).
 | Connects but never answers | `GEMINI_API_KEY` set? `/debug/status` → `gemini.last_error`. An error containing `reported as leaked` means Google disabled the key: create a new one. |
 | Gemini connection times out | The computer must be able to reach Google's Gemini API. In regions where Google is blocked, run the gateway behind a working network proxy. |
 | Wake word never triggers | Model downloaded to `models/kws`? Log shows `KWS ready`? Try `STACKCHAN_KWS_THRESHOLD=0.03`, or run `scripts/kws_offline_repro.py`. `STACKCHAN_WAKE_WORD=0` turns the gate off. |
-| `sherpa-onnx 不可用` / `Library not loaded: libonnxruntime` | Run `uv sync --all-extras` again; it installs `sherpa-onnx-core`, which ships the runtime. |
+| `sherpa-onnx unavailable` / `Library not loaded: libonnxruntime` | Run `uv sync --all-extras` again; it installs `sherpa-onnx-core`, which ships the runtime. |
 | `Could not find Opus library` | Install Opus (`brew install opus` or `apt install libopus0`). |
 | Head does not follow faces | `/debug/status` → `face_tracking`. `null`: gateway too old or not restarted. `tracker_running: false`: build the tracker, or check the log for `face tracker exited returncode=2` (no camera or no camera permission, see [Allow camera access](#allow-camera-access)). `face_reported: false`: the camera does not see a face. `head_follow: false`: say "look at me". Everything fine but the head is still: the firmware is older than the `head` message; update it. |
 | Flashing fails with "port busy" | Stop the gateway if you enabled `STACKCHAN_USB_TRANSPORT`. |

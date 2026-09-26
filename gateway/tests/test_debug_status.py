@@ -1,4 +1,4 @@
-"""调试状态模块与 /debug/status、/debug/panel 端点的测试。"""
+"""Tests for the debug status module and the /debug/status and /debug/panel endpoints."""
 
 import json
 from types import SimpleNamespace
@@ -32,7 +32,7 @@ class FakeAppRequest:
         self.app = app
 
 
-# --- 单例 ---------------------------------------------------------------
+# --- singleton ---------------------------------------------------------------
 
 
 def test_singleton_returns_same_instance_until_reset():
@@ -43,7 +43,7 @@ def test_singleton_returns_same_instance_until_reset():
     assert get_debug_status() is not first
 
 
-# --- device 埋点 ---------------------------------------------------------
+# --- device events ---------------------------------------------------------
 
 
 def test_device_connect_disconnect_updates_counters():
@@ -64,7 +64,7 @@ def test_device_connect_disconnect_updates_counters():
     assert snap["disconnect_count"] == 1
 
 
-# --- gemini 埋点 ---------------------------------------------------------
+# --- gemini events ---------------------------------------------------------
 
 
 def test_gemini_connect_records_session_count_and_since():
@@ -85,7 +85,7 @@ def test_gemini_disconnect_records_error_and_1008_counter():
 
     active = st.on_gemini_disconnected(error="socket closed 1008", code=1008)
     snap = st.snapshot()["gemini"]
-    assert active is False  # 非 LISTENING、非 TTS → 不算活跃掉线
+    assert active is False  # not LISTENING and no TTS → not an active drop
     assert snap["connected"] is False
     assert snap["reconnect_1008_count"] == 1
 
@@ -135,7 +135,7 @@ def test_gemini_disconnect_during_tts_counts_active_drop():
 
 def test_gemini_disconnect_without_prior_connection_is_not_active_drop():
     st = DebugStatus()
-    st.on_wake_woke()  # LISTENING，但会话从未建立
+    st.on_wake_woke()  # LISTENING, but the session never came up
 
     active = st.on_gemini_disconnected(error="connect failed", was_connected=False)
     assert active is False
@@ -271,7 +271,7 @@ def test_usage_metadata_updates_token_usage_snapshot():
 
 
 
-# --- wake_gate / audio 埋点 -----------------------------------------------
+# --- wake_gate / audio events -----------------------------------------------
 
 
 def test_wake_gate_events_update_state_and_counters():
@@ -355,11 +355,11 @@ def test_recent_transcripts_keep_latest_10_and_skip_empty():
 def test_snapshot_is_json_serializable_with_required_fields():
     st = DebugStatus()
     snap = st.snapshot()
-    json.dumps(snap)  # 不抛异常
+    json.dumps(snap)  # does not raise
     assert set(snap) >= {"generated_at", "device", "gemini", "wake_gate", "audio", "recent"}
 
 
-# --- HTTP 端点 -------------------------------------------------------------
+# --- HTTP endpoints -------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -383,7 +383,7 @@ async def test_debug_panel_endpoint_returns_self_refreshing_html():
     assert response.status == 200
     assert response.content_type == "text/html"
     assert "/debug/status" in response.text
-    assert "3000" in response.text  # 3 秒轮询
+    assert "3000" in response.text  # polls every 3 s
     assert "StackChan 状态面板" in response.text
     assert "Token 用量" in response.text
 
@@ -394,7 +394,7 @@ def test_capture_app_defaults_to_singleton_status():
     assert app[DEBUG_STATUS_KEY] is get_debug_status()
 
 
-# --- 组件埋点联动 -----------------------------------------------------------
+# --- events from the components -----------------------------------------------------------
 
 
 class ScriptedSpotter:
@@ -439,7 +439,7 @@ async def test_proxy_wake_and_close_events_reach_debug_status():
     assert st.snapshot()["wake_gate"]["state"] == "LISTENING"
     assert st.snapshot()["wake_gate"]["wake_count"] == 1
 
-    now = 1.5  # 超过 idle_s，闸门关窗
+    now = 1.5  # past idle_s, the gate closes the window
     await proxy._forward_gated_device_pcm(b"\x00\x00")
     assert st.snapshot()["wake_gate"]["state"] == "DORMANT"
     assert st.snapshot()["wake_gate"]["close_count"] == 1

@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 sefuzhou770801-hub
 // SPDX-License-Identifier: BSL-1.0
 //
-// aora-bot (github.com/sam70361/aora-bot) emotion-ball 眼环数据转换器。
-// 读上游 rings.js / emotions.js（路径经 AORA_PATH 提供，上游源码不入仓），
-// 把我们 15 个表情映射到的状态的眼环轮廓平移缩放到本机屏幕坐标系
-// （球心 160,120，半径 100），连同轮换/开合/动画参数生成
-// main/aora_ring_data.hpp。上游更新后重跑本脚本再编译即可同步。
+// Eye-ring data converter for aora-bot's (github.com/sam70361/aora-bot) emotion-ball.
+// Reads the upstream rings.js / emotions.js (path from AORA_PATH; the upstream source is not in this repo),
+// moves and scales the eye-ring contours of the states our 15 expressions map to into the device's screen
+// coordinates (ball centre 160,120, radius 100), and writes them with the rotation / openness / animation
+// parameters to main/aora_ring_data.hpp. After an upstream update, rerun this script and rebuild.
 //
-// 用法: AORA_PATH=/path/to/aora-bot node tools/aora_rings/convert.mjs
+// Usage: AORA_PATH=/path/to/aora-bot node tools/aora_rings/convert.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +31,7 @@ try {
   upstream = execSync(`git -C ${AORA} rev-parse --short HEAD`).toString().trim();
 } catch {}
 
-// 我们的表情枚举 → aora 状态 id
+// Our expression enum → aora state id
 const MAP = [
   ['Neutral', '02'], ['Happy', '10'], ['Sad', '12'], ['Angry', '21'],
   ['Doubt', '11'], ['Sleepy', '00'], ['Listening', '35'], ['Thinking', '30'],
@@ -39,11 +39,11 @@ const MAP = [
   ['Dizzy', '17'], ['Affection', '14'], ['Bored', '04'],
 ];
 
-// 池覆盖：'14' 害羞去掉 ring 0（普通斜杠眼混在里面读不出害羞，
-// 2026-08-30 维护者「摸摸应该是害羞状态」），只留羞怯 24 与闭合 13。
+// Pool override: '14' (shy) drops ring 0 (a plain slanted eye that does not read as shy)
+// and keeps only the bashful ring 24 and the closed ring 13, so petting reads as shy.
 const POOL_OVERRIDE = { '14': [24, 13] };
-// 全局剔除环：ring 8 是八字短杠眼（两眼主轴 -55°/+74° 相对倾斜），
-// 2026-08-30 维护者发真机截图定案「不好看，删了」——待机与思考池都含它。
+// Rings excluded everywhere: ring 8 is a pair of short slanted bars (eye axes at -55°/+74°),
+// which looks wrong on the device; the idle and thinking pools both contained it.
 const BANNED_RINGS = [8];
 const poolOf = (id) => {
   const base = POOL_OVERRIDE[id] ?? byId.get(id).pool;
@@ -51,7 +51,7 @@ const poolOf = (id) => {
   return filtered.length > 0 ? filtered : base.slice(0, 1);
 };
 
-// 缩放：aora 头心 HEAD_C，把所有用到的环装进我们的球（r=100，留边）。
+// Scale: around aora's head centre HEAD_C, fit every used ring into our ball (r=100, with a margin).
 const HEAD = RINGS.HEAD_C;
 const usedRings = [...new Set(MAP.flatMap(([, id]) => poolOf(id)))].sort((a, b) => a - b);
 let maxD = 0;
@@ -62,21 +62,21 @@ for (const ri of usedRings) {
     }
   }
 }
-const SCALE = 88 / maxD; // 环最远点落在半径 88，眼睛不顶球边
+const SCALE = 88 / maxD; // the farthest ring point lands at radius 88, so the eyes never touch the ball's edge
 console.log(`used rings: ${usedRings.join(',')}  maxD=${maxD.toFixed(1)}  scale=${SCALE.toFixed(3)}`);
 
 const ringIndex = new Map(usedRings.map((r, i) => [r, i]));
 
-// ---- NEUTRAL 摆正副本（2026-08-30 维护者：常态不要倒八字眼）----
-// aora 的平静环带歪头姿态：两眼同向斜、一高一低，黑底白圆上读成倒霉相。
-// 给待机池生成矫正副本：各眼绕质心把长轴转竖直、两眼等高、左右对称于
-// 球心，轮廓形状（圆润度/粗细/长短）保持 aora 原样。其他表情用原环。
+// ---- Upright copies for NEUTRAL (currently not used, see below) ----
+// aora's calm rings have a tilted-head pose: both eyes slant the same way, one higher than the other.
+// uprightCopy makes corrected copies for the idle pool: each eye's long axis is rotated upright about its
+// centroid, both eyes at the same height and mirrored about the centre, with aora's contour shape kept.
 function uprightCopy(pair, forceMidY) {
   const centered = pair.map((ring) => {
     let cx = 0, cy = 0;
     for (const [x, y] of ring) { cx += x; cy += y; }
     cx /= ring.length; cy /= ring.length;
-    // PCA 主轴：比较两个候选方向的方差，取长轴
+    // PCA main axis: compare the variance along both candidate directions and take the long axis
     let sxx = 0, syy = 0, sxy = 0;
     for (const [x, y] of ring) {
       const dx = x - cx, dy = y - cy;
@@ -88,7 +88,7 @@ function uprightCopy(pair, forceMidY) {
       return c * c * sxx + 2 * c * s * sxy + s * s * syy;
     };
     const longAxis = varAlong(theta) >= varAlong(theta + Math.PI / 2) ? theta : theta + Math.PI / 2;
-    const rot = Math.PI / 2 - longAxis; // 长轴转到竖直
+    const rot = Math.PI / 2 - longAxis; // rotate the long axis upright
     const cr = Math.cos(rot), sr = Math.sin(rot);
     const pts = ring.map(([x, y]) => {
       const dx = x - cx, dy = y - cy;
@@ -107,13 +107,13 @@ function uprightCopy(pair, forceMidY) {
   };
 }
 
-// 副本统一用第一环的高度：轮换只变形状（粗细长短），眼位不上下跳。
-// 2026-08-30 晚：摆正副本停用，待机回用 aora 原版环。维护者以 aora 展示站
-// 为基准（「眼睛看向的角度不一致」），原版环的倾斜与位置本身承载视线方向。
-// uprightCopy 保留备用：若倒八字观感复发，改用「整体拉平」变体再议。
+// Copies share the first ring's height, so rotating rings changes the shape only and the eyes do not jump.
+// The upright copies are currently off and the idle pool uses aora's original rings: their tilt and position
+// carry the gaze direction, as on aora's own showcase site.
+// uprightCopy is kept so the idle eyes can be levelled again if needed.
 const uprightRows = [];
 const uprightIndexBySrc = new Map();
-// C++ f32 字面量：必须带小数点（77f 非法，77.0f 合法）。
+// C++ float literals need a decimal point (77f is invalid, 77.0f is valid).
 const f = (v) => {
   let s = v.toFixed(2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
   if (s === '-0') s = '0';
@@ -121,7 +121,7 @@ const f = (v) => {
   return s;
 };
 
-// 环数据：屏幕坐标（球心 160,120）
+// Ring data: screen coordinates (ball centre 160,120)
 const emitPair = (pair, label) => {
   const sides = pair.map((ring) =>
     ring.map(([x, y]) => `${f(160 + (x - HEAD) * SCALE)}f, ${f(120 + (y - HEAD) * SCALE)}f`).join(', ')
@@ -130,10 +130,10 @@ const emitPair = (pair, label) => {
 };
 const ringRows = usedRings.map((ri) => emitPair(RINGS.EXPRESSIONS[ri], `aora ring ${ri}`));
 for (const u of uprightRows) {
-  ringRows.push(emitPair(u.pair, `aora ring ${u.src} 摆正副本（NEUTRAL 专用）`));
+  ringRows.push(emitPair(u.pair, `aora ring ${u.src} upright copy (NEUTRAL only)`));
 }
 
-// 表情配置
+// Expression configuration
 const ANIM_KIND = { sine: 0, glance: 1, jitter: 2, scan: 3 };
 const TARGET = { eyes: 0, left: 1, right: 2 };
 const cfgRows = MAP.map(([name, id]) => {
@@ -173,11 +173,11 @@ const hpp = `// SPDX-FileCopyrightText: 2026 sam70361 (Emotion Ball eye-ring and
 // SPDX-FileCopyrightText: 2026 sefuzhou770801-hub (conversion)
 // SPDX-License-Identifier: LicenseRef-Emotion-Ball-Community
 //
-// 本文件由 tools/aora_rings/convert.mjs 生成，勿手改。
-// 数据来源：aora-bot (github.com/sam70361/aora-bot) emotion-ball
-// rings.js / emotions.js，上游 commit ${upstream}。眼环轮廓与行为参数
-// 按 Emotion Ball 社区许可（非商业）使用；许可全文、版权声明与 NOTICE.md
-// 见 third_party/emotion-ball/。球形角色形象（身体造型/配色）未移植。
+// Generated by tools/aora_rings/convert.mjs; do not edit by hand.
+// Source: aora-bot (github.com/sam70361/aora-bot) emotion-ball
+// rings.js / emotions.js, upstream commit ${upstream}. The eye-ring contours and behaviour parameters
+// are used under the Emotion Ball Community License (non-commercial); the full license, copyright notice
+// and NOTICE.md are in third_party/emotion-ball/. The ball character's design (body shape, colours) is not used.
 #pragma once
 
 #include <cstdint>
@@ -187,13 +187,13 @@ namespace stackchan::app::aora {
 inline constexpr std::size_t kRingPoints = 48;
 inline constexpr std::size_t kRingCount = ${usedRings.length + uprightRows.length};
 
-// 每环：左右眼各 48 点屏幕坐标 (x0,y0,x1,y1,...)，球心 160,120。
+// Per ring: 48 screen points for each eye (x0,y0,x1,y1,...), ball centre 160,120.
 inline constexpr float kRings[kRingCount][2][kRingPoints * 2] = {
 ${ringRows.join('\n')}
 };
 
 // anims: kind 0=sine 1=glance 2=jitter 3=scan; axis 0=x 1=y;
-// target 0=both 1=left 2=right。amp 已按环缩放折算成屏幕像素。
+// target 0=both 1=left 2=right. amp is already scaled to screen pixels.
 struct AnimCfg {
     std::uint8_t kind;
     std::uint8_t axis;
@@ -213,7 +213,7 @@ struct ExprCfg {
     std::uint8_t anim_n;
 };
 
-// 下标 = stackchan::avatar::Expression 枚举值（0..14）。
+// Index = stackchan::avatar::Expression value (0..14).
 inline constexpr ExprCfg kExprCfg[15] = {
 ${cfgRows.join('\n')}
 };

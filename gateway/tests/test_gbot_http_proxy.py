@@ -84,7 +84,7 @@ class ProxyServer:
             try:
                 self.request("GET", "/health")
                 return
-            except Exception as exc:  # noqa: BLE001 — 启动期连接拒绝是预期
+            except Exception as exc:  # noqa: BLE001 — connection refused is expected during start-up
                 last_error = exc
                 time.sleep(0.05)
         raise TimeoutError(f"proxy did not become ready: {last_error}")
@@ -206,7 +206,7 @@ class ConcurrentSameBotSend(unittest.TestCase):
                             "/send",
                             body=json.dumps({"text": name}, ensure_ascii=False).encode("utf-8"),
                         )
-                    except Exception as exc:  # noqa: BLE001 — 收集线程内异常到主线程断言
+                    except Exception as exc:  # noqa: BLE001 — collect the thread's exception for the main-thread assert
                         errors[name] = exc
 
                 workers = [
@@ -255,9 +255,9 @@ class ConcurrentSameBotSend(unittest.TestCase):
                 server.close()
 
     def test_send_past_scaled_old_join_cap_does_not_leak(self) -> None:
-        # 默认发送链约 60 秒、原 join 上限 25 秒。send 超时从 20 缩到 4 后，
-        # 25 秒上限相当于 5 秒。延迟 3.2 秒小于单次超时（进程能写完回复），
-        # 但远大于首句超时，504 之后 send 仍跑约 2.8 秒；join 必须等到线程结束。
+        # By default a send takes up to about 60 s and the old join limit was 25 s. With the send timeout cut from 20 to 4,
+        # the 25 s limit scales to 5 s. A 3.2 s delay is below one send timeout (the process can finish its reply)
+        # but well above the first-sentence timeout, so send still runs about 2.8 s after the 504; join must wait for the thread.
         send_timeout = 4.0
         delay = 3.2
         with tempfile.TemporaryDirectory() as tmp:

@@ -123,8 +123,8 @@ jobs:
           # Older releases stay fully downloadable from the GitHub Releases
           # page — raising this floor only prunes the Pages mirror (and the
           # versions.json entries the Web Flasher / release-fetch OTA offer).
-          # groki-bot 自 v0.1.0 起独立编号，上游遗留的 v0.7.0 门槛会把我们的
-          # 全部版本跳过（2026-09-15 首发时 versions.json 为空）。
+          # groki-bot numbers its releases from v0.1.0; the v0.7.0 minimum inherited from upstream would skip
+          # every one of them (versions.json came out empty for the first release).
           RETAIN_FLOOR="v0.1.0"
           # Look releases and their assets up by release id. The by-tag view
           # (`gh release view <tag>`, /releases/tags/<tag>) can keep reporting

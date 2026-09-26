@@ -22,8 +22,8 @@ namespace {
 constexpr const char* kTag = "servo";
 constexpr TickType_t kPeriodTicks = pdMS_TO_TICKS(20);
 
-// 默认弹簧速度。弹簧生效时把 SCS Goal Speed 置为 0，让舵机跟随
-// 插值后的目标点，避免在弹簧外再叠一层慢速斜坡。Goal Time = 0 表示立即运动。
+// Default spring speed. While the spring is active the SCS Goal Speed is set to 0 so the servo follows
+// the interpolated target without a second slow ramp on top of the spring. Goal Time = 0 means move at once.
 constexpr std::uint16_t kDefaultSpringSpeed = 200;
 constexpr std::uint16_t kFollowGoalSpeed = 0;
 constexpr std::uint16_t kGoalTime = 0;
@@ -55,14 +55,14 @@ void servo_task_entry(void* arg)
     } else {
         ESP_LOGI(kTag, "pitch (id=%u) ping OK", scs_servo::kPitchId);
     }
-    // 按需打开扭矩：运动前打开，弹簧稳定后释放。头部静止时，舵机保持安静、
-    // 低温、可被手动拨动。设备端「操作」开关把 servo_enabled 设为 false 时，
-    // 强制关闭扭矩并抑制所有运动（脱力）。
+    // Torque on demand: on before moving, released once the spring settles. While the head rests the servos stay quiet,
+    // cool and can be turned by hand. When the on-device 操作 (control) switch sets servo_enabled to false,
+    // torque is forced off and all motion is suppressed (limp).
     constexpr std::uint32_t kSettleMarginMs = 150;
     auto now_ms = [] { return static_cast<std::uint32_t>(esp_timer_get_time() / 1000); };
     auto target_changed = [](float a, float b) { return std::fabs(a - b) > 0.001f; };
 
-    // 启动时先关闭扭矩；第一次循环会驱动到当前命令姿态。
+    // Torque off at start; the first loop drives to the current commanded pose.
     std::uint16_t last_yaw_target = 0xFFFF;
     std::uint16_t last_pitch_target = 0xFFFF;
     groki_motion::SpringAxis yaw_motion;
@@ -109,7 +109,7 @@ void servo_task_entry(void* arg)
             continue;
         }
         if (last_range_mode) {
-            // 退出范围设置模式：用刚读到的当前位置复位弹簧，再丢弃旧读数。
+            // Leaving range-setting mode: reset the springs to the position just read, then drop the old readings.
             if (const auto raw = args.state->servo.yaw_raw.load(std::memory_order_relaxed); raw >= 0) {
                 yaw_motion.reset(clamp_deg(scs_servo::raw_to_deg(static_cast<std::uint16_t>(raw),
                                                                  args.limits.yaw_zero),
@@ -138,7 +138,7 @@ void servo_task_entry(void* arg)
             continue;
         }
         if (!last_enabled) {
-            // 重新启用（復帰）：重新驱动到当前命令姿态。
+            // Re-enabled: drive to the current commanded pose again.
             last_yaw_target = last_pitch_target = 0xFFFF;
             last_enabled = true;
         }
@@ -187,8 +187,8 @@ void servo_task_entry(void* arg)
 
         if (target_changed(yaw_deg, yaw_motion.target()) ||
             target_changed(pitch_deg, pitch_motion.target())) {
-            // 非零 speed_override 只在下一次目标变化时消费一次。
-            // 这样快速手势不会永久提高后续空闲动作的弹簧速度。
+            // A non-zero speed_override is consumed once, on the next target change,
+            // so a fast gesture does not permanently speed up the springs of later idle motion.
             const std::uint16_t override =
                 args.state->servo.speed_override.exchange(0, std::memory_order_relaxed);
             const std::uint16_t speed = override != 0 ? override : kDefaultSpringSpeed;

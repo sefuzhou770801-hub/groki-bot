@@ -77,18 +77,18 @@ def _serialize_usage_metadata(usage_metadata: Any) -> dict[str, Any]:
 
 @dataclass
 class DebugStatus:
-    """网关全局运行状态。每个字段只由对应组件的埋点方法写入。"""
+    """Gateway-wide runtime status. Each field is written only by the event method of the component that owns it."""
 
     clock: Callable[[], float] = time.time
 
-    # ---- device（ESP32 WebSocket 连接）----
+    # ---- device (ESP32 WebSocket connection)----
     device_connected_flag: bool = False
     device_id: str | None = None
     device_connected_since: float | None = None
     device_last_disconnect_at: float | None = None
     device_disconnect_count: int = 0
 
-    # ---- gemini（Live 会话）----
+    # ---- gemini (Live session)----
     gemini_generation: int = 0
     gemini_running: bool = False
     gemini_connected_flag: bool = False
@@ -112,7 +112,7 @@ class DebugStatus:
     gemini_last_keepalive_skip_at: float | None = None
     gemini_token_usage: dict[str, Any] | None = None
 
-    # ---- wake_gate（唤醒词闸门）----
+    # ---- wake_gate (wake word gate)----
     wake_available: bool = False
     wake_state: str = "DORMANT"
     wake_last_wake_at: float | None = None
@@ -136,7 +136,7 @@ class DebugStatus:
         default_factory=lambda: deque(maxlen=RECENT_LIMIT)
     )
 
-    # ---- device 埋点 ----
+    # ---- device events ----
 
     def on_device_connected(self, device_id: str | None = None) -> None:
         self.device_connected_flag = True
@@ -149,7 +149,7 @@ class DebugStatus:
         self.device_last_disconnect_at = self.clock()
         self.device_disconnect_count += 1
 
-    # ---- gemini 埋点 ----
+    # ---- gemini events ----
 
     def next_gemini_generation(self) -> int:
         """Allocate a generation id for a new Live bridge instance."""
@@ -196,10 +196,12 @@ class DebugStatus:
         was_connected: bool = True,
         generation: int | None = None,
     ) -> bool:
-        """记录一次 Gemini 会话结束；返回是否属于活跃对话掉线。
+        """Record the end of a Gemini session; return whether it dropped an
+        active conversation.
 
-        活跃 = 唤醒闸门处于 LISTENING，或设备正在播放 TTS。这两个信号本身
-        由各自组件埋点维护，所以判定在这里做，调用方不用重复取状态。
+        Active means the wake gate is LISTENING or the device is playing TTS.
+        Both signals are kept by their own components, so the decision is made
+        here and callers need not fetch them.
         """
         now = self.clock()
         if not self._is_current_generation(generation):
@@ -255,7 +257,7 @@ class DebugStatus:
         self.gemini_tool_call_cancel_count += 1
         self.gemini_last_tool_call_cancel_at = self.clock()
 
-    # ---- wake_gate 埋点 ----
+    # ---- wake_gate events ----
 
     def on_wake_gate_configured(self, *, available: bool, state: str = "DORMANT") -> None:
         self.wake_available = available
@@ -274,7 +276,7 @@ class DebugStatus:
         self.wake_available = False
         self.wake_state = "UNAVAILABLE"
 
-    # ---- audio 埋点 ----
+    # ---- audio events ----
 
     def on_device_audio(self) -> None:
         self.last_device_audio_at = self.clock()
@@ -287,7 +289,7 @@ class DebugStatus:
             self._tts_sources.discard(source)
         self.tts_active = bool(self._tts_sources)
 
-    # ---- recent 埋点 ----
+    # ---- recent events ----
 
     def record_tool_call(self, name: str, ok: bool, error: str | None = None) -> None:
         entry: dict[str, Any] = {"name": name, "ok": ok, "at": self.clock()}
@@ -300,10 +302,10 @@ class DebugStatus:
             return
         self.recent_transcripts.append({"text": text, "at": self.clock()})
 
-    # ---- 快照 ----
+    # ---- snapshot ----
 
     def snapshot(self) -> dict[str, Any]:
-        """输出 ``GET /debug/status`` 的 JSON 结构。recent 按新到旧排列。"""
+        """Build the JSON for ``GET /debug/status``. recent lists newest first."""
         return {
             "generated_at": self.clock(),
             "device": {
@@ -362,7 +364,7 @@ _status: DebugStatus | None = None
 
 
 def get_debug_status() -> DebugStatus:
-    """网关进程内的单例状态。测试可自建 DebugStatus 实例注入。"""
+    """Process-wide singleton. Tests can inject their own DebugStatus instance."""
     global _status
     if _status is None:
         _status = DebugStatus()
@@ -370,6 +372,6 @@ def get_debug_status() -> DebugStatus:
 
 
 def reset_debug_status() -> None:
-    """测试用：丢弃单例，下次 get 重建。"""
+    """For tests: drop the singleton; the next get creates a new one."""
     global _status
     _status = None

@@ -36,9 +36,9 @@ class IdleBehavior:
         self.min_interval_s = min_interval_s if min_interval_s is not None else float(os.getenv("STACKCHAN_IDLE_MIN_S", "4"))
         self.max_interval_s = max_interval_s if max_interval_s is not None else float(os.getenv("STACKCHAN_IDLE_MAX_S", "8"))
         self.pause_seconds = pause_seconds if pause_seconds is not None else float(os.getenv("STACKCHAN_IDLE_PAUSE_S", "3"))
-        # 默认 0：固件 IdleMotionModifier（M5 官方移植）接管 idle 动作，
-        # 网关侧 idle 留作兜底/调试，默认关闭，避免双发 set_head_angles
-        # 让弹簧动画来回打架。需要时 export STACKCHAN_GATEWAY_IDLE_ENABLED=1。
+        # Default 0: the firmware's IdleMotionModifier (ported from M5's official one) owns idle motion.
+        # The gateway-side idle is kept as a fallback / debug aid and is off by default, so two sources
+        # never send set_head_angles and fight over the spring animation. Set STACKCHAN_GATEWAY_IDLE_ENABLED=1 to use it.
         self.enabled = os.getenv("STACKCHAN_GATEWAY_IDLE_ENABLED", "0").lower() not in {"0", "false", "no", "off"}
         self._rng = rng or random.Random()
         self._task: asyncio.Task[None] | None = None
@@ -134,12 +134,12 @@ class IdleBehavior:
         """Mirror official IdleMotionModifier action mix in degree units."""
         action = self._rng.randrange(100)
         if action < 50:
-            # 50%: 随意环视。官方 idle_motion.h::perform_idle_motion 调
-            # motion.lookAtNormalized(target_x, target_y, speed)，把 -1..1
-            # 线性映射到舵机限位。我们 yaw 限位是 ±90°、pitch 是 0..60°，
-            # 所以 yaw = x × 90、pitch 用 y∈[-1,1] 映到 [0,60]。
-            # 之前 yaw = x × 128 是凭手感写的，超出限位被钳位反而显得幅度
-            # 大但都贴在边上，不像官方那种"小幅环视"。
+            # 50%: look around. M5's official idle_motion.h::perform_idle_motion calls
+            # motion.lookAtNormalized(target_x, target_y, speed), which maps -1..1
+            # linearly onto the servo limits. Here yaw is limited to ±90° and pitch to 0..60°,
+            # so yaw = x × 90 and pitch maps y in [-1,1] onto [0,60].
+            # A larger factor gets clamped at the limits, so the head sits at the edges
+            # instead of the small look-around the official motion has.
             target_x = self._rng.uniform(-0.4, 0.4)
             target_y = self._rng.uniform(-0.95, 0.2)
             yaw = round(target_x * 90)
@@ -147,19 +147,19 @@ class IdleBehavior:
             speed = self._rng.randint(150, 300)
             label = "look_around"
         elif action < 80:
-            # 30%: 当前位置附近微小观察（官方 diff yaw ±15°, pitch ±8°）
+            # 30%: small glance around the current pose (official diff: yaw ±15°, pitch ±8°)
             yaw = round(self._last_yaw + self._rng.uniform(-15, 15))
             pitch = round(self._last_pitch + self._rng.uniform(-8, 8))
             speed = self._rng.randint(100, 250)
             label = "observe"
         elif action < 90:
-            # 10%: 快速撇一眼
+            # 10%: quick glance
             yaw = self._rng.randint(-50, 50)
             pitch = self._rng.randint(10, 40)
             speed = self._rng.randint(250, 400)
             label = "glance"
         else:
-            # 10%: 回正
+            # 10%: back to centre
             yaw = 0
             pitch = self._rng.randint(5, 40)
             speed = self._rng.randint(100, 300)

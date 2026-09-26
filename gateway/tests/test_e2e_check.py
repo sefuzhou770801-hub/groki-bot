@@ -1,4 +1,4 @@
-"""一键端到端自检核心逻辑的测试（全部 seam 注入，无真实 I/O）。"""
+"""Tests for the end-to-end self-check core logic (all I/O injected, none real)."""
 
 from typing import Any
 
@@ -28,7 +28,7 @@ def healthy_status(**overrides: Any) -> dict[str, Any]:
 
 
 class FakeGateway:
-    """可编排的假网关：fetch/post/run_cmd/sleep/clock 全部走这里。"""
+    """Scriptable fake gateway: fetch/post/run_cmd/sleep/clock all go through here."""
 
     def __init__(self, status: dict[str, Any] | None = None) -> None:
         self.status = status or healthy_status()
@@ -71,7 +71,7 @@ class FakeGateway:
         )
 
 
-# --- 状态健康检查 ----------------------------------------------------------
+# --- status check ----------------------------------------------------------
 
 
 def test_check_status_passes_when_all_healthy():
@@ -89,9 +89,9 @@ def test_check_status_lists_every_problem():
     )
     result = gw.make_checker().check_status()
     assert result.passed is False
-    assert "device 未连接" in result.detail
-    assert "gemini 未连接" in result.detail
-    assert "wake_gate 不可用" in result.detail
+    assert "device not connected" in result.detail
+    assert "gemini not connected" in result.detail
+    assert "wake_gate unavailable" in result.detail
 
 
 def test_check_status_fails_when_gateway_unreachable():
@@ -101,10 +101,10 @@ def test_check_status_fails_when_gateway_unreachable():
     checker = E2EChecker(fetch_json=broken_fetch)
     result = checker.check_status()
     assert result.passed is False
-    assert result.detail.startswith("无法获取")
+    assert result.detail.startswith("cannot read")
 
 
-# --- 文字问答 ---------------------------------------------------------------
+# --- text Q&A ---------------------------------------------------------------
 
 
 def test_text_qa_passes_when_new_transcript_appears_after_inject():
@@ -125,8 +125,8 @@ def test_text_qa_ignores_stale_transcripts_and_times_out():
     gw.status["recent"]["transcripts"] = [{"text": "旧回应", "at": 50.0}]
     result = gw.make_checker(timeout_s=15.0).check_text_qa()
     assert result.passed is False
-    assert "未见新 transcript" in result.detail
-    assert gw.now >= 15.0  # 轮询等满了超时
+    assert "without a new transcript" in result.detail
+    assert gw.now >= 15.0  # polled until the timeout
 
 
 def test_text_qa_fails_fast_when_no_active_session():
@@ -134,10 +134,10 @@ def test_text_qa_fails_fast_when_no_active_session():
     gw.inject_response = {"ok": True, "active_session": False}
     result = gw.make_checker().check_text_qa()
     assert result.passed is False
-    assert "活跃会话" in result.detail
+    assert "active session" in result.detail
 
 
-# --- 语音唤醒 ---------------------------------------------------------------
+# --- voice wake ---------------------------------------------------------------
 
 
 def test_voice_wake_passes_when_wake_count_increases():
@@ -171,7 +171,7 @@ def test_voice_wake_fails_when_say_command_missing():
     gw.cmd_results["say"] = (127, "say not found")
     result = gw.make_checker().check_voice_wake()
     assert result.passed is False
-    assert "say 播报失败" in result.detail
+    assert "say failed" in result.detail
 
 
 def test_voice_wake_hints_device_listing_when_say_device_fails(monkeypatch):
@@ -187,14 +187,14 @@ def test_voice_wake_times_out_without_new_wake():
     gw = FakeGateway()
     result = gw.make_checker(timeout_s=15.0).check_voice_wake()
     assert result.passed is False
-    assert "没有新唤醒记录" in result.detail
+    assert "without a new wake" in result.detail
 
 
-# --- 音乐控制 ---------------------------------------------------------------
+# --- music control ---------------------------------------------------------------
 
 
 class MusicGateway(FakeGateway):
-    """osascript 假实现：注入放歌/暂停指令后播放器状态随之切换。"""
+    """Fake osascript: the player state follows the injected play/pause requests."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -226,7 +226,7 @@ def test_music_check_verifies_play_then_pause():
 
 def test_music_check_fails_when_state_never_reaches_playing():
     gw = MusicGateway()
-    gw.player = "missing"  # 播放器状态卡在 stopped
+    gw.player = "missing"  # the player stays stopped
 
     def run_cmd(cmd):
         gw.cmds.append(cmd)
@@ -235,18 +235,18 @@ def test_music_check_fails_when_state_never_reaches_playing():
     gw.run_cmd = run_cmd
     result = gw.make_checker(timeout_s=15.0).check_music()
     assert result.passed is False
-    assert "放歌未生效" in result.detail
+    assert "playback did not start" in result.detail
 
 
 def test_music_check_reports_no_player():
     gw = FakeGateway()
-    gw.cmd_results["osascript"] = (0, "no player running")  # mac_control 哨兵值
+    gw.cmd_results["osascript"] = (0, "no player running")  # mac_control sentinel value
     result = gw.make_checker(timeout_s=15.0).check_music()
     assert result.passed is False
     assert "no-player" in result.detail
 
 
-# --- 编排与汇总 -------------------------------------------------------------
+# --- run all and summary -------------------------------------------------------------
 
 
 def test_run_all_default_skips_voice_and_runs_music():
@@ -259,7 +259,7 @@ def test_run_all_default_skips_voice_and_runs_music():
     gw.on_sleep = add_transcript
     results = gw.make_checker().run_all()
     names = [r.name for r in results]
-    assert names == ["状态健康检查", "文字问答", "语音唤醒", "音乐控制"]
+    assert names == ["Status", "Text Q&A", "Voice wake", "Music control"]
     voice = results[2]
     assert voice.skipped is True
     assert has_failure(results) is False
@@ -278,15 +278,15 @@ def test_run_all_marks_rest_skipped_when_gateway_unreachable():
 
 def test_render_report_contains_labels_and_summary():
     results = [
-        CheckResult("状态健康检查", True, "全部在线"),
-        CheckResult("文字问答", False, "超时"),
-        CheckResult("语音唤醒", True, "未启用", skipped=True),
+        CheckResult("Status", True, "all online"),
+        CheckResult("Text Q&A", False, "timed out"),
+        CheckResult("Voice wake", True, "not enabled", skipped=True),
     ]
     report = render_report(results)
-    assert "[PASS] 状态健康检查" in report
-    assert "[FAIL] 文字问答" in report
-    assert "[SKIP] 语音唤醒" in report
-    assert "1 项通过，1 项失败，1 项跳过" in report
+    assert "[PASS] Status" in report
+    assert "[FAIL] Text Q&A" in report
+    assert "[SKIP] Voice wake" in report
+    assert "1 passed, 1 failed, 1 skipped" in report
 
 
 def test_main_returns_nonzero_on_failure(monkeypatch, capsys):
@@ -300,7 +300,7 @@ def test_main_returns_nonzero_on_failure(monkeypatch, capsys):
     rc = main(["--skip-music"])
     assert rc == 1
     out = capsys.readouterr().out
-    assert "StackChan 端到端自检" in out
+    assert "Groki Bot end-to-end self-check" in out
     assert "[FAIL]" in out
 
 

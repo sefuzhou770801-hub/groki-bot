@@ -25,8 +25,8 @@ std::uint16_t clamp_speed(std::uint16_t speed) noexcept
 
 std::uint32_t next_rand(std::uint32_t& x) noexcept
 {
-    // 用一个小型确定性混合器，把一次 esp_random() 扩展成几个稳定选择，
-    // 不在这里增加新的运行时依赖。
+    // A small deterministic mixer expands one esp_random() value into several stable choices
+    // without adding a runtime dependency here.
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
@@ -52,8 +52,8 @@ SpringParams spring_params_for_speed(std::uint16_t speed) noexcept
 {
     speed = clamp_speed(speed);
 
-    // 速度到弹簧参数的映射沿用 M5Stack 动作层的二次曲线：speed=500 时
-    // 刚度约为 170，并使用临界阻尼，让目标变化带惯性但不明显过冲。
+    // Speed maps to spring parameters with the quadratic curve of M5Stack's motion layer: at speed=500
+    // the stiffness is about 170, with critical damping, so target changes carry inertia without visible overshoot.
     constexpr float kMinStiffness = 10.0f;
     constexpr float kMaxStiffness = 650.0f;
     constexpr float kMass = 1.0f;
@@ -142,15 +142,15 @@ Pose head_pet_pose(float base_yaw_deg, float base_pitch_deg, Limits limits,
     float yaw = base_yaw_deg;
     float pitch = base_pitch_deg;
     switch (action) {
-    case 0: // 轻微抬头，并加一点左右偏移
+    case 0: // look up slightly, with a little sideways offset
         pitch += static_cast<float>(rand_int(seed, 15, 25));
         yaw += static_cast<float>(rand_int(seed, -5, 5));
         break;
-    case 1: // 轻微歪头
+    case 1: // slight head tilt
         pitch -= static_cast<float>(rand_int(seed, 0, 5));
         yaw += rand_int(seed, 0, 1) == 0 ? -15.0f : 15.0f;
         break;
-    default: // 幅度更大的开心抬头，仍受新底盘限位约束
+    default: // bigger happy look-up, still within the base's limits
         pitch += static_cast<float>(rand_int(seed, 25, 40));
         break;
     }
@@ -173,7 +173,7 @@ Pose idle_pose(float current_yaw_deg, float current_pitch_deg, Limits limits,
     std::uint16_t speed = 180;
 
     if (action < 50) {
-        // 随意环视：限制在配置范围的中段。
+        // Look around: stay in the middle part of the configured range.
         yaw = rand_float(seed,
                          limits.yaw_min_deg * 0.4f,
                          limits.yaw_max_deg * 0.4f);
@@ -182,12 +182,12 @@ Pose idle_pose(float current_yaw_deg, float current_pitch_deg, Limits limits,
                            limits.pitch_max_deg * 0.4f);
         speed = static_cast<std::uint16_t>(rand_int(seed, 150, 300));
     } else if (action < 80) {
-        // 基于当前姿态做很小的观察动作。
+        // Small glance around the current pose.
         yaw += static_cast<float>(rand_int(seed, -12, 12));
         pitch += static_cast<float>(rand_int(seed, -6, 6));
         speed = static_cast<std::uint16_t>(rand_int(seed, 120, 250));
     } else if (action < 90) {
-        // 快速瞥一眼，但仍小于完整机械范围。
+        // Quick glance, still smaller than the full mechanical range.
         yaw = rand_float(seed,
                          limits.yaw_min_deg * 0.55f,
                          limits.yaw_max_deg * 0.55f);
@@ -196,7 +196,7 @@ Pose idle_pose(float current_yaw_deg, float current_pitch_deg, Limits limits,
                            limits.pitch_max_deg * 0.5f);
         speed = static_cast<std::uint16_t>(rand_int(seed, 250, 400));
     } else {
-        // 左右回到中间，同时保留小幅俯仰变化。
+        // Back to the centre left/right, keeping a small pitch change.
         yaw = 0.0f;
         pitch = rand_float(seed,
                            limits.pitch_min_deg * 0.4f,

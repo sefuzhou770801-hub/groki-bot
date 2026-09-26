@@ -33,7 +33,8 @@ esp_partition_mmap_handle_t g_mmap = 0;
 const void* g_mapped = nullptr;
 std::uint32_t g_mapped_size = 0;
 
-// 只认名为 "voice" 的独立分区。没有则所有写入拒绝，绝不使用待机 OTA 槽。
+// Only a separate partition named "voice" is used. Without it every write is refused; the standby OTA
+// slot is never used.
 const esp_partition_t* find_partition() {
     if (g_part == nullptr) {
         g_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, kPart);

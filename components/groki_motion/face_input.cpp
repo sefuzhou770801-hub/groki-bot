@@ -219,7 +219,7 @@ Intent FaceInput::feed_imu(const ImuSample& imu, std::uint32_t now_ms) noexcept 
 
     filtered_x_ += (imu.ax - filtered_x_) * kFilter;
     filtered_y_ += (imu.ay - filtered_y_) * kFilter;
-    // 握持角度缓慢并入中性点，避免一直斜着拿就把眼睛钉死。
+    // Slowly fold the holding angle into the neutral point, so holding the device tilted does not pin the eyes.
     neutral_x_ += (filtered_x_ - neutral_x_) * 0.0004f;
     neutral_y_ += (filtered_y_ - neutral_y_) * 0.0004f;
 

@@ -279,8 +279,8 @@ CONVERSATION_IDLE_TIMEOUT_S = 8.0
 DEFAULT_CTX_TRIGGER_TOKENS = 25_000
 DEFAULT_CTX_TARGET_TOKENS = 8_000
 DEFAULT_VAD_SILENCE_MS = 650
-# DORMANT 静默期服务端可能长时间不发消息，但已知约 270s 会 1008 踢线（踢线
-# 本身是一条消息）。超过 300s 仍收不到任何服务端消息视为半开连接，主动重连。
+# While DORMANT the server may stay silent for a long time, but it is known to close with 1008
+# after about 270 s (the close is itself a message). No server message for over 300 s means a half-open connection: reconnect.
 DEFAULT_RECEIVE_STALL_S = 300.0
 DEFAULT_MANUAL_VAD = True
 DEFAULT_RECONNECT_AUDIO_TTL_S = 5.0
@@ -321,7 +321,7 @@ def _log_session_dead_task(task: asyncio.Task[None]) -> None:
 
 
 def _close_code(exc: BaseException | None) -> int | None:
-    """从 websocket 异常里提取关闭码；取不到属性时在异常文本里查找 1008。"""
+    """Extract the close code from a websocket exception; without the attribute, look for 1008 in the text."""
     if exc is None:
         return None
     code = getattr(getattr(exc, "rcvd", None), "code", None)
@@ -869,7 +869,7 @@ ActivityCallback = Callable[[], None]
 
 @dataclass(frozen=True)
 class ToolMetadata:
-    """Live 工具调度元数据。相同 exclusive_group 在同回合内串行。"""
+    """Live tool dispatch metadata. Tools in the same exclusive_group run one after another within a turn."""
 
     side_effect: bool
     exclusive_group: str | None = None
@@ -1009,8 +1009,8 @@ class GeminiLiveBridge:
         self._receive_watchdog_task: asyncio.Task[None] | None = None
         self._receive_stall_triggered = False
         self._mono_clock: Callable[[], float] = time.monotonic
-        # 手动 VAD：activity 边界是否已打开。send_audio 在边界外会自动补
-        # activity_start；send_activity_end / 新会话建立时复位。
+        # Manual VAD: whether an activity is open. send_audio opens one automatically
+        # (activity_start) when none is; send_activity_end and a new session reset it.
         self._activity_open = False
         self._cancelled_tool_call_ids: set[str] = set()
         self._tool_call_task_ids: dict[str, int] = {}
@@ -1056,7 +1056,7 @@ class GeminiLiveBridge:
         return self._activity_open
 
     def _reset_manual_vad_activity(self) -> None:
-        """新 Live 会话建立时复位 activity 边界，避免沿用旧会话的打开状态。"""
+        """Reset the activity state when a new Live session starts, so an open activity is not carried over."""
         self._activity_open = False
 
     async def _ensure_manual_vad_activity_open(self) -> None:
@@ -1218,7 +1218,7 @@ class GeminiLiveBridge:
             )
 
     def _note_session_end(self, exc: BaseException | None) -> None:
-        """会话结束埋点；活跃对话（LISTENING/TTS 播放中）掉线升级为 ERROR。"""
+        """Record the end of a session; a drop during an active conversation (LISTENING or TTS playing) is logged as ERROR."""
         was_connected = self._session is not None
         active = self._status.on_gemini_disconnected(
             error=str(exc) if exc is not None else None,
@@ -1228,8 +1228,8 @@ class GeminiLiveBridge:
         )
         if active:
             logger.error(
-                "Gemini Live 会话在活跃对话中掉线（说着说着没声音的直接证据）：%s",
-                exc if exc is not None else "会话正常结束",
+                "Gemini Live session dropped during an active conversation (the robot goes silent mid-conversation): %s",
+                exc if exc is not None else "session ended normally",
             )
 
     async def _receive_loop(self) -> None:
@@ -1269,7 +1269,7 @@ class GeminiLiveBridge:
                     pass
 
     async def _receive_liveness_watchdog(self) -> None:
-        """应用层接收活性兜底：半开连接时 receive() 可能无限挂起。"""
+        """Application-level receive-stall fallback: on a half-open connection receive() can hang forever."""
         poll_s = min(5.0, max(1.0, self._receive_stall_s / 10.0))
         while not self._stop_event.is_set():
             await asyncio.sleep(poll_s)
@@ -1673,7 +1673,7 @@ class GeminiLiveBridge:
         }
 
     def _should_defer_set_all_leds(self) -> bool:
-        # TTS 说话蓝灯与 LISTENING 聆听青灯均由 proxy 维护，模型不得覆盖。
+        # The speaking blue and the listening cyan are owned by the proxy; the model must not override them.
         if self._status.tts_active:
             return True
         getter = self._wake_gate_state_getter
@@ -2104,11 +2104,11 @@ class GeminiLiveBridge:
         )
 
     async def send_keepalive_audio(self, pcm_16khz: bytes) -> None:
-        """发送保活静音帧。
+        """Send a keepalive silent frame.
 
-        与 :meth:`send_audio` 的区别：不取消对话静默计时器——保活帧是
-        网关自己造的信号，不代表用户在说话，不应该影响 end_conversation
-        的静默判定。
+        Unlike :meth:`send_audio`, this does not cancel the conversation silence timer: keepalive frames are
+        made up by the gateway, do not mean the user is speaking, and must not affect the end_conversation
+        silence check.
         """
         if self._session is None or self._go_away_received:
             return
@@ -2153,7 +2153,7 @@ class GeminiLiveBridge:
             logger.exception("Gemini Live silence timeout failed")
 
     async def send_activity_start(self) -> None:
-        """手动 VAD：标记用户 activity 开始（须在 automatic VAD 禁用时发送）。"""
+        """Manual VAD: mark the start of user activity (only with automatic VAD disabled)."""
         if self._session is None or self._go_away_received:
             return
         if not manual_vad_enabled() or self._activity_open:
@@ -2164,7 +2164,7 @@ class GeminiLiveBridge:
         self._activity_open = True
 
     async def send_activity_end(self) -> None:
-        """手动 VAD：标记用户 activity 结束。"""
+        """Manual VAD: mark the end of user activity."""
         if self._session is None or self._go_away_received:
             return
         if not manual_vad_enabled() or not self._activity_open:

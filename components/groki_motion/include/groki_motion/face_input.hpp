@@ -7,9 +7,9 @@
 
 namespace stackchan::groki_motion {
 
-// LCD + IMU 语义事件。demo_loop 把 M5.Touch / M5.Imu 的一帧采样送进来，
-// 取出 intent 写 SharedState；手势判定本身不碰硬件。
-// Intent → Expression 的映射在装配层（main/face_intent_map.hpp）。
+// LCD + IMU gesture events. demo_loop feeds in one frame of M5.Touch / M5.Imu samples
+// and writes the resulting intent to SharedState; the gesture logic itself never touches hardware.
+// The Intent → Expression mapping lives in the assembly layer (main/face_intent_map.hpp).
 
 enum class Intent : std::uint8_t {
     None,

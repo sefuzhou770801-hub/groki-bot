@@ -1,4 +1,4 @@
-"""Gemini 会话保活调度与活跃掉线告警的测试。"""
+"""Tests for the Gemini session keepalive scheduler and the active-drop warning."""
 
 import asyncio
 
@@ -13,7 +13,7 @@ from stackchan_mcp.session_keepalive import (
 
 
 class StepSleep:
-    """假时钟：每次 step() 放行一个睡眠周期，测试完全控制节奏。"""
+    """Fake clock: each step() releases one sleep period, so the test controls the pace."""
 
     def __init__(self) -> None:
         self.permits: asyncio.Queue[None] = asyncio.Queue()
@@ -25,14 +25,14 @@ class StepSleep:
 
     async def step(self) -> None:
         self.permits.put_nowait(None)
-        # 让保活循环把发送跑完并回到下一次睡眠。
+        # Let the keepalive loop finish sending and go back to sleep.
         for _ in range(5):
             await asyncio.sleep(0)
 
 
 def test_silence_pcm_is_16khz_int16_zeroes():
     pcm = silence_pcm(200)
-    assert len(pcm) == 16_000 * 2 * 200 // 1000  # 6400 字节
+    assert len(pcm) == 16_000 * 2 * 200 // 1000  # 6400 bytes
     assert pcm == b"\x00" * len(pcm)
 
 
@@ -120,9 +120,9 @@ async def test_keepalive_survives_send_failure():
     )
     ka.start()
     try:
-        await sleep.step()  # 第一轮发送失败
+        await sleep.step()  # first send fails
         assert sent_ok == []
-        await sleep.step()  # 循环没死，第二轮成功
+        await sleep.step()  # the loop survives; the second send succeeds
         assert len(attempts) == 2
         assert len(sent_ok) == 1
     finally:

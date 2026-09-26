@@ -1,25 +1,30 @@
-"""一键端到端自检。
+"""One-command end-to-end self-check.
 
-顺序执行四项检查并输出 PASS/FAIL 汇总表，有失败时退出码非零：
+Runs four checks in order and prints a PASS/FAIL table; the exit code is
+non-zero when any check fails:
 
-1. 状态健康检查：``GET /debug/status`` 里 device / gemini / wake_gate 全部在线；
-2. 文字问答：``POST /debug/inject-text`` 注入「自检：现在几点」，15 秒内
-   transcript 出现新回应；
-3. 语音唤醒（``--with-voice`` 才启用，需要 Mac 扬声器）：``say -v Tingting``
-   播报唤醒词；若设置 ``STACKCHAN_E2E_SAY_DEVICE``，会传给 ``say -a`` 指定
-   输出设备。15 秒内 wake_gate 出现新唤醒记录；
-4. 音乐控制：注入放歌指令后核实播放器 player state 为 playing，再注入
-   暂停指令核实 paused（Spotify 优先，其次 Music，与 mac_control 同一套判定）。
+1. Status: ``GET /debug/status`` shows device / gemini / wake_gate online.
+2. Text Q&A: ``POST /debug/inject-text`` injects a question ("自检：现在几点",
+   "self-check: what time is it"); a new transcript must appear within 15 s.
+3. Voice wake (only with ``--with-voice``, needs the Mac speaker): ``say -v
+   Tingting`` speaks the wake word; ``STACKCHAN_E2E_SAY_DEVICE`` is passed to
+   ``say -a`` to pick the output device. A new wake must be recorded within
+   15 s.
+4. Music control: inject a "play a song" request and check that the player
+   state becomes playing, then a "pause" request and check paused (Spotify
+   first, then Music, with the same logic as mac_control).
 
-用法::
+Usage::
 
     cd gateway && uv run python -m stackchan_mcp.e2e_check
     uv run python -m stackchan_mcp.e2e_check --with-voice
     ./scripts/e2e_check.sh --with-voice
 
-网络请求直连回环地址、绕过系统代理（本机 HTTP_PROXY 会劫持 localhost）。
-所有外部 I/O（HTTP、子进程、睡眠、时钟）都是可注入 seam，单元测试用假
-实现驱动核心逻辑。
+Requests go straight to the loopback address and bypass the system proxy (a
+local HTTP_PROXY would hijack localhost). All external I/O (HTTP, child
+processes, sleep, clock) is injectable, so unit tests drive the core logic
+with fakes. The injected prompts are Chinese on purpose: they exercise the
+Chinese voice path.
 """
 
 from __future__ import annotations
@@ -48,7 +53,7 @@ MUSIC_PAUSE_PROMPT = "暂停音乐"
 
 @dataclass
 class CheckResult:
-    """单项检查的结论。"""
+    """Outcome of one check."""
 
     name: str
     passed: bool
@@ -106,7 +111,7 @@ def _default_run_cmd(cmd: list[str]) -> tuple[int, str]:
 
 
 def gateway_token_from_env() -> str:
-    """inject-text 沿用网关鉴权 token（与 capture server 一致）。"""
+    """inject-text uses the gateway auth token (same as the capture server)."""
     return (
         os.getenv("STACKCHAN_TOKEN")
         or os.getenv("BEARER_TOKEN")
@@ -116,7 +121,7 @@ def gateway_token_from_env() -> str:
 
 
 def voice_wake_say_command() -> tuple[list[str], str | None]:
-    """构造语音唤醒用的 macOS say 命令。"""
+    """Build the macOS say command for the voice wake check."""
     say_device = os.getenv(SAY_DEVICE_ENV)
     cmd = ["say", "-v", "Tingting"]
     if say_device:
@@ -126,7 +131,7 @@ def voice_wake_say_command() -> tuple[list[str], str | None]:
 
 
 class E2EChecker:
-    """自检核心逻辑。全部外部 I/O 通过构造参数注入。"""
+    """Core self-check logic. All external I/O is injected through the constructor."""
 
     def __init__(
         self,
@@ -151,7 +156,7 @@ class E2EChecker:
         self._sleep = sleep
         self._clock = clock
 
-    # ---- 基础操作 ---------------------------------------------------------
+    # ---- helpers ---------------------------------------------------------
 
     def fetch_status(self) -> dict[str, Any]:
         return self._fetch_json(f"{self.base_url}/debug/status", timeout=5.0)
@@ -169,7 +174,7 @@ class E2EChecker:
         self,
         predicate: Callable[[], tuple[bool, str]],
     ) -> tuple[bool, str]:
-        """按 poll_interval 轮询 predicate，超时返回最后一次的说明。"""
+        """Poll predicate every poll_interval; on timeout return the last detail."""
         deadline = self._clock() + self.timeout_s
         while True:
             ok, detail = predicate()
@@ -179,26 +184,26 @@ class E2EChecker:
                 return False, detail
             self._sleep(self.poll_interval_s)
 
-    # ---- 检查 1：状态健康 --------------------------------------------------
+    # ---- check 1: status --------------------------------------------------
 
     def check_status(self) -> CheckResult:
-        name = "状态健康检查"
+        name = "Status"
         try:
             st = self.fetch_status()
         except Exception as exc:
-            return CheckResult(name, False, f"无法获取 /debug/status：{exc}")
+            return CheckResult(name, False, f"cannot read /debug/status: {exc}")
         problems: list[str] = []
         if not st.get("device", {}).get("connected"):
-            problems.append("device 未连接")
+            problems.append("device not connected")
         if not st.get("gemini", {}).get("connected"):
-            problems.append("gemini 未连接")
+            problems.append("gemini not connected")
         if not st.get("wake_gate", {}).get("available"):
-            problems.append("wake_gate 不可用")
+            problems.append("wake_gate unavailable")
         if problems:
             return CheckResult(name, False, "；".join(problems))
-        return CheckResult(name, True, "device / gemini / wake_gate 全部在线")
+        return CheckResult(name, True, "device / gemini / wake_gate all online")
 
-    # ---- 检查 2：文字问答 --------------------------------------------------
+    # ---- check 2: text Q&A --------------------------------------------------
 
     @staticmethod
     def _latest_transcript_at(st: dict[str, Any]) -> float:
@@ -206,17 +211,17 @@ class E2EChecker:
         return max((float(e.get("at", 0.0)) for e in entries), default=0.0)
 
     def check_text_qa(self) -> CheckResult:
-        name = "文字问答"
+        name = "Text Q&A"
         try:
             baseline = self._latest_transcript_at(self.fetch_status())
             resp = self.inject_text(TEXT_QA_PROMPT)
         except Exception as exc:
-            return CheckResult(name, False, f"注入失败：{exc}")
+            return CheckResult(name, False, f"inject failed: {exc}")
         if not resp.get("ok") or not resp.get("active_session"):
             return CheckResult(
                 name,
                 False,
-                f"inject-text 未进入活跃会话：{resp}",
+                f"inject-text did not reach an active session: {resp}",
             )
 
         def new_transcript() -> tuple[bool, str]:
@@ -224,30 +229,30 @@ class E2EChecker:
             latest = self._latest_transcript_at(st)
             if latest > baseline:
                 texts = st["recent"]["transcripts"]
-                return True, f"收到新回应：{texts[0].get('text', '')}"
-            return False, f"{self.timeout_s:.0f} 秒内未见新 transcript"
+                return True, f"new reply: {texts[0].get('text', '')}"
+            return False, f"{self.timeout_s:.0f} s without a new transcript"
 
         ok, detail = self._poll(new_transcript)
         return CheckResult(name, ok, detail)
 
-    # ---- 检查 3：语音唤醒 --------------------------------------------------
+    # ---- check 3: voice wake --------------------------------------------------
 
     def check_voice_wake(self) -> CheckResult:
-        name = "语音唤醒"
+        name = "Voice wake"
         try:
             baseline = int(
                 self.fetch_status().get("wake_gate", {}).get("wake_count", 0)
             )
         except Exception as exc:
-            return CheckResult(name, False, f"无法获取基线状态：{exc}")
+            return CheckResult(name, False, f"cannot read the baseline status: {exc}")
         cmd, say_device = voice_wake_say_command()
         rc, output = self._run_cmd(cmd)
         if rc != 0:
-            detail = f"say 播报失败（rc={rc}）：{output}"
+            detail = f"say failed (rc={rc}): {output}"
             if say_device:
                 detail += (
-                    f"；已指定 {SAY_DEVICE_ENV}={say_device}，"
-                    "若设备名无效，可用 `say -a '?'` 查询可用设备列表"
+                    f"; {SAY_DEVICE_ENV}={say_device} is set, "
+                    "run `say -a '?'` to list valid output devices"
                 )
             return CheckResult(name, False, detail)
 
@@ -255,16 +260,16 @@ class E2EChecker:
             st = self.fetch_status()
             count = int(st.get("wake_gate", {}).get("wake_count", 0))
             if count > baseline:
-                return True, f"唤醒累计 {baseline} → {count}"
-            return False, f"{self.timeout_s:.0f} 秒内没有新唤醒记录"
+                return True, f"wake count {baseline} → {count}"
+            return False, f"{self.timeout_s:.0f} s without a new wake"
 
         ok, detail = self._poll(woke)
         return CheckResult(name, ok, detail)
 
-    # ---- 检查 4：音乐控制 --------------------------------------------------
+    # ---- check 4: music control --------------------------------------------------
 
     def _player_state(self) -> str:
-        """返回 playing/paused/stopped，无播放器时返回 no-player。"""
+        """Return playing/paused/stopped, or no-player when no player runs."""
         rc, player = self._run_cmd(["osascript", "-e", _media_player_script()])
         if rc != 0 or not player or player == _MEDIA_NO_PLAYER:
             return "no-player"
@@ -278,34 +283,34 @@ class E2EChecker:
             state = self._player_state()
             if state == expected:
                 return True, f"player state = {state}"
-            return False, f"player state = {state}（期望 {expected}）"
+            return False, f"player state = {state} (expected {expected})"
 
         return self._poll(probe)
 
     def check_music(self) -> CheckResult:
-        name = "音乐控制"
+        name = "Music control"
         try:
             resp = self.inject_text(MUSIC_PLAY_PROMPT)
         except Exception as exc:
-            return CheckResult(name, False, f"放歌指令注入失败：{exc}")
+            return CheckResult(name, False, f"injecting the play request failed: {exc}")
         if not resp.get("ok") or not resp.get("active_session"):
-            return CheckResult(name, False, f"放歌指令未进入活跃会话：{resp}")
+            return CheckResult(name, False, f"the play request did not reach an active session: {resp}")
         ok, detail = self._expect_player_state("playing")
         if not ok:
-            return CheckResult(name, False, f"放歌未生效：{detail}")
+            return CheckResult(name, False, f"playback did not start: {detail}")
 
         try:
             resp = self.inject_text(MUSIC_PAUSE_PROMPT)
         except Exception as exc:
-            return CheckResult(name, False, f"暂停指令注入失败：{exc}")
+            return CheckResult(name, False, f"injecting the pause request failed: {exc}")
         if not resp.get("ok") or not resp.get("active_session"):
-            return CheckResult(name, False, f"暂停指令未进入活跃会话：{resp}")
+            return CheckResult(name, False, f"the pause request did not reach an active session: {resp}")
         ok, detail = self._expect_player_state("paused")
         if not ok:
-            return CheckResult(name, False, f"暂停未生效：{detail}")
-        return CheckResult(name, True, "播放/暂停均已核实")
+            return CheckResult(name, False, f"playback did not pause: {detail}")
+        return CheckResult(name, True, "play and pause both confirmed")
 
-    # ---- 编排 --------------------------------------------------------------
+    # ---- run all --------------------------------------------------------------
 
     def run_all(
         self,
@@ -315,15 +320,15 @@ class E2EChecker:
     ) -> list[CheckResult]:
         results = [self.check_status()]
         gateway_unreachable = not results[0].passed and results[0].detail.startswith(
-            "无法获取"
+            "cannot read"
         )
         if gateway_unreachable:
-            reason = "网关不可达，跳过"
-            results.append(CheckResult("文字问答", False, reason, skipped=True))
+            reason = "gateway unreachable, skipped"
+            results.append(CheckResult("Text Q&A", False, reason, skipped=True))
             if with_voice:
-                results.append(CheckResult("语音唤醒", False, reason, skipped=True))
+                results.append(CheckResult("Voice wake", False, reason, skipped=True))
             if not skip_music:
-                results.append(CheckResult("音乐控制", False, reason, skipped=True))
+                results.append(CheckResult("Music control", False, reason, skipped=True))
             return results
 
         results.append(self.check_text_qa())
@@ -332,15 +337,15 @@ class E2EChecker:
         else:
             results.append(
                 CheckResult(
-                    "语音唤醒",
+                    "Voice wake",
                     True,
-                    "未启用（加 --with-voice 开启，需要 Mac 扬声器）",
+                    "not enabled (add --with-voice; needs the Mac speaker)",
                     skipped=True,
                 )
             )
         if skip_music:
             results.append(
-                CheckResult("音乐控制", True, "已按 --skip-music 跳过", skipped=True)
+                CheckResult("Music control", True, "skipped (--skip-music)", skipped=True)
             )
         else:
             results.append(self.check_music())
@@ -348,16 +353,16 @@ class E2EChecker:
 
 
 def render_report(results: list[CheckResult]) -> str:
-    """输出 PASS/FAIL 汇总表。"""
+    """Format the PASS/FAIL summary table."""
     width = max(len(r.name) for r in results)
-    lines = ["=" * 56, "StackChan 端到端自检", "=" * 56]
+    lines = ["=" * 56, "Groki Bot end-to-end self-check", "=" * 56]
     for r in results:
         lines.append(f"[{r.label}] {r.name.ljust(width)}  {r.detail}")
     lines.append("=" * 56)
     passed = sum(1 for r in results if r.passed and not r.skipped)
     failed = sum(1 for r in results if not r.passed and not r.skipped)
     skipped = sum(1 for r in results if r.skipped)
-    lines.append(f"结果：{passed} 项通过，{failed} 项失败，{skipped} 项跳过")
+    lines.append(f"Result: {passed} passed, {failed} failed, {skipped} skipped")
     return "\n".join(lines)
 
 
@@ -368,28 +373,28 @@ def has_failure(results: list[CheckResult]) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m stackchan_mcp.e2e_check",
-        description="StackChan 网关一键端到端自检",
+        description="One-command end-to-end self-check for the Groki Bot gateway",
     )
     parser.add_argument(
         "--base-url",
         default=os.getenv("STACKCHAN_DEBUG_BASE_URL", DEFAULT_BASE_URL),
-        help=f"capture server 地址（默认 {DEFAULT_BASE_URL}）",
+        help=f"capture server URL (default {DEFAULT_BASE_URL})",
     )
     parser.add_argument(
         "--timeout",
         type=float,
         default=DEFAULT_TIMEOUT_S,
-        help=f"每项检查的等待上限秒数（默认 {DEFAULT_TIMEOUT_S:.0f}）",
+        help=f"seconds to wait for each check (default {DEFAULT_TIMEOUT_S:.0f})",
     )
     parser.add_argument(
         "--with-voice",
         action="store_true",
-        help="启用语音唤醒检查（用 Mac 扬声器播报唤醒词）",
+        help="run the voice wake check (speaks the wake word through the Mac speaker)",
     )
     parser.add_argument(
         "--skip-music",
         action="store_true",
-        help="跳过音乐控制检查",
+        help="skip the music control check",
     )
     args = parser.parse_args(argv)
 

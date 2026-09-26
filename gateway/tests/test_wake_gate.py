@@ -49,7 +49,7 @@ def _pcm(value: int, samples: int = 160) -> bytes:
 def test_dormant_blocks_until_keyword_and_replays_preroll() -> None:
     kws = FakeKeywordSpotter([False, False, True])
     gate = WakeGate(kws=kws, sample_rate=10, preroll_s=0.6)
-    first = _pcm(100, samples=2)  # 4 字节
+    first = _pcm(100, samples=2)  # 4 bytes
     second = _pcm(200, samples=2)
     third = _pcm(300, samples=2)
 
@@ -59,7 +59,7 @@ def test_dormant_blocks_until_keyword_and_replays_preroll() -> None:
 
     assert result.woke is True
     assert gate.state == WakeGateState.LISTENING
-    # 10 Hz * 2 字节 * 0.6 s = 12 字节，三帧都应在预滚窗口内。
+    # 10 Hz * 2 bytes * 0.6 s = 12 bytes: all three frames fit in the pre-roll.
     assert result.forward_pcm == (first, second, third)
     assert flatten_pcm(result.forward_pcm) == first + second + third
 
@@ -67,7 +67,7 @@ def test_dormant_blocks_until_keyword_and_replays_preroll() -> None:
 def test_preroll_buffer_drops_oldest_frames() -> None:
     kws = FakeKeywordSpotter([False, False, True])
     gate = WakeGate(kws=kws, sample_rate=10, preroll_s=0.4)
-    first = _pcm(100, samples=2)  # 4 字节
+    first = _pcm(100, samples=2)  # 4 bytes
     second = _pcm(200, samples=2)
     third = _pcm(300, samples=2)
 
@@ -75,7 +75,7 @@ def test_preroll_buffer_drops_oldest_frames() -> None:
     gate.process(second)
     result = gate.process(third)
 
-    # 10 Hz * 2 字节 * 0.4 s = 8 字节，只保留最近两帧。
+    # 10 Hz * 2 bytes * 0.4 s = 8 bytes: only the last two frames are kept.
     assert result.forward_pcm == (second, third)
 
 
@@ -434,7 +434,7 @@ def test_model_download_commands_include_keyword_and_model_name() -> None:
 
 
 def test_sherpa_onnx_keyword_spotter_passes_keywords_score_and_threshold(monkeypatch, tmp_path) -> None:
-    """构造参数 keywords_score / keywords_threshold 必须透传给 sherpa_onnx.KeywordSpotter。"""
+    """keywords_score / keywords_threshold must be passed through to sherpa_onnx.KeywordSpotter."""
     mock_np = MagicMock()
     mock_sherpa = MagicMock()
     mock_spotter = MagicMock()
@@ -445,7 +445,7 @@ def test_sherpa_onnx_keyword_spotter_passes_keywords_score_and_threshold(monkeyp
     monkeypatch.setitem(sys.modules, "numpy", mock_np)
     monkeypatch.setitem(sys.modules, "sherpa_onnx", mock_sherpa)
 
-    # 模型文件不入库：用临时目录放同名空文件，sherpa 构造被 mock，不会触发原生加载
+    # The model is not in the repo: empty files with the right names in a temp dir; the sherpa constructor is mocked, so nothing native loads
     model_dir = tmp_path / "kws-model"
     model_dir.mkdir()
     for name in (
@@ -476,7 +476,7 @@ def test_create_wake_gate_from_env_passes_kws_reset_interval(monkeypatch) -> Non
 
 
 def test_create_wake_gate_from_env_passes_kws_env_vars(monkeypatch) -> None:
-    """STACKCHAN_KWS_SCORE / STACKCHAN_KWS_THRESHOLD 必须通过 _float_env 传给 Sherpa 构造。"""
+    """STACKCHAN_KWS_SCORE / STACKCHAN_KWS_THRESHOLD must reach the Sherpa constructor through _float_env."""
     monkeypatch.delenv("STACKCHAN_WAKE_WORD", raising=False)
     monkeypatch.setenv("STACKCHAN_KWS_SCORE", "4.2")
     monkeypatch.setenv("STACKCHAN_KWS_THRESHOLD", "0.09")
