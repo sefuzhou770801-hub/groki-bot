@@ -54,6 +54,11 @@ Pages サイトに反映されます。
 - **サーボ**: SCS0009 yaw + pitch を UART1 (1 Mbps) で制御。台形速度
   プロファイル `PathGenerator`、駆動時のみトルク有効化。ボード別レンジ
   キャリブレーション (ServoLimits) を NVS 保存。
+- **顔追従** (Mac 上のゲートウェイと併用): Mac のカメラで顔を検出する
+  [tools/vision-tracker/](tools/vision-tracker/README.md) の位置情報から、ゲートウェイが
+  XiaoZhi の `head` メッセージで首を顔の方へ向けます。ロボットが話している間と
+  ウェイクワード後に聞いている間は追従を止めます。設定手順は
+  [gateway/README.md の Face tracking](gateway/README.md#face-tracking)（英語）。
 - **スピーカー / オーディオ**: 起動音 (C5–E5–G5、設定で OFF 可)、jtts ランダム
   babble、AAC 録音再生、BLE オーディオ ストリーム、Wi-Fi RTP (L16 / μ-law / AAC) 受信。
   音量は **0..200%** をライブ制御 (BLE / Wi-Fi / 本体 UI)。
@@ -210,7 +215,8 @@ OpenAI / Gemini の API キーはビルドに埋め込まず、BLE / Wi-Fi 設�
 │                           captive_portal, device_ui, atom_status, wifi_sta
 ├── patches/                upstream-targeted patches
 ├── tools/                  apply-m5-patches.sh, monitor_log.py, settings.html,
-│                           avatar_dsl/ (コンパイラ + WASM 連携)
+│                           avatar_dsl/ (コンパイラ + WASM 連携),
+│                           vision-tracker/ (Mac の顔追従プログラム、Swift)
 ├── assets/                 .avdsl ソース (default_face, omega_mouth, aokko_face, grok_face)
 ├── partitions.csv          OTA 配置 (ota_0 / ota_1 / nvs / storage)
 ├── sdkconfig.defaults*     共通 + ボード別 (.cores3 / .atoms3r / .atoms3 / .stopwatch)

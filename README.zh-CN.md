@@ -16,7 +16,7 @@ Groki Bot 桌面机器人（M5Stack CoreS3 加 Stack-chan 底座）的全部内�
 | | 能做什么 | 需要什么 |
 |---|---|---|
 | **1. 只刷固件**（先走这条） | 用你自己的密钥，通过 OpenAI Realtime 或 Google Gemini Live 和机器人语音对话 | 机器人、USB-C 线、桌面版 Chrome 或 Edge、一把 OpenAI 或 Gemini API 密钥 |
-| **2. 加网关** | 「Hey Groki」唤醒词，语音经电脑走 Gemini Live；Claude 等 MCP 客户端能让机器人说话、读取它的状态 | 用法 1 的全部，加一台和机器人在同一 Wi-Fi、运行 [gateway/](gateway/README.zh-CN.md) 的电脑，以及一把 Gemini API 密钥 |
+| **2. 加网关** | 「Hey Groki」唤醒词，语音经电脑走 Gemini Live；在带摄像头的 Mac 上，头会跟着你的脸转；Claude 等 MCP 客户端能让机器人说话、读取它的状态 | 用法 1 的全部，加一台和机器人在同一 Wi-Fi、运行 [gateway/](gateway/README.zh-CN.md) 的电脑，以及一把 Gemini API 密钥 |
 | **3. 再加 Grok Bot** | 说「帮我查一下」「帮我调研 X」，机器人把任务交给你在 Grok Bot 应用里的智能体，智能体每回一段就念一段 | 用法 2 的全部，加上在那台电脑上登录的 Grok Bot 应用和 `gbot` 命令行 |
 
 各部分怎么通信（端口、协议、消息流程、每部分需要什么）：[架构与通信说明](docs/architecture.zh-CN.md)。
@@ -55,7 +55,7 @@ Groki Bot 桌面机器人（M5Stack CoreS3 加 Stack-chan 底座）的全部内�
    - 点「保存并重启」。
 4. 在电脑上打开 <http://127.0.0.1:8766/debug/status>，看到 `"device": {"connected": true}` 后说「Hey Groki」。
 
-用法 2 配合本固件能做什么、不能做什么：网关负责语音对话。Claude 通过网关控制头部、灯和摄像头**到不了**本固件，因为本固件的 XiaoZhi 客户端在握手消息里声明 `features.mcp=false`（[components/conversation/xiaozhi_client.cpp](components/conversation/xiaozhi_client.cpp)），也不处理服务器发来的 MCP 请求。
+用法 2 配合本固件能做什么、不能做什么：网关负责语音对话；在带摄像头的 Mac 上，网关还会让机器人转头跟着你的脸（见[人脸追踪](gateway/README.zh-CN.md#人脸追踪)）。Claude 通过网关的 MCP 工具控制头部、灯和摄像头**到不了**本固件，因为本固件的 XiaoZhi 客户端在握手消息里声明 `features.mcp=false`（[components/conversation/xiaozhi_client.cpp](components/conversation/xiaozhi_client.cpp)），也不处理服务器发来的 MCP 请求。人脸追踪改用 XiaoZhi 的 `head` 消息转头，固件能处理这条消息。
 
 ### 用法 3：再加 Grok Bot
 
@@ -95,6 +95,7 @@ Grok 脸编在固件里，刷完固件就能显示，不需要另外写入资源
 | [gateway/](gateway/README.zh-CN.md) | 运行在电脑上的网关（Python）：Gemini Live 语音、唤醒词、MCP 服务、Grok Bot 转发服务 |
 | [docs/architecture.zh-CN.md](docs/architecture.zh-CN.md) | 固件、网关和 Grok Bot 之间怎么通信 |
 | `docs/` | 刷机页、许可页等文档，发布到 GitHub Pages |
+| [tools/vision-tracker/](tools/vision-tracker/README.md) | Mac 端人脸追踪程序（Swift，Apple Vision），人脸追踪时由网关启动 |
 | `tools/` | 设置页、Avatar DSL 编译器、[tools/stackchan-channel/](tools/stackchan-channel/README.md)（通过固件 HTTP 接口给 Claude Code 用的 MCP 服务）、[tools/face-demo/](tools/face-demo/README.md)（表情演示脚本）等电脑端工具 |
 
 眼睛采用 [aora-bot](https://github.com/sam70361/aora-bot) Emotion Ball 的眼环轮廓体系（15 个本机表情，含眨眼、环游、四权重混合），身体保留呼吸、开心弹跳、说话压扁、害羞飘心与腮红等 DSL 动画。眼环数据按 Emotion Ball 社区许可使用，**仅限非商业用途**，见[授权](#授权)。
@@ -108,6 +109,7 @@ Grok 脸编在固件里，刷完固件就能显示，不需要另外写入资源
 - **表情引擎**：aora 眼环轮廓（每眼 48 点），15 种表情，眨眼、环游、四权重混合；身体层保留呼吸、开心弹跳、说话压扁、害羞飘心与腮红。
 - **AI 语音对话**：WebSocket 连接 OpenAI Realtime、Google Gemini Live 或 XiaoZhi 服务器。麦克风上行，应答音频驱动口型；半双工的 CoreS3 在说话时关闭麦克风，应答中可以点屏幕或摸头顶打断（barge-in）。
 - **舵机头部运动**：SCS0009 偏航加俯仰，梯形速度曲线。
+- **人脸追踪**（网关运行在 Mac 上时）：Mac 摄像头追踪程序找到你的脸，网关让头跟着转；机器人说话或听你说话时暂停跟随。设置方法见[网关 README 的人脸追踪一节](gateway/README.zh-CN.md#人脸追踪)。
 - **头顶触摸互动**：Si12T 三区电容触摸（前、中、后）；抚摸切到害羞脸（Affection）。
 - **气泡字幕**：屏幕底部白底圆角面板显示应答文本，长文跑马灯滚动。
 - **三路配网**：BLE（NimBLE GATT）、Wi-Fi STA（mDNS HTTP）、SoftAP 加 captive portal（对 iOS 友好）。

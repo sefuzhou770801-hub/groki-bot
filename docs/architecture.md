@@ -87,7 +87,7 @@ The firmware also has its own token-protected HTTP API (`/mcp/state`, `/mcp/expr
 
 A wrong token is rejected with HTTP 401 (`ESP32 auth rejected` in the gateway log).
 
-**Hello.** The robot sends `{"type": "hello", "features": {"mcp": false}, "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}`. The gateway answers with its own hello and a 24 kHz downlink format. `features.mcp=false` tells the gateway that this firmware does not accept MCP tool calls from the server, so face, LED, head and camera tools from the gateway do not reach the Groki Bot firmware. Voice works fully.
+**Hello.** The robot sends `{"type": "hello", "features": {"mcp": false}, "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}`. The gateway answers with its own hello and a 24 kHz downlink format. `features.mcp=false` tells the gateway that this firmware does not accept MCP tool calls from the server, so face, LED, head and camera MCP tools from the gateway do not reach the Groki Bot firmware. Voice works fully. Face tracking does not use MCP (see below).
 
 **Audio.** Uplink: Opus, 16 kHz mono, 60 ms frames, as binary WebSocket messages. On the gateway the wake word detector (sherpa-onnx, runs locally) listens first; only after "Hey Groki" is audio forwarded to Gemini, and the listening window closes after `STACKCHAN_WAKE_IDLE_S` seconds of silence. Downlink: Gemini's reply audio is encoded to Opus (24 kHz, 60 ms) and sent back with `tts` state messages so the robot knows when speech starts and stops.
 
@@ -101,6 +101,9 @@ A wrong token is rejected with HTTP 401 (`ESP32 auth rejected` in the gateway lo
 | `GET /debug/panel` | The same status as a web page |
 | `POST /capture` | Photo upload from firmware that has a camera tool (needs `Authorization: Bearer` with `VISION_TOKEN` or `STACKCHAN_TOKEN`). Not used by the Groki Bot firmware. |
 | `POST /debug/inject-text` | Inject a text turn into the live session, token protected |
+| `POST /track` | Face positions from the Mac face tracker (see Face tracking below) |
+
+**Face tracking.** On a Mac with a camera, the gateway starts [tools/vision-tracker](../tools/vision-tracker/README.md) (`groki-vision-tracker --endpoint http://127.0.0.1:8766/track --fps 8`) and restarts it if it exits. The tracker finds the most confident face in each frame with Apple Vision and posts `{"x", "y", "width", "height", "confidence", "timestamp"}` (0..1 image coordinates) at most 8 times a second. `TrackingBridge` maps the position to head angles, smooths them, and sends them at up to 50 Hz as the XiaoZhi control message `{"type": "head", "yaw": <-90..90>, "pitch": <0..60>, "speed": <100..1000>}`, because the Groki Bot firmware has no MCP. The firmware clamps the angles to its servo limits and, while the robot is speaking, keeps only the last command and applies it when the reply ends. The gateway sends no head moves while the robot speaks or listens after the wake word; "look at me" / "stop looking at me" (`self.tracking.start` / `self.tracking.stop`) switch following on and off. `/debug/status` shows the state under `face_tracking`. Setup: [gateway README, Face tracking](../gateway/README.md#face-tracking).
 
 **MCP.** `uv run stackchan-mcp` is a stdio MCP server and, in the same process, the WebSocket and HTTP servers above. Claude Code or Claude Desktop can start it (the gateway runs while the client is open), or `scripts/run_stackchan_gateway_launchd.sh` keeps it running as a background service. With the Groki Bot firmware, `speak` and `get_status` work; hardware tools return an error because of `features.mcp=false`.
 
@@ -191,5 +194,7 @@ curl -sN -X POST http://127.0.0.1:18770/send \
 | Grok Bot client in the gateway | `gateway/stackchan_mcp/gbot_brain.py` |
 | Forwarding service and `gbot` wrapper | `gateway/stackchan_mcp/gbot_http_proxy.py`, `gbot_client.py` |
 | HTTP on 8766 | `gateway/stackchan_mcp/capture_server.py` |
+| Face tracking: tracker process, head mapping | `gateway/stackchan_mcp/face_tracker.py`, `tracking_bridge.py`; `tools/vision-tracker/` |
+| Firmware `head` message | `components/conversation/include/conversation/control_dispatch.hpp`, `main/conversation_task.cpp` |
 | stdio MCP server | `gateway/stackchan_mcp/stdio_server.py`, `cli.py` |
 | Tests | `gateway/tests/` (`test_gbot_http_proxy.py` runs the forwarding service against a fake `gbot`) |

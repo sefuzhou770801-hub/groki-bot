@@ -87,7 +87,7 @@ flowchart LR
 
 令牌不对时网关返回 HTTP 401，日志里是 `ESP32 auth rejected`。
 
-**握手。** 机器人发送 `{"type": "hello", "features": {"mcp": false}, "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}`，网关回一条自己的 hello，下行音频格式是 24 kHz。`features.mcp=false` 告诉网关这个固件不接受服务器发来的 MCP 工具调用，所以网关的表情、灯光、头部、拍照工具到不了 Groki Bot 固件，语音功能完整可用。
+**握手。** 机器人发送 `{"type": "hello", "features": {"mcp": false}, "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}`，网关回一条自己的 hello，下行音频格式是 24 kHz。`features.mcp=false` 告诉网关这个固件不接受服务器发来的 MCP 工具调用，所以网关的表情、灯光、头部、拍照这些 MCP 工具到不了 Groki Bot 固件，语音功能完整可用。人脸追踪不走 MCP（见下文）。
 
 **音频。** 上行：Opus，16 kHz 单声道，每帧 60 毫秒，用 WebSocket 二进制消息发送。网关先用本机的唤醒词检测（sherpa-onnx）听，听到「Hey Groki」之后才把声音转给 Gemini；安静 `STACKCHAN_WAKE_IDLE_S` 秒后结束这一轮聆听。下行：Gemini 回复的声音编码成 Opus（24 kHz，60 毫秒）发回机器人，同时发送 `tts` 状态消息，让机器人知道什么时候开始说、什么时候说完。
 
@@ -101,6 +101,9 @@ flowchart LR
 | `GET /debug/panel` | 同样的状态，网页形式 |
 | `POST /capture` | 带摄像头工具的固件上传照片（需要 `Authorization: Bearer`，值为 `VISION_TOKEN` 或 `STACKCHAN_TOKEN`）。Groki Bot 固件不使用。 |
 | `POST /debug/inject-text` | 往当前会话里插入一段文字，受令牌保护 |
+| `POST /track` | Mac 人脸追踪程序发来的人脸位置（见下面的人脸追踪） |
+
+**人脸追踪。** 在带摄像头的 Mac 上，网关启动 [tools/vision-tracker](../tools/vision-tracker/README.md)（`groki-vision-tracker --endpoint http://127.0.0.1:8766/track --fps 8`），程序退出后自动重启。追踪程序用 Apple Vision 找出每帧里置信度最高的人脸，每秒最多 8 次发送 `{"x", "y", "width", "height", "confidence", "timestamp"}`（0 到 1 的画面坐标）。`TrackingBridge` 把位置换算成头部角度并做平滑，最高每秒 50 次发给机器人。因为 Groki Bot 固件没有 MCP，转头用的是 XiaoZhi 控制消息 `{"type": "head", "yaw": <-90..90>, "pitch": <0..60>, "speed": <100..1000>}`。固件把角度限制在舵机限位之内；机器人说话时只保留最后一条指令，等这段回复说完再执行。机器人说话时和唤醒后听你说话时，网关不发转头指令；「看着我」「别看了」（`self.tracking.start` / `self.tracking.stop`）打开和关闭跟随。`/debug/status` 的 `face_tracking` 一节显示状态。设置方法见[网关 README 的人脸追踪一节](../gateway/README.zh-CN.md#人脸追踪)。
 
 **MCP。** `uv run stackchan-mcp` 是一个 stdio MCP 服务，同一个进程里也运行上面的 WebSocket 和 HTTP 服务。可以由 Claude Code 或 Claude Desktop 启动（客户端开着网关就在运行），也可以用 `scripts/run_stackchan_gateway_launchd.sh` 作为后台服务常驻。配合 Groki Bot 固件时 `speak` 和 `get_status` 可用；硬件类工具因为 `features.mcp=false` 会返回错误。
 
@@ -191,5 +194,7 @@ curl -sN -X POST http://127.0.0.1:18770/send \
 | 网关里的 Grok Bot 客户端 | `gateway/stackchan_mcp/gbot_brain.py` |
 | 转发服务和 `gbot` 封装 | `gateway/stackchan_mcp/gbot_http_proxy.py`、`gbot_client.py` |
 | 8766 端口 HTTP | `gateway/stackchan_mcp/capture_server.py` |
+| 人脸追踪：追踪程序进程、头部角度换算 | `gateway/stackchan_mcp/face_tracker.py`、`tracking_bridge.py`；`tools/vision-tracker/` |
+| 固件的 `head` 消息 | `components/conversation/include/conversation/control_dispatch.hpp`、`main/conversation_task.cpp` |
 | stdio MCP 服务 | `gateway/stackchan_mcp/stdio_server.py`、`cli.py` |
 | 测试 | `gateway/tests/`（`test_gbot_http_proxy.py` 用假的 `gbot` 跑真实的转发服务） |

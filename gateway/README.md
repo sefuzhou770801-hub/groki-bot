@@ -14,6 +14,8 @@ the firmware and Grok Bot is described in
   forwards microphone audio to Gemini after you call the robot.
 - **An MCP server** so Claude Code, Claude Desktop, or any other MCP client
   can make the robot speak and read its status.
+- **Face tracking** on a Mac with a camera: the robot turns its head to
+  follow your face (see [Face tracking](#face-tracking)).
 - Optional: voice control of your Mac, an `ask_claude` voice tool that
   hands hard questions to the Claude CLI (offered only when the `claude` CLI
   is installed), and an `ask_grokbot` voice tool that
@@ -34,15 +36,17 @@ OpenAI or Gemini API key in its settings page, and it works without any
 computer. Install this gateway if you want:
 
 - the "Hey Groki" wake word,
+- the head to follow your face (Mac with a camera),
 - Claude (or another MCP client) to make the robot speak,
 - voice commands that reach your computer (Mac control, `ask_claude`).
 
 **What works with the Groki Bot firmware.** Voice conversation, the wake
-word, and the `speak` and `get_status` MCP tools. The Groki Bot
-firmware's XiaoZhi client announces `features.mcp=false`, so tools that drive
-hardware (`move_head`, `set_led`, `set_avatar`, `take_photo` and similar)
+word, face tracking, and the `speak` and `get_status` MCP tools. The Groki Bot
+firmware's XiaoZhi client announces `features.mcp=false`, so MCP tools that
+drive hardware (`move_head`, `set_led`, `set_avatar`, `take_photo` and similar)
 return an error with that firmware. They work with firmware that implements
-the XiaoZhi device MCP tools.
+the XiaoZhi device MCP tools. Face tracking does not use MCP: it turns the
+head with the XiaoZhi `head` message, which the firmware handles.
 
 ## What you need
 
@@ -186,6 +190,109 @@ or Edge), tab "对话" (Conversation):
 `/debug/status` should now show `"device": {"connected": true, ...}`. Say
 "Hey Groki" and start talking.
 
+## Face tracking
+
+The robot turns its head to follow your face. A small Mac program,
+[tools/vision-tracker](../tools/vision-tracker/README.md), watches the camera
+with Apple Vision and posts the face position to the gateway at
+`http://127.0.0.1:8766/track`; the gateway turns it into head angles and sends
+them to the robot. Camera frames never leave the Mac and are not saved.
+
+What you need:
+
+- A Mac (macOS 13 or later) with a camera: the built-in one, a Studio Display,
+  an iPhone as Continuity Camera, or a USB webcam.
+- A CoreS3 with the Stack-chan base and its two head servos, connected to the
+  gateway (step 4 above).
+- Firmware that handles the gateway's `head` message: a release newer than
+  v0.2.1, or a build from `main`. Older firmware ignores the message and the
+  head does not move.
+- Swift 5.9 or later to build the tracker (Xcode, or the Command Line Tools:
+  `xcode-select --install`).
+
+### Build the tracker
+
+From the repository root:
+
+```bash
+cd tools/vision-tracker
+swift build -c release
+```
+
+This produces `tools/vision-tracker/.build/release/groki-vision-tracker`,
+which is where the gateway looks for it.
+
+### Allow camera access
+
+macOS asks for camera permission the first time the tracker opens the camera,
+and the permission belongs to the app that started it: your terminal (or
+Claude Code's terminal, or Claude Desktop) when the gateway runs from there.
+To get the prompt once, run the tracker by hand in the terminal you will
+start the gateway from, click Allow, then stop it with Ctrl-C:
+
+```bash
+tools/vision-tracker/.build/release/groki-vision-tracker
+```
+
+If you missed the prompt, or the gateway runs as a background service, allow
+the app in System Settings → Privacy & Security → Camera, then restart the
+gateway. Without permission the tracker exits with code 2 and the gateway
+retries with a growing delay (up to 5 minutes).
+
+### Start it
+
+Nothing extra: the gateway starts the tracker when it starts and restarts it
+if it exits. The head follows faces from the start. If the tracker has not
+been built, the gateway logs one line and runs normally without face
+tracking:
+
+```
+face tracker unavailable: executable not found at .../tools/vision-tracker/.build/release/groki-vision-tracker (build with: cd tools/vision-tracker && swift build -c release); the head will not follow faces
+```
+
+To run the tracker yourself instead, set `STACKCHAN_FACE_TRACKER_AUTOSTART=0`
+and start it with
+`groki-vision-tracker --endpoint http://127.0.0.1:8766/track --fps 8`.
+
+### Check that it works
+
+1. The gateway log shows `face tracker started pid=<pid> endpoint=http://127.0.0.1:8766/track`,
+   and the tracker prints `Vision tracker camera: <camera name>`.
+2. Sit in front of the camera and open <http://127.0.0.1:8766/debug/status>.
+   Under `face_tracking`: `tracker_running` is `true`, `face_reported` turns
+   `true` and `last_face_at` keeps updating while the camera sees you,
+   `head_follow` is `true` and `mode` is `idle`.
+3. Move left and right: the head turns toward you and keeps following, within
+   the robot's servo limits (by default ±40° left/right, -10° to +25° up/down).
+   When the camera loses your face, the head stops following and after about
+   two seconds the robot's own idle head motion takes over again.
+
+### While you talk
+
+Following pauses by design during a conversation: the gateway sends no head
+moves while the robot speaks (`mode` is `working`) or while it listens after
+the wake word (`mode` is `quiet`), so servo noise and motion do not get in
+the way of the conversation. It follows again with the next detection once
+the conversation is over. The firmware also holds a head command that arrives
+while the robot is speaking and applies it when the reply ends.
+
+### Turn head follow on and off
+
+- By voice (Gemini backend): "look at me" turns following on, "stop looking at
+  me" turns it off. Face detection keeps running either way.
+- `STACKCHAN_HEAD_FOLLOW_DEFAULT=0` starts the gateway with following off, for
+  a robot without head servos or when you want the head still.
+- `STACKCHAN_FACE_TRACKER_AUTOSTART=0` does not start the tracker at all, for
+  a computer without a camera.
+
+### Choose a camera
+
+Without a setting the tracker uses a Studio Display camera first, then an
+iPhone (Continuity Camera), then the first camera macOS lists. To pick one,
+set `STACKCHAN_FACE_TRACKER_CAMERA` to part of its name (case-insensitive),
+for example `STACKCHAN_FACE_TRACKER_CAMERA=FaceTime`. The tracker prints the
+cameras it found when it starts.
+
 ## Optional: Grok Bot hand-off
 
 With this on, you can say "Hey Groki, look up tomorrow's weather in Tokyo" or
@@ -247,6 +354,10 @@ reconnect the MCP client, after a change).
 | `STACKCHAN_WAKE_PHRASE`, `STACKCHAN_WAKE_KEYWORD` | `hey groki` | Wake word; see [Changing the wake word](#changing-the-wake-word). `STACKCHAN_WAKE_PHRASE=hi grok` alone restores the old one |
 | `STACKCHAN_WAKE_IDLE_S` | `30` | Silence before the listening window closes |
 | `STACKCHAN_MAC_CONTROL` | off | `1` lets voice commands control this Mac (see Safety) |
+| `STACKCHAN_FACE_TRACKER_AUTOSTART` | on | `0` does not start the Mac face tracker (computer without a camera) |
+| `STACKCHAN_FACE_TRACKER_BIN` | `tools/vision-tracker/.build/release/groki-vision-tracker` | Face tracker executable |
+| `STACKCHAN_FACE_TRACKER_CAMERA` | empty | Part of the camera name to use; empty uses the tracker's default order |
+| `STACKCHAN_HEAD_FOLLOW_DEFAULT` | on | `0` starts with head follow off; "look at me" turns it on |
 | `STACKCHAN_GEMINI_DEVICE_TOOLS` | off | `1` gives Gemini face/LED/head tools; only for firmware with device MCP |
 | `STACKCHAN_USB_TRANSPORT` | off | `1` enables the USB serial control channel; it locks `/dev/cu.usbmodem*` |
 | `STACKCHAN_ASK_CLAUDE` | on when the `claude` CLI is found | `0` removes the `ask_claude` voice tool even when the CLI is installed |
@@ -289,6 +400,7 @@ reconnect the MCP client, after a change).
 | Wake word never triggers | Model downloaded to `models/kws`? Log shows `KWS ready`? Try `STACKCHAN_KWS_THRESHOLD=0.03`, or run `scripts/kws_offline_repro.py`. `STACKCHAN_WAKE_WORD=0` turns the gate off. |
 | `sherpa-onnx 不可用` / `Library not loaded: libonnxruntime` | Run `uv sync --all-extras` again; it installs `sherpa-onnx-core`, which ships the runtime. |
 | `Could not find Opus library` | Install Opus (`brew install opus` or `apt install libopus0`). |
+| Head does not follow faces | `/debug/status` → `face_tracking`. `null`: gateway too old or not restarted. `tracker_running: false`: build the tracker, or check the log for `face tracker exited returncode=2` (no camera or no camera permission, see [Allow camera access](#allow-camera-access)). `face_reported: false`: the camera does not see a face. `head_follow: false`: say "look at me". Everything fine but the head is still: the firmware is older than the `head` message; update it. |
 | Flashing fails with "port busy" | Stop the gateway if you enabled `STACKCHAN_USB_TRANSPORT`. |
 | `.env` change has no effect | Restart the gateway; with setup A, reconnect the MCP server (`/mcp` in Claude Code). |
 | The robot says the task could not be sent to the agent | Is `stackchan-gbot-proxy` running (`curl http://127.0.0.1:18770/health`)? Does `gbot bots list` work in a terminal and list the name in `STACKCHAN_TOOL_BOT`? Is the Grok Bot app signed in? |
