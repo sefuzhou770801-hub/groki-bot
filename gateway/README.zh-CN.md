@@ -26,7 +26,7 @@ Groki Bot 固件自己就能对话：刷好固件，在设置页填上自己的 
 - 想让 Claude（或其他 MCP 客户端）让机器人说话；
 - 想用语音操作电脑（Mac 控制、`ask_claude`）。
 
-**配合 Groki Bot 固件能用的部分**：语音对话、唤醒词、人脸追踪，以及 `speak`、`get_status` 两个 MCP 工具。Groki Bot 固件的 XiaoZhi 客户端声明 `features.mcp=false`，所以驱动硬件的 MCP 工具（`move_head`、`set_led`、`set_avatar`、`take_photo` 等）在这个固件上会返回错误；它们需要实现了 XiaoZhi 设备端 MCP 工具的固件。人脸追踪不走 MCP，它用 XiaoZhi 的 `head` 消息转头，固件能处理这条消息。
+**配合 Groki Bot 固件能用的部分**：语音对话、唤醒词、人脸追踪，以及 `speak`、`get_status` 两个 MCP 工具。Groki Bot 固件的 XiaoZhi 客户端声明 `features.mcp=false`，所以驱动硬件的 MCP 工具（`move_head`、`set_led`、`set_avatar`、`take_photo` 等）在这个固件上会返回错误；它们需要实现了 XiaoZhi 设备端 MCP 工具的固件。人脸追踪不走 MCP，它用 XiaoZhi 的 `head` 消息转头，固件能处理这条消息。Gemini 自己的设备工具（`STACKCHAN_GEMINI_DEVICE_TOOLS=1`）也不需要 MCP：配合这个固件时，`move_head` 以 `head` 消息发送（需要 v0.2.1 之后的固件），`set_avatar` 以表情消息发送，`set_all_leds` 以 `led` 消息发送。摄像头类工具没有这样的通道，在这个固件上不能用。
 
 ## 准备
 
@@ -255,7 +255,7 @@ curl -s -X POST http://127.0.0.1:18770/send \
 | `STACKCHAN_FACE_TRACKER_BIN` | `tools/vision-tracker/.build/release/groki-vision-tracker` | 人脸追踪程序的路径 |
 | `STACKCHAN_FACE_TRACKER_CAMERA` | 空 | 要用的摄像头名字里的一段；留空按追踪程序的默认顺序选 |
 | `STACKCHAN_HEAD_FOLLOW_DEFAULT` | 开 | 设为 `0` 时网关启动后不转头跟随，说「看着我」再打开 |
-| `STACKCHAN_GEMINI_DEVICE_TOOLS` | 关 | 设为 `1` 让 Gemini 使用表情、灯光、头部工具；只适用于带设备端 MCP 的固件 |
+| `STACKCHAN_GEMINI_DEVICE_TOOLS` | 关 | 设为 `1` 让 Gemini 使用表情、灯光、头部工具。带设备端 MCP 的固件通过 MCP 调用收到；Groki Bot 固件通过 XiaoZhi 的表情、`led`、`head` 消息收到（`head` 需要 v0.2.1 之后的固件） |
 | `STACKCHAN_USB_TRANSPORT` | 关 | 设为 `1` 启用 USB 串口控制通道；它会独占 `/dev/cu.usbmodem*` |
 | `STACKCHAN_ASK_CLAUDE` | 找到 `claude` 命令行时开启 | 设为 `0` 时即使装了命令行也不提供 `ask_claude` 语音工具 |
 | `STACKCHAN_CLAUDE_BIN` | PATH 里的 `claude` | `ask_claude` 使用的 Claude CLI |

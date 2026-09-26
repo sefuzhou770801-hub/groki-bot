@@ -55,7 +55,7 @@ Groki Bot 桌面机器人（M5Stack CoreS3 加 Stack-chan 底座）的全部内�
    - 点「保存并重启」。
 4. 在电脑上打开 <http://127.0.0.1:8766/debug/status>，看到 `"device": {"connected": true}` 后说「Hi Grok」。想改用「Hey Groki」做唤醒词，在 `gateway/.env` 里设 `STACKCHAN_WAKE_PHRASE=hey groki`，再重启网关。
 
-用法 2 配合本固件能做什么、不能做什么：网关负责语音对话；在带摄像头的 Mac 上，网关还会让机器人转头跟着你的脸（见[人脸追踪](gateway/README.zh-CN.md#人脸追踪)）。Claude 通过网关的 MCP 工具控制头部、灯和摄像头**到不了**本固件，因为本固件的 XiaoZhi 客户端在握手消息里声明 `features.mcp=false`（[components/conversation/xiaozhi_client.cpp](components/conversation/xiaozhi_client.cpp)），也不处理服务器发来的 MCP 请求。人脸追踪改用 XiaoZhi 的 `head` 消息转头，固件能处理这条消息。
+用法 2 配合本固件能做什么、不能做什么：网关负责语音对话；在带摄像头的 Mac 上，网关还会让机器人转头跟着你的脸（见[人脸追踪](gateway/README.zh-CN.md#人脸追踪)）。Claude 通过网关的 MCP 工具控制头部、灯和摄像头**到不了**本固件，因为本固件的 XiaoZhi 客户端在握手消息里声明 `features.mcp=false`（[components/conversation/xiaozhi_client.cpp](components/conversation/xiaozhi_client.cpp)），也不处理服务器发来的 MCP 请求。人脸追踪改用 XiaoZhi 的 `head` 消息转头，固件能处理这条消息。Gemini 自己的头部、表情、灯光工具（默认关闭，设 `STACKCHAN_GEMINI_DEVICE_TOOLS=1` 打开）也走这条路：`move_head` 以 `head` 消息发送（需要 v0.2.1 之后的固件），表情以表情消息发送，灯光颜色以 `led` 消息发送。摄像头类工具在本固件上不能用。
 
 ### 用法 3：再加 Grok Bot
 

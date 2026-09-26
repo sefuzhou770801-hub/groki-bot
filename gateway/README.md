@@ -46,7 +46,11 @@ firmware's XiaoZhi client announces `features.mcp=false`, so MCP tools that
 drive hardware (`move_head`, `set_led`, `set_avatar`, `take_photo` and similar)
 return an error with that firmware. They work with firmware that implements
 the XiaoZhi device MCP tools. Face tracking does not use MCP: it turns the
-head with the XiaoZhi `head` message, which the firmware handles.
+head with the XiaoZhi `head` message, which the firmware handles. Gemini's own
+device tools (`STACKCHAN_GEMINI_DEVICE_TOOLS=1`) do not need MCP either: with
+this firmware `move_head` is sent as a `head` message (firmware newer than
+v0.2.1), `set_avatar` as an emotion and `set_all_leds` as an `led` message.
+Camera tools have no such path and do not work with this firmware.
 
 ## What you need
 
@@ -360,7 +364,7 @@ reconnect the MCP client, after a change).
 | `STACKCHAN_FACE_TRACKER_BIN` | `tools/vision-tracker/.build/release/groki-vision-tracker` | Face tracker executable |
 | `STACKCHAN_FACE_TRACKER_CAMERA` | empty | Part of the camera name to use; empty uses the tracker's default order |
 | `STACKCHAN_HEAD_FOLLOW_DEFAULT` | on | `0` starts with head follow off; "look at me" turns it on |
-| `STACKCHAN_GEMINI_DEVICE_TOOLS` | off | `1` gives Gemini face/LED/head tools; only for firmware with device MCP |
+| `STACKCHAN_GEMINI_DEVICE_TOOLS` | off | `1` gives Gemini face/LED/head tools. Firmware with device MCP gets them as MCP calls; the Groki Bot firmware gets them as XiaoZhi emotion, `led` and `head` messages (`head` needs firmware newer than v0.2.1) |
 | `STACKCHAN_USB_TRANSPORT` | off | `1` enables the USB serial control channel; it locks `/dev/cu.usbmodem*` |
 | `STACKCHAN_ASK_CLAUDE` | on when the `claude` CLI is found | `0` removes the `ask_claude` voice tool even when the CLI is installed |
 | `STACKCHAN_CLAUDE_BIN` | `claude` on PATH | Claude CLI used by `ask_claude` |
