@@ -7,6 +7,7 @@
 - **语音对话**：通过 Google Gemini Live，用机器人的麦克风和喇叭对话。
 - **「Hey Groki」唤醒词**：在电脑上识别，喊到机器人之后网关才把麦克风声音发给 Gemini。
 - **MCP 服务**：Claude Code、Claude Desktop 或其他 MCP 客户端可以让机器人说话、读取它的状态。
+- **人脸追踪**：在带摄像头的 Mac 上，机器人转头跟着你的脸（见[人脸追踪](#人脸追踪)）。
 - 可选：用语音控制你的 Mac；把难题交给 Claude CLI 回答的 `ask_claude` 语音工具（装了 `claude` 命令行才提供）；把任务交给 Grok Bot 应用里的智能体、再把回复念出来的 `ask_grokbot` 语音工具（见[可选：把任务交给 Grok Bot](#可选把任务交给-grok-bot)）。
 
 ```
@@ -21,10 +22,11 @@
 Groki Bot 固件自己就能对话：刷好固件，在设置页填上自己的 OpenAI 或 Gemini 密钥，不接电脑也能说话。以下情况再装网关：
 
 - 想用「Hey Groki」唤醒词；
+- 想让机器人转头跟着你的脸（需要带摄像头的 Mac）；
 - 想让 Claude（或其他 MCP 客户端）让机器人说话；
 - 想用语音操作电脑（Mac 控制、`ask_claude`）。
 
-**配合 Groki Bot 固件能用的部分**：语音对话、唤醒词，以及 `speak`、`get_status` 两个 MCP 工具。Groki Bot 固件的 XiaoZhi 客户端声明 `features.mcp=false`，所以驱动硬件的工具（`move_head`、`set_led`、`set_avatar`、`take_photo` 等）在这个固件上会返回错误；它们需要实现了 XiaoZhi 设备端 MCP 工具的固件。
+**配合 Groki Bot 固件能用的部分**：语音对话、唤醒词、人脸追踪，以及 `speak`、`get_status` 两个 MCP 工具。Groki Bot 固件的 XiaoZhi 客户端声明 `features.mcp=false`，所以驱动硬件的 MCP 工具（`move_head`、`set_led`、`set_avatar`、`take_photo` 等）在这个固件上会返回错误；它们需要实现了 XiaoZhi 设备端 MCP 工具的固件。人脸追踪不走 MCP，它用 XiaoZhi 的 `head` 消息转头，固件能处理这条消息。
 
 ## 准备
 
@@ -140,6 +142,68 @@ Claude Desktop 在 `claude_desktop_config.json` 里加入下面的配置（路�
 
 这时 `/debug/status` 应显示 `"device": {"connected": true, ...}`。说「Hey Groki」就可以开始对话。
 
+## 人脸追踪
+
+机器人转头跟着你的脸。Mac 上的一个小程序 [tools/vision-tracker](../tools/vision-tracker/README.md) 用 Apple Vision 看摄像头画面，把人脸位置发到网关的 `http://127.0.0.1:8766/track`；网关把位置换算成头部角度发给机器人。摄像头画面不离开这台 Mac，也不保存。
+
+需要：
+
+- 一台带摄像头的 Mac（macOS 13 或更新）：内置摄像头、Studio Display、用作连续互通相机的 iPhone，或 USB 摄像头都可以。
+- CoreS3 加 Stack-chan 底座和两个头部舵机，并且已经连上网关（上面第 4 步）。
+- 能处理网关 `head` 消息的固件：v0.2.1 之后的版本，或者从 `main` 编译的固件。旧固件会忽略这条消息，头不会动。
+- 编译追踪程序需要 Swift 5.9 或更新（Xcode，或命令行工具：`xcode-select --install`）。
+
+### 编译追踪程序
+
+在仓库根目录运行：
+
+```bash
+cd tools/vision-tracker
+swift build -c release
+```
+
+产物是 `tools/vision-tracker/.build/release/groki-vision-tracker`，网关默认就在这个位置找它。
+
+### 允许使用摄像头
+
+追踪程序第一次打开摄像头时，macOS 会弹窗询问权限，权限记在启动它的那个程序名下：网关在终端里运行时就是这个终端（或 Claude Code 所在的终端、Claude Desktop）。想先把弹窗处理掉，可以在之后启动网关的那个终端里手动运行一次追踪程序，点「允许」，再按 Ctrl-C 结束：
+
+```bash
+tools/vision-tracker/.build/release/groki-vision-tracker
+```
+
+错过了弹窗，或者网关作为后台服务运行时，到「系统设置 → 隐私与安全性 → 摄像头」里允许对应的程序，再重启网关。没有权限时追踪程序以退出码 2 退出，网关会隔一段时间再试，间隔逐次加长，最长 5 分钟。
+
+### 启动
+
+不需要额外操作：网关启动时自动拉起追踪程序，程序退出了会自动重启。网关一启动，头就开始跟随人脸。追踪程序还没编译时，网关只记一行日志，其余功能照常运行：
+
+```
+face tracker unavailable: executable not found at .../tools/vision-tracker/.build/release/groki-vision-tracker (build with: cd tools/vision-tracker && swift build -c release); the head will not follow faces
+```
+
+想自己手动运行追踪程序，设 `STACKCHAN_FACE_TRACKER_AUTOSTART=0`，然后运行 `groki-vision-tracker --endpoint http://127.0.0.1:8766/track --fps 8`。
+
+### 确认在工作
+
+1. 网关日志出现 `face tracker started pid=<进程号> endpoint=http://127.0.0.1:8766/track`，追踪程序输出 `Vision tracker camera: <摄像头名>`。
+2. 坐到摄像头前，打开 <http://127.0.0.1:8766/debug/status>，看 `face_tracking` 一节：`tracker_running` 是 `true`；摄像头看到你时 `face_reported` 变成 `true`，`last_face_at` 不断更新；`head_follow` 是 `true`，`mode` 是 `idle`。
+3. 左右移动：头会转向你并持续跟随，角度在舵机限位之内（默认左右 ±40°，上下 -10° 到 +25°）。摄像头看不到你的脸时，头停止跟随，大约两秒后机器人恢复自己的空闲动作。
+
+### 对话时暂停跟随
+
+对话期间按设计暂停跟随：机器人说话时（`mode` 为 `working`）和唤醒后听你说话时（`mode` 为 `quiet`），网关不发转头指令，免得舵机的声音和动作干扰对话。对话结束后，下一次检测到人脸就恢复跟随。机器人说话时收到的转头指令，固件也会先存着，等这段回复说完再执行。
+
+### 打开和关闭转头跟随
+
+- 用语音（Gemini 语音后端）：说「看着我」打开跟随，说「别看了」关闭。人脸识别在两种状态下都继续运行。
+- `STACKCHAN_HEAD_FOLLOW_DEFAULT=0`：网关启动时不跟随，适合没装头部舵机或想让头保持不动的情况。
+- `STACKCHAN_FACE_TRACKER_AUTOSTART=0`：完全不启动追踪程序，适合没有摄像头的电脑。
+
+### 选择摄像头
+
+不设置时，追踪程序先选 Studio Display 的摄像头，其次是 iPhone（连续互通相机），再其次是 macOS 列出的第一个摄像头。想指定某个摄像头，把 `STACKCHAN_FACE_TRACKER_CAMERA` 设为它名字里的一段（不区分大小写），例如 `STACKCHAN_FACE_TRACKER_CAMERA=FaceTime`。追踪程序启动时会列出它找到的所有摄像头。
+
 ## 可选：把任务交给 Grok Bot
 
 打开这项功能后，可以说「Hey Groki，帮我查一下明天东京的天气」或「帮我调研一下 X」：Gemini 马上回一句「已经发给助手啦」，把任务交给 Grok Bot 应用里的智能体，智能体每回一段话，机器人就念一段。闲聊仍由 Gemini 直接回答。完整的消息流程见[架构与通信说明](../docs/architecture.zh-CN.md#4-把任务交给-grok-bot)。
@@ -187,6 +251,10 @@ curl -s -X POST http://127.0.0.1:18770/send \
 | `STACKCHAN_WAKE_PHRASE`、`STACKCHAN_WAKE_KEYWORD` | `hey groki` | 唤醒词，见[更换唤醒词](#更换唤醒词)。只设 `STACKCHAN_WAKE_PHRASE=hi grok` 即可换回旧唤醒词 |
 | `STACKCHAN_WAKE_IDLE_S` | `30` | 安静多久后结束这一轮聆听 |
 | `STACKCHAN_MAC_CONTROL` | 关 | 设为 `1` 允许语音控制这台 Mac（见「安全」） |
+| `STACKCHAN_FACE_TRACKER_AUTOSTART` | 开 | 设为 `0` 时不启动 Mac 人脸追踪程序（没有摄像头的电脑） |
+| `STACKCHAN_FACE_TRACKER_BIN` | `tools/vision-tracker/.build/release/groki-vision-tracker` | 人脸追踪程序的路径 |
+| `STACKCHAN_FACE_TRACKER_CAMERA` | 空 | 要用的摄像头名字里的一段；留空按追踪程序的默认顺序选 |
+| `STACKCHAN_HEAD_FOLLOW_DEFAULT` | 开 | 设为 `0` 时网关启动后不转头跟随，说「看着我」再打开 |
 | `STACKCHAN_GEMINI_DEVICE_TOOLS` | 关 | 设为 `1` 让 Gemini 使用表情、灯光、头部工具；只适用于带设备端 MCP 的固件 |
 | `STACKCHAN_USB_TRANSPORT` | 关 | 设为 `1` 启用 USB 串口控制通道；它会独占 `/dev/cu.usbmodem*` |
 | `STACKCHAN_ASK_CLAUDE` | 找到 `claude` 命令行时开启 | 设为 `0` 时即使装了命令行也不提供 `ask_claude` 语音工具 |
@@ -219,6 +287,7 @@ curl -s -X POST http://127.0.0.1:18770/send \
 | 喊了唤醒词没反应 | 模型是否下载到 `models/kws`？日志里有没有 `KWS ready`？可以试 `STACKCHAN_KWS_THRESHOLD=0.03`，或运行 `scripts/kws_offline_repro.py`。`STACKCHAN_WAKE_WORD=0` 可关闭唤醒词。 |
 | 报 `sherpa-onnx 不可用` 或 `Library not loaded: libonnxruntime` | 重新运行 `uv sync --all-extras`，它会安装自带运行库的 `sherpa-onnx-core`。 |
 | 报 `Could not find Opus library` | 安装 Opus（`brew install opus` 或 `apt install libopus0`）。 |
+| 头不跟着人脸转 | 看 `/debug/status` 的 `face_tracking`。是 `null`：网关版本太旧或没有重启。`tracker_running: false`：先编译追踪程序，或在日志里找 `face tracker exited returncode=2`（没有摄像头或没有摄像头权限，见[允许使用摄像头](#允许使用摄像头)）。`face_reported: false`：摄像头没看到人脸。`head_follow: false`：说「看着我」。这些都正常但头不动：固件太旧，不认 `head` 消息，需要更新固件。 |
 | 刷固件提示串口被占用 | 如果开了 `STACKCHAN_USB_TRANSPORT`，先停掉网关。 |
 | 改了 `.env` 不生效 | 重启网关；用方式 A 时在 Claude Code 里用 `/mcp` 重新连接。 |
 | 机器人说任务没送到 | `stackchan-gbot-proxy` 在运行吗（`curl http://127.0.0.1:18770/health`）？终端里 `gbot bots list` 能用、并且列出了 `STACKCHAN_TOOL_BOT` 里的名字吗？Grok Bot 应用登录了吗？ |

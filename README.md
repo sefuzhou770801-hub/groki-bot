@@ -16,7 +16,7 @@ Each path adds to the one before it. Start with path 1.
 | | What you get | What you need |
 |---|---|---|
 | **1. Firmware only** (start here) | Voice conversation with the robot through OpenAI Realtime or Google Gemini Live, using your own API key | The robot, a USB-C cable, desktop Chrome or Edge, an OpenAI or Gemini API key |
-| **2. + gateway** | A "Hey Groki" wake word and Gemini Live voice running through your computer; Claude or another MCP client can make the robot speak and read its status | Path 1, plus a computer on the same Wi-Fi running [gateway/](gateway/README.md) with a Gemini API key |
+| **2. + gateway** | A "Hey Groki" wake word and Gemini Live voice running through your computer; on a Mac with a camera, the head follows your face; Claude or another MCP client can make the robot speak and read its status | Path 1, plus a computer on the same Wi-Fi running [gateway/](gateway/README.md) with a Gemini API key |
 | **3. + Grok Bot** | Say "look this up" or "research X": the robot hands the task to your agent in the Grok Bot app and reads the agent's replies aloud as they arrive | Path 2, plus the Grok Bot app signed in on that computer and the `gbot` CLI |
 
 How the pieces talk to each other (ports, protocol, message flow, what each part needs): [docs/architecture.md](docs/architecture.md).
@@ -55,7 +55,7 @@ Use this if you want the robot's voice to run through your computer, for example
    - Click "保存并重启" (Save and restart).
 4. Check <http://127.0.0.1:8766/debug/status> on the computer: `"device": {"connected": true}`. Say "Hey Groki".
 
-What path 2 does and does not do with this firmware: the gateway handles voice conversation. Head, LED and camera control from Claude through the gateway does **not** reach this firmware, because its XiaoZhi client announces `features.mcp=false` in its hello message ([components/conversation/xiaozhi_client.cpp](components/conversation/xiaozhi_client.cpp)) and does not handle MCP requests from the server.
+What path 2 does and does not do with this firmware: the gateway handles voice conversation, and on a Mac with a camera it turns the robot's head to follow your face ([Face tracking](gateway/README.md#face-tracking)). Head, LED and camera control from Claude through the gateway's MCP tools does **not** reach this firmware, because its XiaoZhi client announces `features.mcp=false` in its hello message ([components/conversation/xiaozhi_client.cpp](components/conversation/xiaozhi_client.cpp)) and does not handle MCP requests from the server. Face tracking uses the XiaoZhi `head` message instead, which the firmware handles.
 
 ### Path 3: firmware + gateway + Grok Bot
 
@@ -95,6 +95,7 @@ The Grok face is compiled into the firmware, so there is nothing else to flash.
 | [gateway/](gateway/README.md) | Gateway for your computer (Python): Gemini Live voice, wake word, MCP server, Grok Bot forwarding service |
 | [docs/architecture.md](docs/architecture.md) | How firmware, gateway and Grok Bot communicate |
 | `docs/` | Web flasher, license page and other documentation, published to GitHub Pages |
+| [tools/vision-tracker/](tools/vision-tracker/README.md) | Mac face tracker (Swift, Apple Vision) that the gateway starts for face tracking |
 | `tools/` | Settings pages, avatar DSL compiler, [tools/stackchan-channel/](tools/stackchan-channel/README.md) (MCP for Claude Code over the firmware's HTTP API), [tools/face-demo/](tools/face-demo/README.md) (face demo scripts) and other host tools |
 
 The eyes use the eye-ring contour system from the [aora-bot](https://github.com/sam70361/aora-bot) Emotion Ball (15 on-device expressions with blinking, ring cycling and four-weight blending), while the body keeps the DSL animations for breathing, happy bounce, squash while speaking, shy floating hearts and blush. The eye-ring data is used under the Emotion Ball Community License, which allows **non-commercial use only**; see [License](#license).
@@ -108,6 +109,7 @@ The eyes use the eye-ring contour system from the [aora-bot](https://github.com/
 - **Expression engine**: aora eye-ring contours (48 points per eye), 15 expressions, blink, ring cycling and four-weight blending. The body layer keeps breathing, happy bounce, squash while speaking, shy floating hearts and blush.
 - **AI voice conversation**: WebSocket connection to OpenAI Realtime, Google Gemini Live or a XiaoZhi server. Microphone audio goes up; reply audio drives the mouth. The half-duplex CoreS3 mutes the microphone while speaking; tap the screen or touch the head to interrupt a reply (barge-in).
 - **Servo head motion**: SCS0009 yaw and pitch with a trapezoidal velocity profile.
+- **Face tracking** (with the gateway on a Mac): a Mac camera tracker finds your face and the gateway turns the head to follow it; following pauses while the robot talks or listens. Setup: [gateway README, Face tracking](gateway/README.md#face-tracking).
 - **Head touch**: Si12T three-zone capacitive touch (front, middle, back); stroking switches to the shy face (Affection).
 - **Speech balloon**: reply text on a rounded white panel at the bottom of the screen; long text scrolls as a marquee.
 - **Three setup paths**: BLE (NimBLE GATT), Wi-Fi STA (mDNS HTTP), SoftAP with a captive portal (iOS friendly).
