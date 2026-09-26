@@ -332,10 +332,19 @@ async def test_send_device_binary_forwards_decoded_pcm_to_bridge(monkeypatch, in
         return FakeBridge(*args, **kwargs)
 
     proxy.bridge_factory = capture_bridge
+    tracking_calls = []
+
+    async def switch_tracking(enabled):
+        tracking_calls.append(enabled)
+        return {"ok": True, "enabled": enabled}
+
+    proxy.set_face_tracking = switch_tracking
 
     async def send(_msg): pass
 
     await proxy.start(info, {"type": "hello"}, send)
+    assert await bridge_kwargs["set_face_tracking"](True) == {"ok": True, "enabled": True}
+    assert tracking_calls == [True]
     bridge = proxy._bridge  # FakeBridge
     forwarded = await proxy.send_device_binary(b"\x00" * 100)
     assert forwarded is True

@@ -11,6 +11,7 @@ import asyncio
 import inspect
 import logging
 import os
+import time
 
 from aiohttp import web
 from aiohttp.web_log import AccessLogger
@@ -19,7 +20,9 @@ from .capture_server import create_capture_app
 from .cloud_proxy import CloudProxy, DEFAULT_CLOUD_URL
 from .device_emotion import IDLE_EMOTION, LISTENING_EMOTION, face_to_device_emotion
 from .demo_reactions import DemoReactions
+from .debug_status import get_debug_status
 from .esp32_client import ESP32Manager
+from .face_tracker import FaceTrackerSupervisor
 from .gemini_voice_proxy import GeminiVoiceProxy
 from .idle_behavior import IdleBehavior
 from .idle_gate import IdleGate
@@ -63,6 +66,16 @@ class TrackQuietAccessLogger(AccessLogger):
                 self.logger.info(message, extra=extra)
         except Exception:
             self.logger.exception("Error in logging")
+
+
+def head_follow_default_enabled() -> bool:
+    """Whether the head follows faces when the gateway starts.
+
+    Set STACKCHAN_HEAD_FOLLOW_DEFAULT=0 when the robot has no head servos or
+    should stay still; "look at me" turns following on later.
+    """
+    value = os.getenv("STACKCHAN_HEAD_FOLLOW_DEFAULT", "1").strip().lower()
+    return value not in {"0", "false", "no", "off"}
 
 
 class Gateway:
@@ -120,9 +133,19 @@ class Gateway:
         self.tracking_bridge = TrackingBridge(
             self.esp32,
             usb_transport=self.usb_transport,
-            on_face_detected=self.idle_gate.notify_face_detected,
+            on_face_detected=self._notify_face_detected,
             on_auto_head_command=self.idle_gate.notify_auto_head_command,
+            # The head holds still while the robot speaks or listens.
+            is_tts_active=lambda: get_debug_status().tts_active,
+            is_listening=lambda: bool(getattr(
+                getattr(self._active_voice_proxy(), "_wake_gate", None), "is_listening", False,
+            )),
         )
+        # The face tracker runs as long as the gateway does; head follow is on
+        # by default and "look at me" / "stop looking" toggle it.
+        self.tracking_bridge.enabled = head_follow_default_enabled()
+        self.face_tracker = FaceTrackerSupervisor()
+        self._last_face_at: float | None = None
         self.esp32.on_activity = self.idle_behavior.notify_activity
         self.esp32.on_head_command = self.idle_gate.notify_head_command
         self.esp32.on_device_state = self.idle_gate.notify_device_state
@@ -131,8 +154,57 @@ class Gateway:
         self._running = False
         self._http_runner: web.AppRunner | None = None
 
+    def _notify_face_detected(self) -> None:
+        self._last_face_at = time.time()
+        self.idle_gate.notify_face_detected()
+        self.face_tracker.notify_face_reported()
+
+    def face_tracking_status(self) -> dict:
+        """The "face_tracking" section of /debug/status."""
+        return {
+            "tracker_running": self.face_tracker.running,
+            "tracker_pid": self.face_tracker.pid,
+            "face_reported": self.face_tracker.available,
+            "last_face_at": self._last_face_at,
+            "head_follow": self.tracking_bridge.enabled,
+            # idle: following; working: the robot is speaking; quiet: it is
+            # listening after the wake word. The head holds still in both.
+            "mode": self.tracking_bridge.mode,
+        }
+
+    def _active_voice_proxy(self):
+        connection = getattr(self.esp32, "connection", None)
+        return getattr(connection, "cloud_proxy", None)
+
+    @property
+    def capture_port(self) -> int:
+        return int(os.getenv("CAPTURE_PORT", "8766"))
+
+    async def start_face_tracking(self) -> dict:
+        """Turn head follow on ("look at me"). The face tracker keeps running either way."""
+        return self._set_head_follow(True)
+
+    async def stop_face_tracking(self) -> dict:
+        """Turn head follow off ("stop looking"). Face detection keeps running."""
+        return self._set_head_follow(False)
+
+    def _set_head_follow(self, enabled: bool) -> dict:
+        self.tracking_bridge.enabled = enabled
+        result: dict = {
+            "ok": True,
+            "enabled": enabled,
+            "face_detector_running": self.face_tracker.running,
+        }
+        if enabled and not self.face_tracker.running:
+            result["warning"] = "face tracker is not running; head will not follow"
+        return result
+
     async def _handle_external_local_tool(self, name: str, arguments: dict) -> dict:
         """Handle gateway-local tools called through the external command socket."""
+        if name == "set_face_tracking":
+            if not isinstance(arguments.get("enabled"), bool):
+                return {"ok": False, "error": "enabled must be a boolean"}
+            return await (self.start_face_tracking() if arguments["enabled"] else self.stop_face_tracking())
         if name == "set_voice_mode":
             return self.voice_input_bridge.set_enabled(
                 bool(arguments.get("enabled")),
@@ -189,6 +261,7 @@ class Gateway:
                 usb_transport=self.usb_transport,
                 on_head_command=self.idle_gate.notify_head_command,
                 on_device_state=self.idle_gate.notify_device_state,
+                set_face_tracking=self._set_face_tracking_from_voice,
             )
         if backend == "xiaozhi":
             return CloudProxy(voice_bridge=self.voice_input_bridge)
@@ -202,7 +275,11 @@ class Gateway:
             usb_transport=self.usb_transport,
             on_head_command=self.idle_gate.notify_head_command,
             on_device_state=self.idle_gate.notify_device_state,
+            set_face_tracking=self._set_face_tracking_from_voice,
         )
+
+    async def _set_face_tracking_from_voice(self, enabled: bool) -> dict:
+        return await self._handle_external_local_tool("set_face_tracking", {"enabled": enabled})
 
     @property
     def vision_url(self) -> str:
@@ -228,7 +305,7 @@ class Gateway:
                 "set to a full capture URL."
             )
             host = "127.0.0.1"
-        port = int(os.getenv("CAPTURE_PORT", "8766"))
+        port = self.capture_port
         return f"http://{host}:{port}/capture"
 
     @property
@@ -255,7 +332,7 @@ class Gateway:
         """Start the ESP32 WebSocket server and HTTP capture server."""
         host = os.getenv("HOST", "0.0.0.0")
         ws_port = int(os.getenv("WS_PORT", os.getenv("PORT", "8765")))
-        capture_port = int(os.getenv("CAPTURE_PORT", "8766"))
+        capture_port = self.capture_port
         logger.info("claude CLI resolved to %s", resolve_claude_bin())
 
         # Start WebSocket server for ESP32
@@ -285,6 +362,7 @@ class Gateway:
         await self.idle_gate.start()
 
         # Start HTTP capture server (also hosts /track for face tracking)
+        get_debug_status().face_tracking_provider = self.face_tracking_status
         app = create_capture_app(
             capture_token=self.vision_token,
             inject_text_handler=self._inject_debug_text,
@@ -308,6 +386,8 @@ class Gateway:
             host, ws_port, host, capture_port, self.vision_url,
             self.voice_proxy_url if self.voice_backend == "xiaozhi" else self.voice_backend,
         )
+        # /track is up; now launch the face tracker that posts to it.
+        self.face_tracker.start(f"http://127.0.0.1:{capture_port}/track")
 
     async def _handle_track(self, request: web.Request) -> web.Response:
         """Forward face-detection JSON from Vision Tracker to TrackingBridge.
@@ -458,6 +538,7 @@ class Gateway:
     async def stop(self) -> None:
         """Stop the gateway."""
         self._running = False
+        await self.face_tracker.stop()
         await self.demo_reactions.stop()
         if self._http_runner:
             await self._http_runner.cleanup()

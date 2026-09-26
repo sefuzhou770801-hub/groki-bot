@@ -87,6 +87,52 @@ async def test_tracking_ignores_low_confidence_and_working_mode():
     assert esp32.calls == []
 
 
+@pytest.mark.asyncio
+async def test_live_voice_states_pause_tracking_and_resume_head_writes():
+    esp32 = FakeESP32()
+    voice = {"tts": False, "listening": False}
+    bridge = TrackingBridge(
+        esp32,
+        config=TrackingConfig(smoothing=1.0, move_threshold=0.0),
+        is_tts_active=lambda: voice["tts"],
+        is_listening=lambda: voice["listening"],
+    )
+    detection = {"x": 0.8, "y": 0.5, "confidence": 0.9}
+    try:
+        voice["tts"] = True
+        assert bridge.mode == "working"
+        assert await bridge.handle_detection(detection) is False
+        voice["tts"] = False
+        voice["listening"] = True
+        assert bridge.mode == "quiet"
+        assert await bridge.handle_detection(detection) is False
+        assert esp32.calls == []
+        voice["listening"] = False
+        assert bridge.mode == "idle"
+        assert await bridge.handle_detection(detection) is True
+        await pump_resampler(bridge)
+        assert len(esp32.calls) == 1
+    finally:
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
+async def test_active_resampler_stops_writing_when_speech_begins():
+    esp32 = FakeESP32()
+    voice = {"tts": False}
+    bridge = TrackingBridge(
+        esp32, config=TrackingConfig(smoothing=1.0, move_threshold=0.0),
+        is_tts_active=lambda: voice["tts"],
+    )
+    try:
+        assert await bridge.handle_detection({"x": 0.8, "y": 0.5, "confidence": 0.9})
+        voice["tts"] = True
+        await pump_resampler(bridge)
+        assert esp32.calls == []
+    finally:
+        await bridge.stop()
+
+
 def test_tracking_config_updates_live():
     bridge = TrackingBridge(FakeESP32())
 
@@ -481,4 +527,44 @@ async def test_scenario_no_usb_transport_pure_ws():
     moved = await bridge.snap_to_last_position()
     assert moved is True
     assert len(esp32.calls) == 2
+    await bridge.stop()
+
+
+class FakeVoiceOnlyESP32:
+    """Firmware without MCP: set_head_angles is rejected, WS ``head`` works."""
+
+    device_connected = True
+    mcp_supported = False
+
+    def __init__(self):
+        self.calls = []
+        self.head_calls = []
+
+    async def call_tool(self, name, arguments, **kwargs):
+        self.calls.append((name, arguments))
+        return None, {"code": -32000, "message": "ESP32 MCP unsupported (features.mcp=false)"}
+
+    async def send_head(self, yaw, pitch, speed, **kwargs):
+        self.head_calls.append(((yaw, pitch, speed), kwargs))
+        return {"ok": True}, None
+
+
+@pytest.mark.asyncio
+async def test_voice_only_device_tracks_via_ws_head_message():
+    esp32 = FakeVoiceOnlyESP32()
+    bridge = TrackingBridge(
+        esp32,
+        config=TrackingConfig(smoothing=1.0, move_threshold=0.0),
+        usb_transport=None,
+    )
+
+    moved = await bridge.handle_detection({"x": 0.7, "y": 0.4, "confidence": 0.9})
+    await pump_resampler(bridge)
+
+    assert moved is True
+    assert esp32.calls == []
+    assert len(esp32.head_calls) == 1
+    (_yaw, _pitch, speed), kwargs = esp32.head_calls[0]
+    assert speed == TrackingBridge.TRACKING_SPEED
+    assert kwargs == {"notify_activity": False, "notify_head_command": False}
     await bridge.stop()

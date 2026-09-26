@@ -35,6 +35,7 @@ from typing import Any, Awaitable, Callable
 
 from .debug_status import DebugStatus, get_debug_status
 from .device_emotion import face_to_device_emotion
+from .face_tracker import autostart_enabled as face_tracker_autostart_enabled
 from .gbot_brain import grokbot_enabled, tool_bot
 from .mac_control import (
     MAC_TOOL_NAMES,
@@ -556,16 +557,36 @@ def build_function_declarations() -> list[Any]:
         ),
     )
 
+    start_face_tracking = types.FunctionDeclaration(
+        name="self.tracking.start",
+        description=(
+            "Turn on face following: the head turns to follow the user's face through the Mac camera. "
+            "Call only when the user explicitly asks, e.g. \"look at me\" or \"follow my face\"; "
+            "never during small talk."
+        ),
+        parameters=types.Schema(type="OBJECT", properties={}),
+    )
+    stop_face_tracking = types.FunctionDeclaration(
+        name="self.tracking.stop",
+        description=(
+            "Turn off face following: the head stops turning toward the user's face. "
+            "Call when the user asks, e.g. \"stop looking at me\" or \"stop following me\"."
+        ),
+        parameters=types.Schema(type="OBJECT", properties={}),
+    )
+
     device = [move_head, set_avatar, set_all_leds, express_emotion] if device_tools_enabled() else []
     mac = _build_mac_declarations(types) if mac_control_enabled() else []
     grokbot = [ask_grokbot] if bot else []
     claude = [ask_claude] if ask_claude_enabled() else []
+    tracking = [start_face_tracking, stop_face_tracking] if face_tracker_autostart_enabled() else []
     return [
         *device,
         end_conversation,
         *grokbot,
         *claude,
         get_current_datetime,
+        *tracking,
         *mac,
     ]
 
@@ -864,6 +885,8 @@ TOOL_METADATA: dict[str, ToolMetadata] = {
     "ask_grokbot": ToolMetadata(False, None, 8.0),
     "ask_claude": ToolMetadata(False, None, 35.0),
     "get_current_datetime": ToolMetadata(False, None, 2.0),
+    "self.tracking.start": ToolMetadata(True, "face_tracking", 8.0),
+    "self.tracking.stop": ToolMetadata(True, "face_tracking", 8.0),
     "open_app": ToolMetadata(True, "mac_app", 8.0),
     "open_url": ToolMetadata(True, "mac_app", 8.0),
     "web_search": ToolMetadata(True, "mac_app", 8.0),
@@ -925,6 +948,7 @@ class GeminiLiveBridge:
         usb_transport: Any | None = None,
         on_head_command: ActivityCallback | None = None,
         wake_gate_state_getter: Callable[[], str] | None = None,
+        set_face_tracking: Callable[[bool], Awaitable[dict[str, Any]]] | None = None,
         reconnect_on_close: bool = True,
         reconnect_initial_backoff_s: float = 1.0,
         reconnect_max_backoff_s: float = 30.0,
@@ -953,6 +977,7 @@ class GeminiLiveBridge:
         self._client: Any | None = None
         self._on_head_command = on_head_command
         self._wake_gate_state_getter = wake_gate_state_getter
+        self._set_face_tracking = set_face_tracking
         self._stop_event = asyncio.Event()
         self._connected_event = asyncio.Event()
         # Buffer text fragments until the model marks the turn complete so
@@ -1543,6 +1568,10 @@ class GeminiLiveBridge:
             return await self._dispatch_ask_claude(args)
         if name == "get_current_datetime":
             return self._dispatch_get_datetime()
+        if name in {"self.tracking.start", "self.tracking.stop"}:
+            if self._set_face_tracking is None:
+                return {"ok": False, "error": "face tracking unavailable"}
+            return await self._set_face_tracking(name == "self.tracking.start")
         if name in MAC_TOOL_NAMES:
             if self._mac is None:
                 return {"ok": False, "error": "Mac control is turned off"}

@@ -711,6 +711,22 @@ async def test_external_hook_client_calls_local_tool_handler():
     result = hook_ws.sent[0]["payload"]["result"]
     assert json.loads(result["content"][0]["text"]) == {"ok": True, "enabled": True}
 
+    await manager._handle_external_mcp_request(
+        hook_ws,
+        {
+            "session_id": "hook-local", "type": "mcp",
+            "payload": {
+                "jsonrpc": "2.0", "id": 12, "method": "tools/call",
+                "params": {"name": "set_face_tracking", "arguments": {"enabled": False}},
+            },
+        },
+        session_id="fallback",
+    )
+    assert calls[-1] == ("set_face_tracking", {"enabled": False})
+    assert json.loads(hook_ws.sent[-1]["payload"]["result"]["content"][0]["text"]) == {
+        "ok": True, "enabled": False,
+    }
+
 
 @pytest.mark.asyncio
 async def test_external_hook_client_can_call_speak(manager, monkeypatch):
@@ -782,6 +798,53 @@ async def test_esp32_disconnect_handling(manager):
     # Connection closed
     await asyncio.sleep(0.2)
     assert manager.device_connected is False
+
+
+@pytest.mark.asyncio
+async def test_replacing_speaking_device_clears_old_tts_without_erasing_new_speech():
+    """A stale WebSocket cannot leave tracking paused or clear its replacement's TTS."""
+    from stackchan_mcp.debug_status import DebugStatus
+
+    status = DebugStatus()
+    mgr = ESP32Manager(debug_status=status)
+    await mgr.start("127.0.0.1", 0)
+    port = mgr._server.sockets[0].getsockname()[1]
+    hello = json.dumps({"type": "hello", "version": 1, "features": {"mcp": False}})
+
+    async def wait_for_tts(active):
+        async def check():
+            while status.tts_active != active:
+                await asyncio.sleep(0.01)
+        await asyncio.wait_for(check(), timeout=1.0)
+
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as old:
+            await old.send(hello)
+            await asyncio.wait_for(old.recv(), timeout=1.0)
+            await old.send(json.dumps({"type": "tts", "state": "start"}))
+            await wait_for_tts(True)
+            await mgr.send_tts_state("start")  # local say also belongs to the old socket
+            assert status._tts_sources == {"device", "local"}
+            async with websockets.connect(f"ws://127.0.0.1:{port}") as new:
+                await new.send(hello)
+                await asyncio.wait_for(new.recv(), timeout=1.0)
+                await wait_for_tts(False)
+                assert status._tts_sources == set()
+                await old.send(json.dumps({"type": "tts", "state": "start"}))
+                await asyncio.sleep(0.05)
+                assert status.tts_active is False
+                await new.send(json.dumps({"type": "tts", "state": "start"}))
+                await wait_for_tts(True)
+                # The old socket can still have queued events; none owns the new device.
+                await old.send(json.dumps({"type": "tts", "state": "stop"}))
+                await old.close()
+                await asyncio.sleep(0.05)
+                assert status.tts_active is True
+                assert status._tts_sources == {"device"}
+                await new.send(json.dumps({"type": "tts", "state": "stop"}))
+                await wait_for_tts(False)
+    finally:
+        await mgr.stop()
 
 
 @pytest.mark.asyncio

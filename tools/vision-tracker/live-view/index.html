@@ -1,0 +1,90 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 sefuzhou770801-hub -->
+<!-- SPDX-License-Identifier: BSL-1.0 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Groki Face Tracking Live View</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #090d14; color: #f4f7fb; }
+    main { display: grid; grid-template-columns: 1fr 320px; gap: 20px; padding: 20px; }
+    .stage { position: relative; background: #111827; border-radius: 18px; overflow: hidden; min-height: 480px; }
+    video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    aside { background: #111827; border-radius: 18px; padding: 18px; }
+    label { display: grid; gap: 6px; margin: 14px 0; font-size: 13px; color: #cbd5e1; }
+    input[type="range"] { width: 100%; }
+    .status { color: #93c5fd; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <section class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </section>
+  <aside>
+    <h1>Face tracking live view</h1>
+    <div id="status" class="status">Starting the camera...</div>
+    <div id="controls"></div>
+  </aside>
+</main>
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('overlay');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const controls = document.getElementById('controls');
+let lastDetection = null;
+let config = {gain_x:1, gain_y:1, offset_x:0, offset_y:0, smoothing:.35, deadzone:.04, move_threshold:2, fps:8};
+const ranges = {
+  gain_x:[0,3,.05], gain_y:[0,3,.05], offset_x:[-30,30,1], offset_y:[-15,15,1],
+  smoothing:[0,1,.05], deadzone:[0,.2,.01], move_threshold:[0,10,.5], fps:[1,20,1]
+};
+function renderControls(){
+  controls.innerHTML = '';
+  for (const [key,[min,max,step]] of Object.entries(ranges)) {
+    const label = document.createElement('label');
+    label.textContent = `${key}: ${config[key]}`;
+    const input = document.createElement('input');
+    input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = config[key];
+    input.oninput = async () => {
+      config[key] = Number(input.value); label.firstChild.textContent = `${key}: ${config[key]}`;
+      await fetch('/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({[key]:config[key]})});
+    };
+    label.appendChild(input); controls.appendChild(label);
+  }
+}
+function draw(){
+  canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if (lastDetection) {
+    const x = lastDetection.x * canvas.width;
+    const y = (1 - lastDetection.y) * canvas.height;
+    const w = lastDetection.width * canvas.width;
+    const h = lastDetection.height * canvas.height;
+    ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 3;
+    ctx.strokeRect(x - w/2, y - h/2, w, h);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText(`confidence ${lastDetection.confidence.toFixed(2)}`, x - w/2, y - h/2 - 8);
+  }
+  requestAnimationFrame(draw);
+}
+async function startCamera(){
+  try { video.srcObject = await navigator.mediaDevices.getUserMedia({video:true, audio:false}); statusEl.textContent = 'Camera on, waiting for face detections...'; }
+  catch (err) { statusEl.textContent = 'No camera or no camera permission: ' + err; }
+}
+function connectWs(){
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.onmessage = event => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'config') { config = {...config, ...msg.config}; renderControls(); }
+    if (msg.type === 'detection') { lastDetection = msg.detection; statusEl.textContent = 'Face detected: ' + JSON.stringify(lastDetection, null, 2); }
+  };
+  ws.onclose = () => setTimeout(connectWs, 1000);
+}
+renderControls(); startCamera(); connectWs(); draw();
+</script>
+</body>
+</html>

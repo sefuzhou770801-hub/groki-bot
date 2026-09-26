@@ -49,3 +49,8 @@ components/jtts/test/host/*.wav
 components/jtts/generated/
 components/jtts/test/host/build/
 components/groki_motion/test/host/build/
+
+# Swift build output of the Mac face tracker (tools/vision-tracker).
+.build/
+
+__pycache__/

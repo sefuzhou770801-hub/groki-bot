@@ -545,6 +545,78 @@ async def test_dispatch_tool_routes_to_esp32():
     ]
 
 
+def test_face_tracking_tools_hidden_when_tracker_autostart_is_off(monkeypatch):
+    monkeypatch.setenv("STACKCHAN_FACE_TRACKER_AUTOSTART", "0")
+    names = {decl.name for decl in build_function_declarations()}
+    assert not names & {"self.tracking.start", "self.tracking.stop"}
+
+
+@pytest.mark.defaults
+def test_face_tracking_tools_offered_with_shipped_defaults(monkeypatch):
+    """The face tracker starts with the gateway by default, so voice can switch head follow."""
+    monkeypatch.delenv("STACKCHAN_FACE_TRACKER_AUTOSTART", raising=False)
+    names = [decl.name for decl in build_function_declarations()]
+    assert names == [
+        "end_conversation",
+        "get_current_datetime",
+        "self.tracking.start",
+        "self.tracking.stop",
+    ]
+    by_name = {decl.name: decl for decl in build_function_declarations()}
+    assert by_name["self.tracking.start"].parameters.properties == {}
+    assert "look at me" in by_name["self.tracking.start"].description
+    assert TOOL_METADATA["self.tracking.start"].exclusive_group == "face_tracking"
+    assert TOOL_METADATA["self.tracking.stop"].exclusive_group == "face_tracking"
+
+
+@pytest.mark.asyncio
+async def test_voice_tracking_tools_use_gateway_local_switch_without_device():
+    calls = []
+
+    async def switch(enabled):
+        calls.append(enabled)
+        return {"ok": True, "enabled": enabled}
+
+    bridge = GeminiLiveBridge(FakeESP32(), api_key="k", set_face_tracking=switch)
+    assert await bridge._dispatch_tool("self.tracking.start", {}) == {"ok": True, "enabled": True}
+    assert await bridge._dispatch_tool("self.tracking.stop", {}) == {"ok": True, "enabled": False}
+    assert calls == [True, False]
+    assert bridge._esp32.calls == []
+
+
+@pytest.mark.asyncio
+async def test_voice_tracking_tools_without_switch_report_unavailable():
+    bridge = GeminiLiveBridge(FakeESP32(), api_key="k")
+    assert await bridge._dispatch_tool("self.tracking.start", {}) == {
+        "ok": False, "error": "face tracking unavailable",
+    }
+
+
+@pytest.mark.asyncio
+async def test_gemini_function_calls_return_tracking_switch_results():
+    from types import SimpleNamespace
+
+    results = []
+
+    async def switch(enabled):
+        return {"ok": True, "enabled": enabled}
+
+    class Session:
+        async def send_tool_response(self, *, function_responses):
+            results.extend(function_responses)
+
+    bridge = GeminiLiveBridge(FakeESP32(), api_key="k", set_face_tracking=switch)
+    bridge._session = Session()
+    await bridge._dispatch_tool_calls([
+        SimpleNamespace(id="start-1", name="self.tracking.start", args={}),
+        SimpleNamespace(id="stop-1", name="self.tracking.stop", args={}),
+    ])
+    assert [(r.id, r.response) for r in results] == [
+        ("start-1", {"ok": True, "enabled": True}),
+        ("stop-1", {"ok": True, "enabled": False}),
+    ]
+
+
 @pytest.mark.asyncio
 async def test_dispatch_set_background_color_is_unknown():
     bridge = _bridge()

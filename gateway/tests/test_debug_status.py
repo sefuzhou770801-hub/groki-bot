@@ -305,6 +305,23 @@ def test_audio_events_update_snapshot():
     assert snap["tts_active"] is True
 
 
+def test_face_tracking_section_comes_from_the_provider():
+    st = DebugStatus()
+    assert st.snapshot()["face_tracking"] is None
+    st.face_tracking_provider = lambda: {"tracker_running": True}
+    assert st.snapshot()["face_tracking"] == {"tracker_running": True}
+
+
+def test_tts_sources_do_not_clear_another_active_speaker():
+    st = DebugStatus()
+    st.on_tts_state(True, source="local")
+    st.on_tts_state(True, source="gemini")
+    st.on_tts_state(False, source="local")
+    assert st.tts_active is True
+    st.on_tts_state(False, source="gemini")
+    assert st.tts_active is False
+
+
 # --- recent --------------------------------------------------------------
 
 
