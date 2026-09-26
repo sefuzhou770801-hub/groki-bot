@@ -1,5 +1,5 @@
-// 第一步验证：解析 aora rings.js，检查每组眼环能否用蛇形三角条带剖分
-// （固定索引 (i, i+1, n-i...) series，无翻转三角形、面积守恒）。
+// Check: parse aora's rings.js and test whether every eye ring can be split into a zigzag triangle strip
+// (fixed indices (i, i+1, n-i...), no flipped triangles, area preserved).
 import { readFileSync } from 'node:fs';
 
 const AORA = process.env.AORA_PATH;
@@ -15,7 +15,7 @@ function loadWindowScript(path) {
 const rings = loadWindowScript(`${AORA}/emotion-ball/js/rings.js`).EB_RINGS;
 console.log('HEAD_C =', rings.HEAD_C, 'EYE_HALF =', rings.EYE_HALF, 'rings =', rings.EXPRESSIONS.length);
 
-// 蛇形条带索引：0,1,47, 1,2,47? 标准 strip: 顺序 v[] = 0,1,n-1,2,n-2,3,...
+// Zigzag strip indices: the vertex order is v[] = 0,1,n-1,2,n-2,3,...
 function stripTriangles(n) {
   const order = [0];
   let lo = 1, hi = n - 1, takeLo = true;
@@ -59,4 +59,4 @@ rings.EXPRESSIONS.forEach((pair, ri) => {
     }
   });
 });
-console.log(bad === 0 ? '全部 50 条环蛇形剖分通过' : `${bad} 条环需要特殊处理`);
+console.log(bad === 0 ? 'all 50 rings split into zigzag strips' : `${bad} rings need special handling`);

@@ -218,3 +218,36 @@ def _ogg_page(packet: bytes) -> bytes:
     header.extend(b"\x01")
     header.extend(bytes([len(packet)]))
     return bytes(header) + packet
+
+
+@pytest.mark.asyncio
+async def test_cloud_prompt_puts_chinese_text_into_the_english_template(monkeypatch):
+    prompts: list[str] = []
+
+    async def fake_say(text: str, *, sample_rate: int = 24000) -> SynthesizedSpeech:
+        prompts.append(text)
+        assert sample_rate == 16000
+        return SynthesizedSpeech(opus_frames=[b"opus"], provider="fake")
+
+    monkeypatch.delenv("XIAOZHI_CLOUD_TTS_PROMPT_TEMPLATE", raising=False)
+    monkeypatch.setattr(audio_stream, "_synthesize_macos_say", fake_say)
+
+    await audio_stream.synthesize_cloud_prompt("今天天气很好")
+
+    assert prompts == ["Repeat after me: 今天天气很好. Say only: 今天天气很好."]
+
+
+@pytest.mark.asyncio
+async def test_cloud_prompt_template_can_be_overridden(monkeypatch):
+    prompts: list[str] = []
+
+    async def fake_say(text: str, *, sample_rate: int = 24000) -> SynthesizedSpeech:
+        prompts.append(text)
+        return SynthesizedSpeech(opus_frames=[b"opus"], provider="fake")
+
+    monkeypatch.setenv("XIAOZHI_CLOUD_TTS_PROMPT_TEMPLATE", "跟我说：{text}。只说这句：{text}")
+    monkeypatch.setattr(audio_stream, "_synthesize_macos_say", fake_say)
+
+    await audio_stream.synthesize_cloud_prompt("你好")
+
+    assert prompts == ["跟我说：你好。只说这句：你好"]

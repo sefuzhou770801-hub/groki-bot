@@ -180,9 +180,9 @@ async def test_idle_step_defers_when_head_is_still_moving():
 
 @pytest.mark.asyncio
 async def test_idle_start_is_idempotent_for_double_entry(monkeypatch):
-    """显式打开网关 idle 时，重复 start 不会创建第二个 task。
+    """With the gateway idle turned on explicitly, a second start creates no second task.
 
-    默认是关的（固件 IdleMotionModifier 接管），这个测试只验幂等性。
+    It is off by default (the firmware's IdleMotionModifier owns idle); this test only checks idempotence.
     """
     monkeypatch.setenv("STACKCHAN_GATEWAY_IDLE_ENABLED", "1")
     esp32 = FakeESP32()

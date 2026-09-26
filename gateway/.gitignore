@@ -17,7 +17,7 @@ tests/private_wordlist.txt
 # Captures (user photos)
 captures/
 
-# 本地唤醒词模型
+# Local wake word model
 models/kws/
 
 # IDE

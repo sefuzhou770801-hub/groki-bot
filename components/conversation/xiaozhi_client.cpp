@@ -646,7 +646,7 @@ private:
         std::uint8_t g = 0;
         std::uint8_t b = 0;
         if (!json_u8(root, "r", r) || !json_u8(root, "g", g) || !json_u8(root, "b", b)) {
-            ESP_LOGW(kTag, "LED 控制消息无效；需要 type=led 且 r/g/b 在 0..255 内");
+            ESP_LOGW(kTag, "Invalid LED control message: expected type=led and r/g/b in 0..255");
             return;
         }
 
@@ -656,7 +656,7 @@ private:
         ev.led_g = g;
         ev.led_b = b;
         emit(ev);
-        ESP_LOGI(kTag, "LED 控制消息: r=%u g=%u b=%u",
+        ESP_LOGI(kTag, "LED control message: r=%u g=%u b=%u",
                  static_cast<unsigned>(r), static_cast<unsigned>(g), static_cast<unsigned>(b));
     }
 

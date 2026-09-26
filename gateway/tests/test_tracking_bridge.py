@@ -448,12 +448,12 @@ def test_map_to_head_pitch_does_not_saturate_at_two_thirds():
     assert 20 <= pitch < 35
 
 
-# --- USB ↔ WS handoff scenarios (维护者的 4 个验收场景) ---------------------------
+# --- USB ↔ WS handoff scenarios ------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_scenario_usb_online_uses_usb():
-    """场景 1：USB 在线 → 走 USB。"""
+    """Scenario 1: USB online → use USB."""
     esp32 = FakeESP32()
     usb = FakeUsbTransport(connected=True)
     bridge = TrackingBridge(
@@ -470,9 +470,9 @@ async def test_scenario_usb_online_uses_usb():
 
 @pytest.mark.asyncio
 async def test_scenario_usb_disconnect_falls_back_to_ws():
-    """场景 2：USB 拔掉 → 自动 fallback WS，功能不断。"""
+    """Scenario 2: USB unplugged → fall back to WS automatically, nothing breaks."""
     esp32 = FakeESP32()
-    usb = FakeUsbTransport(connected=False)  # 模拟拔掉
+    usb = FakeUsbTransport(connected=False)  # unplugged
     bridge = TrackingBridge(
         esp32,
         config=TrackingConfig(smoothing=1.0, move_threshold=0.0),
@@ -481,14 +481,14 @@ async def test_scenario_usb_disconnect_falls_back_to_ws():
     moved = await bridge.handle_detection({"x": 0.7, "y": 0.4, "confidence": 0.9})
     await pump_resampler(bridge)
     assert moved is True
-    assert usb.calls == []  # 没尝试 USB（connected=False 直接跳过）
+    assert usb.calls == []  # USB not tried (connected=False skips it)
     assert len(esp32.calls) == 1
     await bridge.stop()
 
 
 @pytest.mark.asyncio
 async def test_scenario_usb_reconnect_switches_back_to_usb():
-    """场景 3：USB 重新插上 → 自动切回 USB。"""
+    """Scenario 3: USB plugged back in → switch back to USB automatically."""
     esp32 = FakeESP32()
     usb = FakeUsbTransport(connected=False)
     bridge = TrackingBridge(
@@ -496,34 +496,34 @@ async def test_scenario_usb_reconnect_switches_back_to_usb():
         config=TrackingConfig(smoothing=1.0, move_threshold=0.0),
         usb_transport=usb,
     )
-    # 拔掉时走 WS
+    # WS while unplugged
     await bridge.handle_detection({"x": 0.3, "y": 0.4, "confidence": 0.9})
     await pump_resampler(bridge)
     assert len(esp32.calls) == 1 and usb.calls == []
-    # 模拟 USB 重连
+    # USB reconnects
     usb.connected = True
     esp32.calls.clear()
     await bridge.handle_detection({"x": 0.7, "y": 0.6, "confidence": 0.9})
     await pump_resampler(bridge)
     assert len(usb.calls) == 1
-    assert esp32.calls == []  # 切回 USB
+    assert esp32.calls == []  # back on USB
     await bridge.stop()
 
 
 @pytest.mark.asyncio
 async def test_scenario_no_usb_transport_pure_ws():
-    """场景 4：完全没 USB（STACKCHAN_USB_DISABLE=1）→ 纯 WS 模式。"""
+    """Scenario 4: no USB at all (STACKCHAN_USB_DISABLE=1) → WS only."""
     esp32 = FakeESP32()
     bridge = TrackingBridge(
         esp32,
         config=TrackingConfig(smoothing=1.0, move_threshold=0.0),
-        usb_transport=None,  # 没创建 transport
+        usb_transport=None,  # no transport created
     )
     moved = await bridge.handle_detection({"x": 0.7, "y": 0.4, "confidence": 0.9})
     await pump_resampler(bridge)
     assert moved is True
     assert len(esp32.calls) == 1
-    # snap 也走 WS
+    # snap uses WS too
     moved = await bridge.snap_to_last_position()
     assert moved is True
     assert len(esp32.calls) == 2

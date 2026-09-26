@@ -72,7 +72,7 @@ cd ../..
 
 ```bash
 uv run python scripts/kws_offline_repro.py --generate-say
-# 输出「命中」或「未命中」
+# 命中时输出 hit，没命中时输出 miss
 ```
 
 ### 更换唤醒词
@@ -285,7 +285,7 @@ curl -s -X POST http://127.0.0.1:18770/send \
 | 连上了但不回答 | 是否填了 `GEMINI_API_KEY`？看 `/debug/status` 里的 `gemini.last_error`。错误里有 `reported as leaked` 表示 Google 已经停用这把密钥，需要新建一把。 |
 | 连接 Gemini 超时 | 电脑需要能访问 Google 的 Gemini 接口。在无法直连 Google 的地区，需要让网关通过可用的网络代理运行。 |
 | 喊了唤醒词没反应 | 模型是否下载到 `models/kws`？日志里有没有 `KWS ready`？可以试 `STACKCHAN_KWS_THRESHOLD=0.03`，或运行 `scripts/kws_offline_repro.py`。`STACKCHAN_WAKE_WORD=0` 可关闭唤醒词。 |
-| 报 `sherpa-onnx 不可用` 或 `Library not loaded: libonnxruntime` | 重新运行 `uv sync --all-extras`，它会安装自带运行库的 `sherpa-onnx-core`。 |
+| 报 `sherpa-onnx unavailable` 或 `Library not loaded: libonnxruntime` | 重新运行 `uv sync --all-extras`，它会安装自带运行库的 `sherpa-onnx-core`。 |
 | 报 `Could not find Opus library` | 安装 Opus（`brew install opus` 或 `apt install libopus0`）。 |
 | 头不跟着人脸转 | 看 `/debug/status` 的 `face_tracking`。是 `null`：网关版本太旧或没有重启。`tracker_running: false`：先编译追踪程序，或在日志里找 `face tracker exited returncode=2`（没有摄像头或没有摄像头权限，见[允许使用摄像头](#允许使用摄像头)）。`face_reported: false`：摄像头没看到人脸。`head_follow: false`：说「看着我」。这些都正常但头不动：固件太旧，不认 `head` 消息，需要更新固件。 |
 | 刷固件提示串口被占用 | 如果开了 `STACKCHAN_USB_TRANSPORT`，先停掉网关。 |

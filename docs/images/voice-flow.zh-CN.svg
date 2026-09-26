@@ -3,8 +3,8 @@ SPDX-FileCopyrightText: 2026 sefuzhou770801-hub
 SPDX-License-Identifier: BSL-1.0
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" role="img" aria-labelledby="title desc">
-  <title id="title">Groki Bot AI voice conversation flow</title>
-  <desc id="desc">Microphone audio goes over WebSocket to one of three conversation services; reply audio drives the speaker and mouth, tool calls drive expressions and servos; a screen tap or head touch interrupts the reply.</desc>
+  <title id="title">Groki Bot AI 语音对话流程</title>
+  <desc id="desc">麦克风音频经 WebSocket 发送到三种可选对话服务，应答音频驱动扬声器和口型，工具调用控制表情与舵机；屏幕点击或头顶触摸可以打断应答。</desc>
   <style>
     :root { color-scheme:light dark; --ink:#23324a; --muted:#5d6b82; --line:#6b7a90; --panel:#eff4fa; --panel-2:#e4ebf5; --accent:#4f46e5; --accent-soft:#e8e7ff; --teal:#0f766e; --teal-soft:#d9f3ef; --amber:#985b0d; --amber-soft:#fff0d2; --danger:#b42318; --danger-soft:#fde8e7; }
     @media (prefers-color-scheme:dark) { :root { --ink:#e6edf7; --muted:#afbdd0; --line:#8997aa; --panel:#182332; --panel-2:#223146; --accent:#aaa5ff; --accent-soft:#302e5d; --teal:#68d9cb; --teal-soft:#163e3a; --amber:#ffca73; --amber-soft:#493619; --danger:#ff918a; --danger-soft:#4a2522; } }
@@ -20,8 +20,8 @@ SPDX-License-Identifier: BSL-1.0
     <marker id="arrow-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--danger)"/></marker>
   </defs>
 
-  <text class="title" x="28" y="38">AI voice conversation</text>
-  <text class="subtitle" x="28" y="62">Speech up, replies down, motion tool calls, interrupt at any time</text>
+  <text class="title" x="28" y="38">AI 语音对话</text>
+  <text class="subtitle" x="28" y="62">语音上行、应答下行、动作工具调用与随时打断</text>
 
   <path class="arrow" d="M152 166 H186"/>
   <path class="arrow" d="M340 166 H374"/>
@@ -31,7 +31,7 @@ SPDX-License-Identifier: BSL-1.0
     <rect class="panel" x="24" y="104" width="128" height="124" rx="16"/>
     <rect x="76" y="128" width="24" height="45" rx="12" fill="var(--teal-soft)" stroke="var(--teal)" stroke-width="2.5"/>
     <path d="M66 163v2a22 22 0 0 0 44 0v-2M88 187v17M73 204h30" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linecap="round"/>
-    <text class="label" x="88" y="218" text-anchor="middle">Microphone</text>
+    <text class="label" x="88" y="218" text-anchor="middle">麦克风</text>
   </g>
 
   <g>
@@ -39,12 +39,12 @@ SPDX-License-Identifier: BSL-1.0
     <rect class="accent-panel" x="213" y="124" width="100" height="60" rx="10"/>
     <path d="M235 154 Q249 140 263 154 Q277 168 291 154" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
     <text class="label" x="263" y="211" text-anchor="middle">CoreS3</text>
-    <text class="small" x="263" y="246" text-anchor="middle">mic off while speaking (half duplex)</text>
+    <text class="small" x="263" y="246" text-anchor="middle">发话时关闭麦克风（半双工）</text>
   </g>
 
   <g>
     <rect class="accent-panel" x="374" y="88" width="232" height="156" rx="16"/>
-    <text class="label" x="490" y="116" text-anchor="middle">WebSocket · one of three</text>
+    <text class="label" x="490" y="116" text-anchor="middle">WebSocket · 三选一</text>
     <rect class="panel" x="394" y="132" width="192" height="28" rx="7"/>
     <rect class="panel" x="394" y="168" width="192" height="28" rx="7"/>
     <rect class="panel" x="394" y="204" width="192" height="28" rx="7"/>
@@ -56,37 +56,37 @@ SPDX-License-Identifier: BSL-1.0
   <g>
     <rect class="panel" x="640" y="104" width="294" height="124" rx="16"/>
     <path d="M692 180h151c20 0 29-24 14-37a31 31 0 0 0-44-27 43 43 0 0 0-80 15 27 27 0 0 0-41 22c0 15 12 27 27 27z" fill="var(--panel-2)" stroke="var(--line)" stroke-width="1.5"/>
-    <text class="label" x="787" y="154" text-anchor="middle">Realtime service</text>
-    <text class="body" x="787" y="207" text-anchor="middle">recognition · reasoning · speech</text>
+    <text class="label" x="787" y="154" text-anchor="middle">实时对话服务</text>
+    <text class="body" x="787" y="207" text-anchor="middle">识别 · 推理 · 语音生成</text>
   </g>
 
   <path class="return" d="M787 228 V276 H280 V300"/>
   <path class="return" d="M787 228 V276 H680 V300"/>
-  <text class="small" x="515" y="270" text-anchor="middle">reply</text>
+  <text class="small" x="515" y="270" text-anchor="middle">应答下行</text>
 
   <g>
     <rect class="teal-panel" x="112" y="300" width="336" height="96" rx="16"/>
-    <text class="label" x="280" y="329" text-anchor="middle">Reply audio</text>
-    <path transform="translate(8 -8) scale(0.85)" transform-origin="180 357" d="M150 352h18l22-18v48l-22-18h-18zM201 345q15 12 0 24M211 337q28 20 0 40" fill="none" stroke="var(--teal)" stroke-width="2.3" stroke-linecap="round"/>
+    <text class="label" x="280" y="329" text-anchor="middle">应答音频</text>
+    <path d="M150 352h18l22-18v48l-22-18h-18zM201 345q15 12 0 24M211 337q28 20 0 40" fill="none" stroke="var(--teal)" stroke-width="2.3" stroke-linecap="round"/>
     <path d="M302 352 Q320 331 338 352 Q356 373 374 352" fill="none" stroke="var(--accent)" stroke-width="3"/>
-    <text class="body" x="186" y="389" text-anchor="middle">Speaker</text>
-    <text class="body" x="338" y="389" text-anchor="middle">mouth follows the audio</text>
+    <text class="body" x="190" y="384" text-anchor="middle">扬声器</text>
+    <text class="body" x="338" y="384" text-anchor="middle">频谱与能量驱动口型</text>
   </g>
 
   <g>
     <rect class="amber-panel" x="512" y="300" width="336" height="96" rx="16"/>
-    <text class="label" x="680" y="329" text-anchor="middle">Expression / servo tool calls</text>
+    <text class="label" x="680" y="329" text-anchor="middle">表情 / 舵机工具调用</text>
     <ellipse cx="587" cy="354" rx="18" ry="13" fill="none" stroke="var(--amber)" stroke-width="2.4"/>
     <ellipse cx="625" cy="354" rx="18" ry="13" fill="none" stroke="var(--amber)" stroke-width="2.4"/>
     <circle cx="756" cy="354" r="18" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
     <path d="M756 336v36M738 354h36" stroke="var(--accent)" stroke-width="2"/>
-    <text class="body" x="606" y="384" text-anchor="middle">Expression</text>
-    <text class="body" x="756" y="384" text-anchor="middle">Head servos</text>
+    <text class="body" x="606" y="384" text-anchor="middle">表情</text>
+    <text class="body" x="756" y="384" text-anchor="middle">舵机头部运动</text>
   </g>
 
   <g>
     <rect class="danger-panel" x="188" y="430" width="584" height="48" rx="12"/>
-    <text class="label" x="480" y="460" text-anchor="middle">barge-in: screen tap / head touch → interrupts the reply at once</text>
+    <text class="label" x="480" y="460" text-anchor="middle">barge-in：屏幕点击 / 头顶触摸 → 立即打断应答</text>
   </g>
   <path class="interrupt" d="M480 430 V412 H875 V228"/>
 </svg>

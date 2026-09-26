@@ -299,9 +299,9 @@ void worker_task(void* /*arg*/)
     std::uint32_t pcm_sample_rate = 0;
     bool playback_started = false;
     bool i2s_acquired = false;
-    // playRaw 失败（I2S/DMA 分配不出来）后的退避：不退避会以毫秒级频率
-    // 反复走 I2S init 失败路径，把本核 IDLE 饿死、触摸失去响应
-    // （2026-08-30 真机事故：INT free 7KB 时 i2s_alloc_dma_desc 自旋）。
+    // Back off after playRaw fails (no I2S/DMA memory): without it the I2S init failure path runs every few
+    // milliseconds, starves this core's IDLE task and makes touch unresponsive
+    // (seen on a device with 7 KB of free internal RAM: i2s_alloc_dma_desc spun).
     TickType_t play_fail_backoff_until = 0;
     std::size_t raw_len = 0;
 

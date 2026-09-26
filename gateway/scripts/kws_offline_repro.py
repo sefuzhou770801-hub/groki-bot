@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""离线验证 StackChan 唤醒词 KWS。
+"""Check the wake word KWS offline.
 
-用法：
+Usage:
 
     uv run --extra wakeword python scripts/kws_offline_repro.py --generate-say
     uv run --extra wakeword python scripts/kws_offline_repro.py --wav /path/to/16k.wav
 
-脚本只验证 ``wake_gate.SherpaOnnxKeywordSpotter`` 本身，不经过网关、不连接设备。
+Only ``wake_gate.SherpaOnnxKeywordSpotter`` itself is checked; no gateway and no device are involved.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from stackchan_mcp.wake_gate import (
 
 
 def _kws_float_from_env(name: str) -> float | None:
-    """读同名环境变量，支持脚本通过 env 覆盖 KWS 参数。"""
+    """Read the environment variable of the same name, so KWS parameters can be overridden from the environment."""
     raw = os.getenv(name)
     if raw is None:
         return None
@@ -64,7 +64,7 @@ def _read_wav(path: Path) -> bytes:
         sample_width = wav.getsampwidth()
         if (channels, sample_rate, sample_width) != (1, 16_000, 2):
             raise SystemExit(
-                f"只接受 16kHz 16-bit 单声道 WAV，实际为 "
+                f"only 16 kHz 16-bit mono WAV is accepted, got "
                 f"{channels}ch {sample_rate}Hz {sample_width * 8}-bit"
             )
         return wav.readframes(wav.getnframes())
@@ -114,7 +114,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.wav and not args.generate_say:
-        parser.error("必须传 --wav 或 --generate-say")
+        parser.error("pass --wav or --generate-say")
 
     with tempfile.TemporaryDirectory(prefix="stackchan-kws-") as tmp:
         wav_path = args.wav or _generate_say_wav(args.text, args.voice, Path(tmp))
@@ -129,9 +129,9 @@ def main() -> int:
         )
 
     if hit_at is None:
-        print(f"未命中：{args.text!r}")
+        print(f"miss: {args.text!r}")
         return 1
-    print(f"命中：{args.text!r}，chunk={hit_at}")
+    print(f"hit: {args.text!r}, chunk={hit_at}")
     return 0
 
 

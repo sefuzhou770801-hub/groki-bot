@@ -1,13 +1,18 @@
-"""Gemini 设备麦克风流的唤醒词闸门。
+"""Wake word gate for the device microphone stream sent to Gemini.
 
-设备会持续把 16 kHz PCM 送到网关。本模块在检测到配置的唤醒词前，只在本地消费音频；
-唤醒后打开有边界的聆听窗口，并返回允许转发到 Gemini Live 的 PCM 帧。
+The device streams 16 kHz PCM to the gateway continuously. Until the
+configured wake word is detected, audio is only consumed locally; after a
+wake the gate opens a bounded listening window and returns the PCM frames
+that may be forwarded to Gemini Live.
 
-LED 写权仲裁（与 gemini_live_bridge / gemini_voice_proxy 协同）：
+Who may set the LEDs (together with gemini_live_bridge / gemini_voice_proxy):
 
-* LISTENING：聆听青灯 (0,180,180) 由 proxy 在唤醒时点亮；bridge 的 set_all_leds 推迟执行。
-* TTS 活跃：说话蓝灯 (0,80,180) 由 proxy._begin_tts 点亮；闸门 close 不得熄灯；bridge set_all_leds 推迟。
-* DORMANT：无网关状态灯写权，行为映射 idle 与模型 set_all_leds 可正常写入。
+* LISTENING: the proxy lights the listening cyan (0,180,180) on wake; the
+  bridge's set_all_leds is deferred.
+* TTS active: proxy._begin_tts lights the speaking blue (0,80,180); closing
+  the gate must not turn it off; the bridge's set_all_leds is deferred.
+* DORMANT: the gateway holds no status light, so idle behaviour and the
+  model's set_all_leds may write normally.
 """
 
 from __future__ import annotations
@@ -26,8 +31,9 @@ from typing import Protocol
 
 logger = logging.getLogger(__name__)
 
-# 默认唤醒词「Hi Grok」。sherpa-onnx 是开放词表关键词检测：关键词按模型
-# tokens.txt 里的音素写，换词不需要重新训练模型。附加几种元音读法，覆盖不同口音。
+# Default wake word "Hi Grok". sherpa-onnx does open-vocabulary keyword
+# spotting: keywords are written in the phonemes of the model's tokens.txt, so
+# changing the phrase needs no retraining. A few vowel variants cover accents.
 WAKE_PHRASE = "hi grok"
 WAKE_KEYWORD = "HH AY1 G R AA1 K @hi_grok"
 WAKE_KEYWORD_VARIANTS = (
@@ -35,8 +41,8 @@ WAKE_KEYWORD_VARIANTS = (
     "HH AY1 G R AO1 K @hi_grok_ao",
     "HH AY1 G R AH1 K @hi_grok_ah",
 )
-# 可选唤醒词「Hey Groki」：设 STACKCHAN_WAKE_PHRASE=hey groki 即可打开，
-# 同样带三种元音读法。
+# Optional wake word "Hey Groki": set STACKCHAN_WAKE_PHRASE=hey groki. It has
+# three vowel variants as well.
 HEY_GROKI_WAKE_PHRASE = "hey groki"
 HEY_GROKI_WAKE_KEYWORD = "HH EY1 G R OW1 K IY0 @hey_groki"
 HEY_GROKI_WAKE_KEYWORD_VARIANTS = (
@@ -57,14 +63,14 @@ LISTENING_LED_RGB = (0, 180, 180)
 
 
 class WakeGateState(str, Enum):
-    """网关侧麦克风闸门状态。"""
+    """Gateway-side microphone gate state."""
 
     DORMANT = "DORMANT"
     LISTENING = "LISTENING"
 
 
 class KeywordSpotter(Protocol):
-    """状态机和测试共用的最小接口。"""
+    """Minimal interface shared by the state machine and tests."""
 
     @property
     def available(self) -> bool: ...
@@ -76,7 +82,7 @@ class KeywordSpotter(Protocol):
 
 @dataclass(frozen=True)
 class WakeGateResult:
-    """单个已解码设备 PCM 帧的闸门决策。"""
+    """Gate decision for one decoded device PCM frame."""
 
     forward_pcm: tuple[bytes, ...] = ()
     woke: bool = False
@@ -85,11 +91,11 @@ class WakeGateResult:
 
 
 class WakeWordUnavailable(RuntimeError):
-    """可选 KWS 运行时或模型文件未就绪时抛出。"""
+    """Raised when the optional KWS runtime or model files are not available."""
 
 
 class SherpaOnnxKeywordSpotter:
-    """面向 StackChan 唤醒短语的 sherpa-onnx KeywordSpotter 包装。"""
+    """sherpa-onnx KeywordSpotter wrapper for the robot's wake phrase."""
 
     def __init__(
         self,
@@ -108,7 +114,7 @@ class SherpaOnnxKeywordSpotter:
             import sherpa_onnx  # noqa: PLC0415
         except (ImportError, OSError) as exc:
             raise WakeWordUnavailable(
-                f"sherpa-onnx 不可用；安装 gateway[wakeword] 并确认原生库可加载后才能启用唤醒词：{exc}"
+                f"sherpa-onnx unavailable; install gateway[wakeword] and make sure the native library loads to use the wake word: {exc}"
             ) from exc
 
         self._np = np
@@ -135,8 +141,8 @@ class SherpaOnnxKeywordSpotter:
                 keywords_threshold=keywords_threshold,
             )
             self._stream = self._spotter.create_stream(self._stream_keyword)
-        except Exception as exc:  # pragma: no cover - 依赖原生运行时
-            raise WakeWordUnavailable(f"sherpa-onnx KWS 初始化失败：{exc}") from exc
+        except Exception as exc:  # pragma: no cover - needs the native runtime
+            raise WakeWordUnavailable(f"sherpa-onnx KWS initialisation failed: {exc}") from exc
         logger.info(
             "KWS ready model=%s dir=%s phrase=%r keyword=%r score=%.2f threshold=%.2f",
             self._model_dir.name,
@@ -189,17 +195,17 @@ class SherpaOnnxKeywordSpotter:
             fallback = self._model_dir / "keywords.txt"
             if fallback.is_file():
                 logger.warning(
-                    "无法写入自定义唤醒词文件 %s，改用模型自带 keywords.txt 并在 stream 中追加关键词：%s",
+                    "cannot write the custom wake word file %s; using the model's keywords.txt and adding the keyword to the stream instead: %s",
                     path,
                     exc,
                 )
                 return fallback
-            raise WakeWordUnavailable(f"无法写入唤醒词文件 {path}: {exc}") from exc
+            raise WakeWordUnavailable(f"cannot write the wake word file {path}: {exc}") from exc
 
 
 @dataclass
 class WakeGate:
-    """带预滚缓冲和 RMS 空闲关窗的两态唤醒闸门。"""
+    """Two-state wake gate with a pre-roll buffer and an RMS-based idle close."""
 
     kws: KeywordSpotter | None
     enabled: bool = True
@@ -237,7 +243,7 @@ class WakeGate:
         return max(0, int(self.sample_rate * 2 * self.preroll_s))
 
     def process(self, pcm_16khz: bytes) -> WakeGateResult:
-        """处理一个 PCM 帧，返回允许上行转发的帧。"""
+        """Process one PCM frame and return the frames that may be forwarded upstream."""
         if not self.available:
             return WakeGateResult(forward_pcm=(pcm_16khz,), bypassed=True)
         if not pcm_16khz:
@@ -270,7 +276,7 @@ class WakeGate:
         return WakeGateResult(forward_pcm=(pcm_16khz,), closed=closed)
 
     def close(self) -> bool:
-        """回到 DORMANT，并清理已缓存的对话音频。"""
+        """Go back to DORMANT and drop the buffered conversation audio."""
         was_listening = self.is_listening
         self.state = WakeGateState.DORMANT
         self._last_voice_at = None
@@ -318,11 +324,11 @@ class WakeGate:
             return
         if self._tts_active_since is not None:
             was_stuck = self._tts_stuck_latched
-            # 最长聆听窗口从 TTS 结束（含 stuck 兜底）起重新起算。
+            # The maximum listening window restarts when TTS ends (including the stuck-TTS fallback).
             self._listening_window_anchor = now
             self._tts_active_since = None
             if not was_stuck:
-                # 正常结束：把此刻视为新的活动起点，给用户完整 idle_s 接话窗口。
+                # Normal end: treat now as new activity, so the user gets a full idle_s window to answer.
                 self._last_voice_at = now
 
     def _is_idle(self, now: float) -> bool:
@@ -355,12 +361,15 @@ class WakeGate:
         self._preroll_bytes = 0
 
     def _maybe_reset_kws_in_dormant(self, pcm: bytes, now: float) -> None:
-        """DORMANT 期间按硬周期重置 KWS 流，避免「越听越聋」。
+        """Reset the KWS stream on a fixed period while DORMANT, so detection
+        does not degrade over time.
 
-        重置不再依赖环境安静——电视/聊天等持续偏响场景照样到期重置。
-        副作用：重置会清空识别流里累积到一半的候选唤醒词。若当前帧 RMS
-        表明可能有人正在说唤醒词，可短暂顺延；顺延总时长有上限，避免
-        「一直疑似命中」退化成永不重置。
+        The reset does not wait for a quiet room: with a TV or conversation
+        going on it still happens when due. Side effect: a reset drops a
+        half-recognised wake word. When the current frame's RMS suggests
+        someone may be saying the wake word, the reset is postponed briefly;
+        the total postponement is capped so "maybe a hit" cannot turn into
+        never resetting.
         """
         if self.kws is None or self.kws_reset_interval_s <= 0:
             return
@@ -386,13 +395,13 @@ class WakeGate:
             return False
         if now - due_since >= self.kws_reset_defer_max_s:
             return False
-        # 仅在高能量语音帧（疑似正在说唤醒词）时顺延，与「环境持续偏响」区分：
-        # 后者会在 defer 上限到达后强制重置。
+        # Postpone only for high-energy speech frames (possibly the wake word);
+        # a room that is loud all the time is reset once the cap is reached.
         return pcm_rms_int16(pcm) >= self.activity_rms_threshold
 
 
 def pcm_rms_int16(pcm: bytes) -> float:
-    """返回小端有符号 16 位单声道 PCM 的 RMS 能量。"""
+    """Return the RMS energy of little-endian signed 16-bit mono PCM."""
     sample_count = len(pcm) // 2
     if sample_count <= 0:
         return 0.0
@@ -407,7 +416,7 @@ def create_wake_gate_from_env(
     kws: KeywordSpotter | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> WakeGate | None:
-    """创建生产唤醒闸门；返回 None 表示直通模式。"""
+    """Create the production wake gate; None means pass-through mode."""
     if _env_disabled("STACKCHAN_WAKE_WORD"):
         logger.info("wake word gate disabled by STACKCHAN_WAKE_WORD=0")
         return None
@@ -442,7 +451,7 @@ def create_wake_gate_from_env(
 
 
 def model_download_commands(target_dir: str | Path | None = None) -> str:
-    """返回手动安装当前 KWS 模型的 shell 命令。"""
+    """Return the shell commands to install the current KWS model by hand."""
     base = Path(target_dir) if target_dir is not None else _default_model_root()
     archive = f"{KWS_MODEL_NAME}.tar.bz2"
     url = f"https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/{archive}"
@@ -459,7 +468,7 @@ def model_download_commands(target_dir: str | Path | None = None) -> str:
 
 
 def keywords_file_body(keyword: str) -> str:
-    """关键词文件内容：配置的关键词，内置唤醒词再加上它的元音变体。"""
+    """Keywords file content: the configured keyword, plus its vowel variants for a built-in wake word."""
     wanted = keyword.strip()
     variants: tuple[str, ...] = ()
     if wanted == WAKE_KEYWORD:
@@ -481,7 +490,7 @@ def _resolve_model_dir(model_dir: str | Path | None) -> Path:
     if _looks_like_kws_dir(named):
         return named
     raise WakeWordUnavailable(
-        f"模型目录不存在：{named}；也没有直接指向可用的 KWS 目录（需要 tokens.txt + encoder-*.onnx）"
+        f"model directory not found: {named}; and the path is not a KWS directory itself (needs tokens.txt + encoder-*.onnx)"
     )
 
 
@@ -491,7 +500,7 @@ def _find_onnx(model_dir: Path, prefix: str) -> Path:
     if direct.is_file():
         cands.append(direct)
     if not cands:
-        raise WakeWordUnavailable(f"模型文件缺失：{model_dir}/{prefix}*.onnx")
+        raise WakeWordUnavailable(f"model file missing: {model_dir}/{prefix}*.onnx")
     fp32 = [p for p in cands if "int8" not in p.name]
     pool = fp32 or cands
     preferred = [p for p in pool if "chunk-16-left-64" in p.name]
@@ -500,7 +509,7 @@ def _find_onnx(model_dir: Path, prefix: str) -> Path:
 
 def _require_file(path: Path) -> Path:
     if not path.is_file():
-        raise WakeWordUnavailable(f"模型文件缺失：{path}")
+        raise WakeWordUnavailable(f"model file missing: {path}")
     return path
 
 
@@ -549,5 +558,5 @@ def _float_env(name: str, default: float) -> float:
 
 
 def flatten_pcm(chunks: Iterable[bytes]) -> bytes:
-    """测试和诊断用的小工具。"""
+    """Small helpers for tests and diagnostics."""
     return b"".join(chunks)

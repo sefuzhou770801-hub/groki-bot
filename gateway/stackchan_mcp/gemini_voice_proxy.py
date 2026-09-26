@@ -356,7 +356,7 @@ class GeminiVoiceProxy:
         return True
 
     def _start_keepalive(self) -> None:
-        """可选实验性静音帧保活（默认停用，见 session_keepalive 模块说明）。"""
+        """Optional experimental silent-frame keepalive (off by default; see the session_keepalive module)."""
         gate = self._wake_gate
         if gate is None:
             self._status.on_keepalive_disabled("wake_gate_absent")
@@ -553,13 +553,13 @@ class GeminiVoiceProxy:
                 logger.warning("manual VAD activity_end failed: %s", exc)
 
     async def _forward_gated_device_pcm(self, pcm: bytes) -> None:
-        """在转发已解码设备 PCM 到 Gemini 前应用唤醒闸门。"""
+        """Apply the wake gate before forwarding decoded device PCM to Gemini."""
         bridge = self._bridge
         if bridge is None:
             return
         gate = self._maybe_rebuild_wake_gate()
         if gate is None:
-            # 重建退避或永久失效期间直通麦克风，避免用户完全失聪。
+            # While the gate is backing off a rebuild or has failed for good, pass the microphone through so the robot is never deaf.
             await bridge.send_audio(pcm)
             return
         try:
@@ -615,7 +615,7 @@ class GeminiVoiceProxy:
             logger.exception("session-dead red LED failed")
 
     async def _handle_bridge_end_conversation(self) -> None:
-        """Gemini 明确结束对话时关闭唤醒窗口。"""
+        """Close the wake window when Gemini explicitly ends the conversation."""
         gate = self._wake_gate
         if gate is None:
             return

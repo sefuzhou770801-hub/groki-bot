@@ -25,7 +25,7 @@ int main()
         const float expected_yaw = (i % 2 == 0) ? -kNadenadeWobbleDeg : kNadenadeWobbleDeg;
         CHECK(steps[i].yaw_deg == expected_yaw);
 
-        // 调用方每段写入覆盖值；servo_task 用 exchange(0) 单次消费。
+        // The caller writes the override for every step; servo_task consumes it once with exchange(0).
         override = steps[i].speed;
         const std::uint16_t consumed = std::exchange(override, std::uint16_t{0});
         CHECK(consumed == kNadenadeWobbleSpeed);

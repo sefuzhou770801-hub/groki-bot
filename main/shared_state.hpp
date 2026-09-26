@@ -502,7 +502,8 @@ public:
 
 private:
     mutable std::mutex balloon_mutex_;
-    std::atomic<std::uint8_t> overlay_seq_counter_{0}; // 多任务发布方并发递增；打包进 overlay_command
+    // Incremented concurrently by publishers in several tasks; packed into overlay_command.
+    std::atomic<std::uint8_t> overlay_seq_counter_{0};
     std::string balloon_text_;
     std::uint32_t balloon_hold_ms_{0};
     BalloonCompletionCallback balloon_callback_{};

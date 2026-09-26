@@ -1242,7 +1242,7 @@ async def test_start_raises_without_api_key(monkeypatch):
         await bridge.start()
 
 
-# --- USB-first dispatch (维护者的约束：USB 是加速通道，不是唯一通道) ----------
+# --- USB-first dispatch (USB is a faster channel, not the only one) -----------
 
 
 class FakeUsbTransport:
@@ -1306,7 +1306,7 @@ async def test_dispatch_returns_offline_when_both_channels_down():
 
 @pytest.mark.asyncio
 async def test_handle_text_chunks_buffered_until_turn_complete():
-    """Gemini 流式输出文字，turn_complete 才整句给 on_text 触发 TTS。"""
+    """Gemini streams text; only turn_complete hands the whole sentence to on_text for TTS."""
     captured: list[str] = []
 
     async def on_text(text: str) -> None:
@@ -1344,7 +1344,7 @@ async def test_handle_text_chunks_buffered_until_turn_complete():
 
 @pytest.mark.asyncio
 async def test_handle_text_skips_empty_turn():
-    """空 turn 不应触发 on_text 调 TTS。"""
+    """An empty turn must not trigger on_text / TTS."""
     captured: list[str] = []
 
     async def on_text(text: str) -> None:
@@ -1409,7 +1409,7 @@ async def test_receive_loop_keeps_same_session_after_turn_complete():
 
 
 def test_build_live_config_text_mode_omits_speech_config():
-    """3.1 Live 不直出 TEXT；用音频转写拿文字再交给 Edge TTS。"""
+    """3.1 Live does not output TEXT directly; the audio transcription provides the text for Edge TTS."""
     cfg = build_live_config(response_modality="TEXT")
     assert _modality_values(cfg.response_modalities) == ["AUDIO"]
     assert cfg.speech_config is not None
@@ -1626,7 +1626,7 @@ async def test_reconnect_audio_timeout_drops_buffer_and_signals_dead():
 
 @pytest.mark.asyncio
 async def test_handle_output_transcription_flushes_when_finished():
-    """AUDIO+output_transcription 模式下，转写完成就触发 Edge TTS。"""
+    """With AUDIO + output_transcription, a finished transcription triggers Edge TTS."""
     captured: list[str] = []
 
     async def on_text(text: str) -> None:
@@ -1965,7 +1965,7 @@ async def test_successful_connection_resets_backoff_after_later_error(monkeypatc
     assert timeouts == [1.0, 1.0]
 
 
-# --- 会话保活与活跃掉线告警（可观测性 v3）------------------------------------
+# --- Session keepalive and the active-drop warning -----------------------------
 
 
 class RecordingSession:
@@ -1997,7 +1997,7 @@ def test_note_session_end_during_listening_logs_error_and_counts(caplog):
     st = DebugStatus()
     bridge = _bridge(debug_status=st)
     st.on_gemini_connected(1)
-    st.on_wake_woke()  # LISTENING → 属于活跃对话
+    st.on_wake_woke()  # LISTENING → an active conversation
     bridge._session = object()
 
     with caplog.at_level("ERROR"):
@@ -2007,7 +2007,7 @@ def test_note_session_end_during_listening_logs_error_and_counts(caplog):
     assert snap["active_drops"] == 1
     assert snap["reconnect_1008_count"] == 1
     assert snap["last_error"]["message"] == "socket closed 1008"
-    assert "活跃对话中掉线" in caplog.text
+    assert "dropped during an active conversation" in caplog.text
 
 
 def test_note_session_end_while_dormant_stays_quiet(caplog):
@@ -2042,7 +2042,7 @@ async def test_send_keepalive_audio_does_not_cancel_silence_timer():
         assert len(session.calls) == 1
         assert timer.cancelled() is False
 
-        # 对照组：真实用户音频会取消静默计时器。
+        # Control: real user audio cancels the silence timer.
         await bridge.send_audio(b"\x00" * 64)
         await asyncio.sleep(0)
         assert timer.cancelled() is True
@@ -2054,7 +2054,7 @@ async def test_send_keepalive_audio_does_not_cancel_silence_timer():
 async def test_send_keepalive_audio_noop_without_session():
     bridge = _bridge()
     bridge._session = None
-    await bridge.send_keepalive_audio(b"\x00" * 64)  # 不抛异常
+    await bridge.send_keepalive_audio(b"\x00" * 64)  # does not raise
 
 
 @pytest.mark.asyncio
@@ -2276,7 +2276,7 @@ async def test_reconnect_resets_activity_open_flag(monkeypatch):
 
 
 class _ExpiredHandleConnect:
-    """__aenter__ 直接抛服务端拒绝句柄的 1008，模拟带死句柄的 connect。"""
+    """__aenter__ raises the server's 1008 handle rejection, like a connect with a dead handle."""
 
     def __init__(self, exc_text: str) -> None:
         self._exc_text = exc_text
@@ -2292,14 +2292,14 @@ class _ExpiredHandleConnect:
 
 @pytest.mark.asyncio
 async def test_bridge_drops_resumption_handle_when_server_says_expired():
-    """服务端 1008「session expired」拒绝句柄后必须丢弃句柄。
+    """After the server rejects the handle with 1008 "session expired", the handle must be dropped.
 
-    回归背景（2026-07-07 09:38–11:37）：句柄过期后 bridge 抱着同一个死句柄
-    每 30 秒重连一次，被连续拒绝两小时，语音链路装死直到进程重启。
+    Regression: after the handle expired, the bridge kept reconnecting with the same dead handle
+    every 30 s, was rejected for two hours, and voice stayed dead until the process restarted.
     """
     sessions = [
         _ExpiredHandleConnect("1008 None. BidiGenerateContent session expired"),
-        _RecordingFakeSession([]),  # 丢句柄后的新会话应能正常起飞
+        _RecordingFakeSession([]),  # the new session after dropping the handle starts normally
     ]
     bridge = GeminiLiveBridge(
         FakeESP32(),
@@ -2321,13 +2321,13 @@ async def test_bridge_drops_resumption_handle_when_server_says_expired():
 
     assert bridge._resumption_handle is None
     assert bridge._session_count == 1
-    # 第二次 connect 必须不带句柄（全新会话）
+    # the second connect must carry no handle (a fresh session)
     assert bridge._client.live.configs[1].session_resumption.handle is None
 
 
 @pytest.mark.asyncio
 async def test_bridge_keeps_resumption_handle_on_transient_network_error():
-    """普通网络错误不能丢句柄——句柄仍有效时丢弃会白白丢掉对话上下文。"""
+    """An ordinary network error must not drop the handle: dropping a valid handle throws away the conversation context."""
     sessions = [
         _ExpiredHandleConnect("[Errno 61] Could not connect to proxy 127.0.0.1:1080"),
         _RecordingFakeSession([]),

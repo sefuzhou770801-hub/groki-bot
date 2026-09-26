@@ -126,8 +126,8 @@ constexpr const char* kTag = "stackchan";
     };
     bool head_pet_touch_active = false;
     bool head_pet_restore_pending = false;
-    std::uint32_t head_pet_overlay_cmd = 0; // 本任务最近发布的覆盖命令（条件清除凭据）
-    std::uint32_t gesture_overlay_cmd = 0;  // 屏幕手势最近发布的覆盖命令（条件清除凭据）
+    std::uint32_t head_pet_overlay_cmd = 0; // last overlay command this task published (token for a conditional clear)
+    std::uint32_t gesture_overlay_cmd = 0;  // last overlay from a screen gesture (token for a conditional clear)
     float head_pet_prev_yaw = 0.0f;
     float head_pet_prev_pitch = 0.0f;
     std::uint32_t head_pet_restore_at_ms = 0;
@@ -257,8 +257,8 @@ constexpr const char* kTag = "stackchan";
         app::screens::poll_inputs();
         {
             const auto td = M5.Touch.getDetail();
-            // 只有真正播报中才禁表情手势并武装 barge-in；Thinking 属于等待，
-            // 触摸交互照常（瞬时覆盖在仲裁里本来就压过思考脸）。
+            // Only real playback blocks expression gestures and arms barge-in; Thinking is waiting,
+            // so touch works as usual (a transient overlay already wins over the thinking face).
             const bool conv_speaking =
                 static_cast<stackchan::avatar::VoiceState>(g_state->conv.voice_state.load(
                     std::memory_order_relaxed)) == stackchan::avatar::VoiceState::Speaking;
@@ -300,7 +300,7 @@ constexpr const char* kTag = "stackchan";
             float ax = 0.0f, ay = 0.0f, az = 0.0f;
             if (M5.Imu.getAccel(&ax, &ay, &az)) {
                 imu.valid = true;
-                // StopWatch BMI270：官方 demo 把原始 X/Y 对调成屏幕坐标。
+                // StopWatch BMI270: the official demo swaps raw X/Y to get screen coordinates.
                 if (touch_gaze_follow) {
                     imu.ax = ay;
                     imu.ay = ax;
@@ -326,7 +326,7 @@ constexpr const char* kTag = "stackchan";
                 g_state->note_face_activity();
             }
             if (intent == Intent::StrokeRestore || intent == Intent::DizzyEnd) {
-                // 只清屏幕手势自己发布的覆盖；其他来源的新覆盖不受影响。
+                // Only clear the overlay the screen gesture published; newer overlays from other sources stay.
                 if (g_state->clear_face_overlay_if(gesture_overlay_cmd)) {
                     gesture_overlay_cmd = 0;
                 }
@@ -469,7 +469,7 @@ constexpr const char* kTag = "stackchan";
 
             const bool firmly_touched = reading.firmly_touched();
             if (reading.any_touched()) {
-                // 轻触也算理它：立即唤回闲置衰减（规格：任何触摸立即唤回）。
+                // A light touch counts as attention too: any touch immediately wakes it from idle decay.
                 g_state->note_face_activity();
             }
             if (firmly_touched && !head_pet_touch_active && !external_servo_control) {
@@ -481,8 +481,8 @@ constexpr const char* kTag = "stackchan";
                 head_pet_restore_pending = false;
                 speech.stop();
 
-                // 头顶被按住 = 抚摸亲昵态（aora 害羞：躲闪眼+腮红+飘心），
-                // 2026-08-30 维护者确认：抚摸应当是害羞，不是普通开心。
+                // Holding the top of the head = being petted: the aora shy face (averted eyes, blush, floating hearts).
+                // Petting shows shyness, not plain happiness.
                 head_pet_overlay_cmd = g_state->request_face_overlay(avatar::Expression::Affection, 0);
                 balloon_in_flight.store(true, std::memory_order_release);
                 g_state->set_balloon_text("摸摸♡", /*hold_ms=*/2200, [] {
@@ -555,7 +555,7 @@ constexpr const char* kTag = "stackchan";
                 // external source (ESP-NOW remote) owns the head; still show
                 // the happy face + balloon above.
                 if (!external_servo_control) {
-                    // speed_override 单次消费：每一段目标变化前都重新写入。
+                    // speed_override is consumed once: write it again before every target change.
                     constexpr std::uint32_t kHalfPeriodMs = 160;
                     for (const auto& cmd : groki_motion::nadenade_wobble_steps()) {
                         g_state->servo.speed_override.store(cmd.speed, std::memory_order_relaxed);
@@ -591,7 +591,7 @@ constexpr const char* kTag = "stackchan";
             g_state->servo.target_pitch_deg.store(head_pet_prev_pitch, std::memory_order_relaxed);
         }
 
-        // 空闲头部姿态沿用旧固件「没人交互时自己动」的身体手感。
+        // Idle head poses: the head moves on its own when nobody interacts with it.
         if (!external_servo_control && !head_pet_touch_active && !head_pet_restore_pending &&
             !g_state->servo.masked.load(std::memory_order_relaxed) &&
             static_cast<std::int32_t>(now_ms - g_state->servo.head_hold_until_ms.load(std::memory_order_relaxed)) >= 0 &&

@@ -102,9 +102,9 @@ Grok 脸编在固件里，刷完固件就能显示，不需要另外写入资源
 
 ## 特性
 
-![眼环合成管线：18 个眼环经四组权重混合、纵向压扁后写入屏幕坐标](docs/images/expression-engine.svg)
+![眼环合成管线：18 个眼环经四组权重混合、纵向压扁后写入屏幕坐标](docs/images/expression-engine.zh-CN.svg)
 
-![AI 语音对话：麦克风经 WebSocket 连接三种服务，应答驱动音频、口型、表情与舵机](docs/images/voice-flow.svg)
+![AI 语音对话：麦克风经 WebSocket 连接三种服务，应答驱动音频、口型、表情与舵机](docs/images/voice-flow.zh-CN.svg)
 
 - **表情引擎**：aora 眼环轮廓（每眼 48 点），15 种表情，眨眼、环游、四权重混合；身体层保留呼吸、开心弹跳、说话压扁、害羞飘心与腮红。
 - **AI 语音对话**：WebSocket 连接 OpenAI Realtime、Google Gemini Live 或 XiaoZhi 服务器。麦克风上行，应答音频驱动口型；半双工的 CoreS3 在说话时关闭麦克风，应答中可以点屏幕或摸头顶打断（barge-in）。
@@ -119,7 +119,7 @@ Grok 脸编在固件里，刷完固件就能显示，不需要另外写入资源
 
 ### 标准机：CoreS3 + Stack-chan 底座
 
-![CoreS3 与 Stack-chan 底座的 I²C 设备、屏幕与 UART1 双舵机连接](docs/images/hardware.svg)
+![CoreS3 与 Stack-chan 底座的 I²C 设备、屏幕与 UART1 双舵机连接](docs/images/hardware.zh-CN.svg)
 
 | 项目 | 规格 |
 |---|---|

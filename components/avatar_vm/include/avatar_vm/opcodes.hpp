@@ -110,9 +110,9 @@ enum class Var : std::uint8_t {
     ExprHold2To = 0x23,
     ExprHold2Blend = 0x24,
     VarCount,
-    // aora 眼环坐标区间：[RingBase, RingBase + kRingVarCount)。布局
-    // l0x,l0y..l47x,l47y,r0x..r47y（屏幕坐标，C++ 每帧插值好）。数据经
-    // DrawContext::aora_ring 提供；空指针时读到 0。
+    // aora eye-ring coordinate range: [RingBase, RingBase + kRingVarCount). Layout
+    // l0x,l0y..l47x,l47y,r0x..r47y (screen coordinates, interpolated in C++ every frame). The data comes
+    // from DrawContext::aora_ring; a null pointer reads 0.
     RingBase = 0x25,
 };
 

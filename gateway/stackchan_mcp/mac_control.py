@@ -186,7 +186,7 @@ def _media_script(action: str) -> str:
 
 
 def _music_library_shuffle_script() -> str:
-    """Music 播放队列为空时 play 是无效指令：开随机后从资料库开播。"""
+    """With an empty Music queue, play does nothing: turn on shuffle and play from the library."""
     return (
         f'tell application "{_MUSIC_APP}"\n'
         "    set shuffle enabled to true\n"

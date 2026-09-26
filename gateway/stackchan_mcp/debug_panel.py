@@ -1,7 +1,7 @@
-"""``GET /debug/panel`` 的零依赖自刷新页面。
+"""Zero-dependency, self-refreshing page for ``GET /debug/panel``.
 
-单文件内联 HTML/CSS/JS，每 3 秒 fetch 一次 ``/debug/status`` 重绘。
-色块语义：绿=健康，红=断了，黄=重连中（进程在但会话没接上）。
+Single file with inline HTML/CSS/JS; fetches ``/debug/status`` every 3 s and redraws.
+Block colours: green = healthy, red = down, yellow = reconnecting (process up, session not connected). The page text is Chinese.
 """
 
 from __future__ import annotations

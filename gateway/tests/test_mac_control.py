@@ -473,7 +473,7 @@ def test_run_mac_task_starts_and_announces_completion(monkeypatch):
     argv = runner.calls[0]
     assert argv[:3] == ("claude-test", "-p", "整理桌面截图")
     assert "--permission-mode" in argv
-    # 语音场景速度优先：sonnet5 + low effort。
+    # Voice favours speed: sonnet5 with low effort.
     assert "claude-sonnet-5" in argv
     assert "--effort" in argv and "low" in argv
     assert started == [True]
@@ -603,11 +603,11 @@ def test_web_search_defaults_to_grok_and_uses_chrome(monkeypatch):
     assert result["engine"] == "grok"
     assert len(runner.calls) == 1
     argv = runner.calls[0]
-    # grok 强制用 Chrome
+    # grok always uses Chrome
     assert argv[:3] == ("open", "-a", "Google Chrome")
     url = argv[3]
     assert url.startswith("https://grok.com/?q=")
-    # 验证中文被 quote_plus 正确编码（不含未编码的中文或空格）
+    # The Chinese query is encoded by quote_plus (no raw Chinese or spaces left)
     assert "东京" not in url and " " not in url
     assert "%E4%B8%9C%E4%BA%AC%E5%A4%A9%E6%B0%94" in url or "%E6%9D%B1%E4%BA%AC" in url  # 东京 or variant
 
@@ -638,9 +638,9 @@ def test_web_search_engine_param_bing_baidu_and_explicit_override():
     _dispatch(MacController(run_cmd=runner), "web_search", {"query": "测试", "engine": "baidu"})
     url_baidu = runner.calls[-1][1]
     assert url_baidu.startswith("https://www.baidu.com/s?wd=")
-    assert "测试" not in url_baidu  # 已编码
+    assert "测试" not in url_baidu  # encoded
 
-    # 显式 engine 覆盖默认 grok
+    # an explicit engine overrides the default grok
     _dispatch(MacController(run_cmd=runner), "web_search", {"query": "天气", "engine": "google"})
     argv_google = runner.calls[-1]
     assert argv_google[0] == "open"

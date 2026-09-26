@@ -1,15 +1,17 @@
-# XiaoZhi LED 控制消息
+English · [中文](xiaozhi_led_control.zh-CN.md)
 
-XiaoZhi WebSocket 的文本控制帧新增 `led` 类型，用来把底座 LED 切成一个纯色状态灯。
+# XiaoZhi LED control message
 
-## 消息格式
+XiaoZhi WebSocket text control frames have an `led` type that switches the base LEDs to one solid colour, used as a status light.
+
+## Message format
 
 ```json
 {"type":"led","r":0,"g":180,"b":180}
 ```
 
-- `type` 固定为 `led`。
-- `r`、`g`、`b` 必须同时存在，取值为 `0..255` 的整数。
-- 设备收到后把 `SharedState::led.mode` 设为纯色模式，把 `SharedState::led.color` 设为 `0x00RRGGBB`，并把亮度设为 `255`。
-- 这条消息只改变运行时状态，不写入 NVS；重启后仍使用设备设置页保存的 LED 配置。
-- 真正的硬件输出仍由 `main/led_task.cpp` 统一完成：`led_task` 读取 `SharedState`，再驱动 `Board::LedStrip`。
+- `type` is always `led`.
+- `r`, `g` and `b` must all be present, as integers in `0..255`.
+- On receipt the device sets `SharedState::led.mode` to solid colour, `SharedState::led.color` to `0x00RRGGBB`, and the brightness to `255`.
+- The message changes runtime state only and is not written to NVS; after a reboot the LED settings saved on the device settings page apply again.
+- The hardware output is still done in one place, `main/led_task.cpp`: `led_task` reads `SharedState` and drives `Board::LedStrip`.

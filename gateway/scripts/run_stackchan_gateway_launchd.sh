@@ -42,7 +42,7 @@ RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/stackchan-gateway.XXXXXX")"
 STDIN_FIFO="${RUNTIME_DIR}/stdin"
 mkfifo "${STDIN_FIFO}"
 
-# 打开 FIFO 的写端但不写数据：读端不会收到 EOF，网关仍然保持“无交互输入”的行为。
+# Open the FIFO's write end without writing: the reader never gets EOF, and the gateway still behaves as if there is no interactive input.
 (
     sleep_pid=""
     trap 'if [[ -n "${sleep_pid}" ]]; then kill "${sleep_pid}" 2>/dev/null || true; fi; exit 0' TERM INT

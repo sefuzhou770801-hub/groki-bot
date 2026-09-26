@@ -59,7 +59,7 @@ bool near(float a, float b) {
 } // namespace
 
 int main() {
-    // 点一下 → Happy（等双击窗口过完才落，避免双击先闪 Happy）
+    // One tap → Happy (only after the double-tap window, so a double tap does not flash Happy first)
     {
         FaceInput in;
         auto t = in.tick(press(200, 200, 10), {}, kOpen);
@@ -79,7 +79,7 @@ int main() {
         CHECK(expression_for(t.intent) == Expression::Happy);
     }
 
-    // 双击 → Surprised 暂映射 Doubt；第一下不落 Happy
+    // Double tap → Surprised (mapped to Doubt for now); the first tap does not give Happy
     {
         FaceInput in;
         in.tick(press(200, 200, 10), {}, kOpen);
@@ -99,7 +99,7 @@ int main() {
         CHECK(in.tick(idle(80 + kDoubleTapWaitMs), {}, kOpen).intent == Intent::None);
     }
 
-    // 长按且几乎没移动 → Angry
+    // Long press with almost no movement → Angry
     {
         FaceInput in;
         in.tick(press(200, 200, 10), {}, kOpen);
@@ -110,7 +110,7 @@ int main() {
         CHECK(expression_for(t.intent) == Expression::Angry);
     }
 
-    // 按住拖动过程中一直跟手，不在中途切成左右滑
+    // Press and drag keeps following the finger and does not turn into a left/right flick midway
     {
         FaceInput in;
         in.tick(press(200, 200, 10), {}, kOpen);
@@ -141,7 +141,7 @@ int main() {
         CHECK(t.preview_step == -1);
     }
 
-    // 上滑 Surprised（Doubt），下滑 Sleepy
+    // Flick up → Surprised (Doubt), flick down → Sleepy
     {
         FaceInput in;
         in.tick(press(200, 200, 10), {}, kOpen);
@@ -167,7 +167,7 @@ int main() {
         CHECK(expression_for(t.intent) == Expression::Sleepy);
     }
 
-    // 松开时 was_flicked 仍能判定（50ms 循环可能错过中途采样）
+    // was_flicked still works on release (the 50 ms loop may miss samples in between)
     {
         FaceInput in;
         in.tick(press(200, 200, 10), {}, kOpen);
@@ -181,7 +181,7 @@ int main() {
         CHECK(t.preview_step == 1);
     }
 
-    // 按住拖动：视线跟手，指向触点相对屏幕中心的方向；点按不跟手
+    // Press and drag: the gaze follows the finger toward the touch point relative to the screen centre; a tap does not
     {
         FaceInput in;
         in.set_screen_center(233.0f, 233.0f);
@@ -199,7 +199,7 @@ int main() {
         CHECK(!released.gaze_active);
     }
 
-    // 慢速来回轻扫 → 抚摸，松手数秒后回落；不当成左右滑
+    // Slow back-and-forth strokes → petting, which fades a few seconds after release; not a left/right flick
     {
         FaceInput in;
         in.tick(press(180, 200, 10), {}, kOpen);
@@ -233,7 +233,7 @@ int main() {
         CHECK(wait.intent == Intent::StrokeRestore);
     }
 
-    // 播报中 / 叠加层占用：点按不触发 Happy
+    // While speaking / while an overlay is active: a tap does not trigger Happy
     {
         FaceInput in;
         Policy speaking;
@@ -254,7 +254,7 @@ int main() {
         CHECK(t.intent == Intent::None);
     }
 
-    // IMU：四次左右猛晃 → Dizzy，静置后结束
+    // IMU: four hard left/right shakes → Dizzy, which ends once the device rests
     {
         FaceInput in;
         auto seed = [&](float ax, float ay, float az, std::uint32_t now) {
@@ -293,7 +293,7 @@ int main() {
         CHECK(ended == Intent::DizzyEnd);
     }
 
-    // 毫秒计时回绕：点击在回绕前 250 ms，松手当帧不得立刻变成 Tap
+    // Millisecond counter wrap: tap 250 ms before the wrap; the release frame must not become a Tap right away
     {
         FaceInput in;
         const std::uint32_t t0 = 0xFFFFFFFFu - 250u;
@@ -308,7 +308,7 @@ int main() {
         CHECK(in.tick(idle(t0 + 400u), {}, kOpen).intent == Intent::Tap);
     }
 
-    // 缓慢倾斜：视线跟倾斜方向
+    // Slow tilt: the gaze follows the tilt
     {
         FaceInput in;
         ImuSample n;
@@ -327,11 +327,11 @@ int main() {
         CHECK(t.gaze_h > 0.0f);
     }
 
-    // 毫秒计时回绕（约 49.7 天）跨越时，双击窗口不得提前触发。
-    // 点击发生在回绕前 250 ms，窗口 400 ms：回绕后约 150 ms 处才判 Tap。
+    // When the millisecond counter wraps (about every 49.7 days), the double-tap window must not fire early.
+    // Tap 250 ms before the wrap with a 400 ms window: Tap is decided about 150 ms after the wrap.
     {
         FaceInput in;
-        const std::uint32_t t0 = 0xFFFFFFFFu - 249u; // 回绕前 250 ms
+        const std::uint32_t t0 = 0xFFFFFFFFu - 249u; // 250 ms before the wrap
         in.tick(press(160, 120, t0), {}, kOpen);
         TouchSample up;
         up.now_ms = t0 + 30;
@@ -340,11 +340,11 @@ int main() {
         FaceInputTick t = in.tick(up, {}, kOpen);
         CHECK(t.intent == Intent::None);
 
-        // 回绕后 20 ms（挂起后约 240 ms）：窗口未满，不得触发。
+        // 20 ms after the wrap (about 240 ms after the tap): the window is not over, nothing fires.
         t = in.tick(idle(20), {}, kOpen);
         CHECK(t.intent == Intent::None);
 
-        // 挂起后约 430 ms（回绕后 210 ms）：窗口已满，判定单击。
+        // About 430 ms after the tap (210 ms after the wrap): the window is over, a single tap.
         t = in.tick(idle(210), {}, kOpen);
         CHECK(t.intent == Intent::Tap);
     }

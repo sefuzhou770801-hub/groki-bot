@@ -3,8 +3,8 @@ SPDX-FileCopyrightText: 2026 sefuzhou770801-hub
 SPDX-License-Identifier: BSL-1.0
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" role="img" aria-labelledby="title desc">
-  <title id="title">CoreS3 and Stack-chan base wiring</title>
-  <desc id="desc">CoreS3 reaches the head touch sensor, battery gauge, IO expander and power management chip over I2C, and the yaw and pitch SCS0009 servos over UART1.</desc>
+  <title id="title">CoreS3 与 Stack-chan 底座硬件连接</title>
+  <desc id="desc">CoreS3 通过 I2C 连接头顶触摸、电池计、IO 扩展与电源管理芯片，通过 UART1 连接偏航和俯仰两颗 SCS0009 舵机。</desc>
   <style>
     :root { color-scheme: light dark; --ink:#23324a; --muted:#5d6b82; --line:#6b7a90; --panel:#eff4fa; --panel-2:#e4ebf5; --accent:#4f46e5; --accent-soft:#e8e7ff; --teal:#0f766e; --teal-soft:#d9f3ef; --amber:#985b0d; --amber-soft:#fff0d2; }
     @media (prefers-color-scheme: dark) { :root { --ink:#e6edf7; --muted:#afbdd0; --line:#8997aa; --panel:#182332; --panel-2:#223146; --accent:#aaa5ff; --accent-soft:#302e5d; --teal:#68d9cb; --teal-soft:#163e3a; --amber:#ffca73; --amber-soft:#493619; } }
@@ -17,35 +17,35 @@ SPDX-License-Identifier: BSL-1.0
     .connector { fill:var(--panel); stroke:var(--line); stroke-width:1.2; } .pin { fill:var(--teal); }
   </style>
 
-  <text class="title" x="28" y="38">CoreS3 + Stack-chan base</text>
-  <text class="subtitle" x="28" y="62">Standard unit wiring and bus parameters</text>
+  <text class="title" x="28" y="38">CoreS3 + Stack-chan 底座</text>
+  <text class="subtitle" x="28" y="62">标准机硬件连接与总线参数</text>
 
-  <text class="label" x="150" y="102" text-anchor="middle" fill="var(--teal)">I²C devices</text>
+  <text class="label" x="150" y="102" text-anchor="middle" fill="var(--teal)">I²C 设备</text>
   <path class="bus" d="M284 128 V428 M284 250 H342"/>
 
   <g>
     <rect class="teal-panel" x="28" y="122" width="230" height="62" rx="11"/>
     <text class="label" x="48" y="148">Si12T</text>
-    <text class="body" x="48" y="170">Head touch · 0x68 · 3 zones</text>
+    <text class="body" x="48" y="170">头顶触摸 · 0x68 · 前 / 中 / 后</text>
     <path class="bus" d="M258 153 H284"/>
   </g>
   <g>
     <rect class="teal-panel" x="28" y="202" width="230" height="62" rx="11"/>
     <text class="label" x="48" y="228">INA226</text>
-    <text class="body" x="48" y="250">Battery gauge · 0x41</text>
+    <text class="body" x="48" y="250">电池计 · 0x41</text>
     <path class="bus" d="M258 233 H284"/>
   </g>
   <g>
     <rect class="teal-panel" x="28" y="282" width="230" height="68" rx="11"/>
     <text class="label" x="48" y="308">PY32</text>
-    <text class="body" x="48" y="330">IO expander · 0x6F · pin 0</text>
-    <text class="small" x="48" y="346">switches servo VM power</text>
+    <text class="body" x="48" y="330">IO 扩展 · 0x6F · Pin 0</text>
+    <text class="small" x="48" y="346">控制舵机 VM 电源</text>
     <path class="bus" d="M258 316 H284"/>
   </g>
   <g>
     <rect class="teal-panel" x="28" y="368" width="230" height="62" rx="11"/>
     <text class="label" x="48" y="394">AXP2101</text>
-    <text class="body" x="48" y="416">PMIC · 0x34 · via M5Unified</text>
+    <text class="body" x="48" y="416">PMIC · 0x34 · M5Unified 管理</text>
     <path class="bus" d="M258 399 H284"/>
   </g>
 
@@ -54,7 +54,7 @@ SPDX-License-Identifier: BSL-1.0
     <rect class="panel-2" x="360" y="110" width="242" height="190" rx="15"/>
     <rect class="accent-panel" x="382" y="132" width="198" height="126" rx="10"/>
     <text class="label" x="481" y="174" text-anchor="middle">320 × 240 IPS</text>
-    <text class="body" x="481" y="200" text-anchor="middle">Touch screen</text>
+    <text class="body" x="481" y="200" text-anchor="middle">触摸屏</text>
     <path d="M448 225 Q465 208 481 225 Q497 242 514 225" fill="none" stroke="var(--accent)" stroke-width="3"/>
     <circle cx="448" cy="225" r="3" fill="var(--teal)"/><circle cx="481" cy="225" r="3" fill="var(--teal)"/><circle cx="514" cy="225" r="3" fill="var(--teal)"/>
     <text class="label" x="481" y="330" text-anchor="middle">M5Stack CoreS3</text>
@@ -65,26 +65,26 @@ SPDX-License-Identifier: BSL-1.0
     <text class="body" x="417" y="406" text-anchor="middle">I²C</text>
     <circle cx="583" cy="401" r="4" fill="var(--accent)"/>
     <text class="body" x="545" y="406" text-anchor="middle">UART1</text>
-    <text class="small" x="481" y="470" text-anchor="middle">Stack-chan base</text>
+    <text class="small" x="481" y="470" text-anchor="middle">Stack-chan 底座</text>
   </g>
 
   <path class="uart" d="M620 250 H672 V181 H700 M672 250 V333 H700"/>
-  <text class="label" x="805" y="102" text-anchor="middle" fill="var(--accent)">UART1 servo bus</text>
+  <text class="label" x="805" y="102" text-anchor="middle" fill="var(--accent)">UART1 舵机总线</text>
   <text class="body" x="805" y="122" text-anchor="middle">TX GPIO 6 · RX GPIO 7 · 1 Mbps · 8N1</text>
   <g>
     <rect class="accent-panel" x="700" y="145" width="232" height="76" rx="12"/>
     <circle cx="728" cy="183" r="17" fill="none" stroke="var(--accent)" stroke-width="3"/>
     <path d="M728 166 V200 M711 183 H745" stroke="var(--accent)" stroke-width="2" opacity=".65"/>
-    <text class="label" x="762" y="178">Yaw SCS0009</text>
-    <text class="body" x="762" y="201">ID 1 · zero 460</text>
+    <text class="label" x="762" y="178">偏航 SCS0009</text>
+    <text class="body" x="762" y="201">ID 1 · 零位 460</text>
   </g>
   <g>
     <rect class="accent-panel" x="700" y="295" width="232" height="76" rx="12"/>
     <circle cx="728" cy="333" r="17" fill="none" stroke="var(--accent)" stroke-width="3"/>
     <path d="M728 316 V350 M711 333 H745" stroke="var(--accent)" stroke-width="2" opacity=".65"/>
-    <text class="label" x="762" y="328">Pitch SCS0009</text>
-    <text class="body" x="762" y="351">ID 2 · zero 620</text>
+    <text class="label" x="762" y="328">俯仰 SCS0009</text>
+    <text class="body" x="762" y="351">ID 2 · 零位 620</text>
   </g>
   <rect class="amber-panel" x="700" y="395" width="232" height="42" rx="9"/>
-  <text class="small" x="816" y="421" text-anchor="middle">wait 200 ms after power-on</text>
+  <text class="small" x="816" y="421" text-anchor="middle">舵机上电后等待 200 ms 再访问总线</text>
 </svg>
